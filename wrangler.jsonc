@@ -1,0 +1,10 @@
+// Wrangler configuration for grassmvtsurvey Cloudflare Worker
+// Static assets directory: ./public
+
+{
+  "name": "grassmvtsurvey",
+  "compatibility_date": "2026-01-20",
+  "assets": {
+    "directory": "./public"
+  }
+}
