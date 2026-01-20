@@ -1,0 +1,28 @@
+{
+  "name": "grassmvt_survey",
+  "version": "1.0.0",
+  "description": "Static site tooling for Cloudflare Pages.",
+  "scripts": {
+    "format": "prettier --write \"public/**/*.{html,css,js,md}\"",
+    "lint": "eslint \"public/**/*.js\" && stylelint \"public/**/*.css\" && htmlhint \"public/**/*.html\"",
+    "check": "npm run lint && prettier --check \"public/**/*.{html,css,js,md}\"",
+    "dev": "http-server ./public -p 8788 -c-1",
+    "deploy": "wrangler pages deploy public --project-name grassrootsmvt",
+    "cf:login": "wrangler login"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "globals": "^17.0.0",
+    "htmlhint": "^1.8.0",
+    "http-server": "^14.1.1",
+    "prettier": "^3.8.0",
+    "stylelint": "^17.0.0",
+    "stylelint-config-standard": "^40.0.0",
+    "wrangler": "^4.59.2"
+  }
+}

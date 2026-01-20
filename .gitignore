@@ -1,0 +1,17 @@
+node_modules
+*.log
+npm-debug.log*
+dist
+build
+.cache
+.wrangler/
+wrangler/.wrangler/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
