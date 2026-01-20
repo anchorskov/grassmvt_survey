@@ -11,3 +11,4 @@ These rules apply to all work in this repository.
 - Keep JavaScript optional and minimal.
 - When generating or modifying files, always add an HTML comment at the top with the relative path and filename for HTML, and a block comment for CSS/JS.
 - Keep URLs stable: `/`, `/surveys/`, `/verify/`, `/privacy/`.
+- Create and run test scripts from `scripts/test/`.

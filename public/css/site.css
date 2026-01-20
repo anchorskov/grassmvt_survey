@@ -1,0 +1,105 @@
+/* public/css/site.css */
+:root {
+  color-scheme: light;
+  --header-bg: #f8f5ef;
+  --header-border: #d8d2c6;
+  --text-color: #1a1a1a;
+  --link-color: #1b4d3e;
+  --link-hover: #0f2d24;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Georgia", "Times New Roman", serif;
+  color: var(--text-color);
+  background: #fffaf3;
+}
+
+.site-header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+}
+
+.site-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.site-brand {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  color: var(--text-color);
+}
+
+.site-nav {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.site-nav__link {
+  text-decoration: none;
+  font-weight: 600;
+  color: var(--link-color);
+}
+
+.site-nav__link:hover,
+.site-nav__link:focus {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+.site-footer {
+  border-top: 1px solid var(--header-border);
+  background: var(--header-bg);
+}
+
+.site-footer__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  color: var(--text-color);
+}
+
+.site-footer a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+.site-footer a:hover,
+.site-footer a:focus {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+@media (max-width: 640px) {
+  .site-header__inner {
+    align-items: flex-start;
+  }
+
+  .site-nav {
+    width: 100%;
+  }
+}
