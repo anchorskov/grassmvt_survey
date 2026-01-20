@@ -1,0 +1,9 @@
+{
+  "tagname-lowercase": true,
+  "attr-lowercase": true,
+  "doctype-first": true,
+  "doctype-html5": true,
+  "attr-value-double-quotes": true,
+  "id-unique": true,
+  "spec-char-escape": true
+}
