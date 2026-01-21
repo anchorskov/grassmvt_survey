@@ -253,11 +253,24 @@ echo "🔍 Page Element Tests:"
 test_page_element "/surveys/" "Surveys - Scope Form" "scope"
 test_page_element "/surveys/list/" "Survey List - Grid" "survey-grid"
 test_http_status "/surveys/take/property-taxes-services" "Survey Take - Property Taxes (GET)" "GET" ""
+test_page_element "/surveys/take/property-taxes-services" "Survey Take - Radio Options" "name=\"selected_key\""
+test_page_element "/surveys/take/property-taxes-services" "Survey Take - Bias Checkbox" "id=\"biased\""
+test_page_element "/surveys/take/property-taxes-services" "Survey Take - Bias Label" "for=\"biased\""
 
 echo ""
 echo "🔌 API Tests:"
 test_api_endpoint "/api/scope" "API - POST /api/scope" "POST" '{"industry":"tech","size":"small"}'
-test_http_status "/api/surveys/property-taxes-services/submit" "Survey Submit - Property Taxes (POST)" "POST" "selected_key=policy_1"
+
+echo -n "Testing Survey Submit - Property Taxes (POST JSON)... "
+submit_response=$(curl -s -X POST -d "selected_key=policy_1" "$BASE_URL/api/surveys/property-taxes-services/submit")
+if echo "$submit_response" | grep -q "\"submission_id\""; then
+  echo -e "${GREEN}PASS${NC}"
+  ((PASS_COUNT++))
+else
+  echo -e "${RED}FAIL${NC}"
+  echo "  ❌ Missing submission_id in response"
+  ((FAIL_COUNT++))
+fi
 
 # Summary
 echo ""

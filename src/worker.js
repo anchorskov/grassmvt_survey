@@ -368,12 +368,20 @@ const renderSurveyForm = ({
   ln,
   email,
 }) => {
+  const privacyLine = email
+    ? `We will only use ${escapeHtml(email)} to send survey updates and follow-ups.`
+    : 'We will only use your email to send survey updates and follow-ups.';
   const optionInputs = options
     .map(
       (option, index) => `
-        <label>
-          <input type="radio" name="selected_key" value="policy_${index + 1}" required />
-          ${escapeHtml(option)}
+        <label class="option-card">
+          <input
+            type="radio"
+            name="selected_key"
+            value="policy_${index + 1}"
+            required
+          />
+          <span>${escapeHtml(option)}</span>
         </label>
       `
     )
@@ -392,25 +400,41 @@ const renderSurveyForm = ({
   };
 
   return `
-    <form method="post" action="/api/surveys/${encodeURIComponent(slug)}/submit">
+    <form
+      class="survey-response"
+      data-survey-form
+      method="post"
+      action="/api/surveys/${encodeURIComponent(slug)}/submit"
+    >
       <input type="hidden" name="survey_id" value="${surveyId}" />
       <input type="hidden" name="question_id" value="${questionId}" />
-      ${renderUserField('fn', 'First name', fn)}
-      ${renderUserField('ln', 'Last name', ln)}
-      ${renderUserField('email', 'Email', email)}
-      <fieldset>
+      <fieldset class="option-list">
         <legend>Select one option</legend>
-        ${optionInputs}
+        <div class="option-cards">
+          ${optionInputs}
+        </div>
       </fieldset>
-      <label>
-        <input type="checkbox" name="biased" value="1" />
-        I feel this is biased
-      </label>
-      <label>
-        Bias note (optional)
-        <textarea name="bias_note" rows="4"></textarea>
-      </label>
-      <button type="submit">Submit response</button>
+      <p class="form-error is-hidden" id="survey-error" role="alert"></p>
+      <p class="privacy-note">${privacyLine}</p>
+      <h3>Your info (optional for now)</h3>
+      <div class="survey-info">
+        ${renderUserField('fn', 'First name', fn)}
+        ${renderUserField('ln', 'Last name', ln)}
+        ${renderUserField('email', 'Email', email)}
+      </div>
+      <div class="bias-section">
+        <div class="bias-check">
+          <input type="checkbox" id="biased" name="biased" value="1" />
+          <label for="biased">I feel this is biased</label>
+        </div>
+        <label class="bias-note is-hidden" for="bias_note">
+          How should these options improve? (optional)
+          <textarea id="bias_note" name="bias_note" maxlength="500" rows="4"></textarea>
+        </label>
+        <a class="bias-link" href="/bias/">Suggest improvements</a>
+      </div>
+      <button class="button button--primary" type="submit">Submit response</button>
+      <div class="survey-success is-hidden" id="survey-success" role="status"></div>
     </form>
   `;
 };
@@ -595,6 +619,7 @@ export default {
         <h1>${escapeHtml(survey.title)}</h1>
         ${surveyHtml}
         ${formHtml}
+        <script src="/js/survey-take.js"></script>
       `;
 
       const page = await renderPage(env, url, {
@@ -671,17 +696,9 @@ export default {
       }
 
       const receiptUrl = `/receipt/${submissionId}`;
-      const bodyHtml = `
-        <h1>Survey submitted</h1>
-        <p>Thank you for your response. Your receipt ID is ${escapeHtml(submissionId)}.</p>
-        <p><a href="${receiptUrl}">View receipt</a></p>
-      `;
-      const page = await renderPage(env, url, {
-        title: 'Survey submitted',
-        bodyHtml,
-      });
-      return new Response(page, {
-        headers: { 'content-type': 'text/html; charset=utf-8' },
+      return jsonResponse({
+        submission_id: submissionId,
+        receipt_url: receiptUrl,
       });
     }
 

@@ -1,5 +1,7 @@
+# .gitignore
 node_modules
 *.log
+*.pid
 npm-debug.log*
 dist
 build

@@ -191,6 +191,10 @@ main {
   font-weight: 600;
 }
 
+.is-hidden {
+  display: none;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -258,6 +262,83 @@ main {
   margin-top: 1.5rem;
   font-weight: 600;
   color: var(--link-hover);
+}
+
+.survey-response {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.option-list {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.option-cards {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.option-card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--header-border);
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.option-card input {
+  margin-top: 0.2rem;
+}
+
+.privacy-note {
+  margin: 0;
+  color: #3a2a1a;
+}
+
+.survey-info {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.bias-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.bias-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bias-note textarea {
+  margin-top: 0.5rem;
+}
+
+.bias-link {
+  font-weight: 600;
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+.bias-link:hover,
+.bias-link:focus {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+.survey-success {
+  padding: 1rem;
+  border-radius: 12px;
+  background: #d7efe2;
+  color: #12402f;
 }
 
 @media (max-width: 640px) {
