@@ -324,6 +324,9 @@ const handleScopeMe = async (request, env) => {
 };
 
 const fetchAssetText = async (env, originUrl, pathname) => {
+  if (!env || !env.ASSETS || typeof env.ASSETS.fetch !== 'function') {
+    return '';
+  }
   const assetUrl = new URL(pathname, originUrl.origin);
   const response = await env.ASSETS.fetch(new Request(assetUrl));
   if (!response.ok) {
@@ -603,6 +606,10 @@ export default {
       });
     }
 
+    if (request.method !== 'GET' && pathParts[0] === 'surveys' && pathParts[1] === 'take' && pathParts[2]) {
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+
     if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'surveys' && pathParts[2] && pathParts[3] === 'submit') {
       const slug = decodeURIComponent(pathParts[2]);
       const formData = await request.formData();
@@ -695,7 +702,7 @@ export default {
     }
 
     // Serve static assets from /public
-    if (env.ASSETS) {
+    if (env.ASSETS && typeof env.ASSETS.fetch === 'function') {
       return env.ASSETS.fetch(request);
     }
     

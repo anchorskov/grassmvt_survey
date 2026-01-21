@@ -1,4 +1,5 @@
 #!/bin/bash
+# scripts/test/survey-flow.sh
 
 # scripts/test/survey-flow.sh - Test survey flow endpoints with wrangler dev
 
@@ -213,6 +214,31 @@ test_api_endpoint() {
   fi
 }
 
+test_http_status() {
+  local route=$1
+  local label=$2
+  local method=$3
+  local data=$4
+  local url="$BASE_URL$route"
+
+  echo -n "Testing $label... "
+
+  local http_code=""
+  if [ "$method" = "POST" ]; then
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST -d "$data" "$url")
+  else
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+  fi
+
+  if [ "$http_code" = "200" ] || [ "$http_code" = "302" ] || [ "$http_code" = "303" ]; then
+    echo -e "${GREEN}PASS${NC}"
+    ((PASS_COUNT++))
+  else
+    echo -e "${RED}FAIL${NC} (HTTP $http_code)"
+    ((FAIL_COUNT++))
+  fi
+}
+
 # Test pages with includes
 echo "📄 Page Include Tests:"
 test_page_includes "/" "Home (/)"
@@ -226,10 +252,12 @@ echo ""
 echo "🔍 Page Element Tests:"
 test_page_element "/surveys/" "Surveys - Scope Form" "scope"
 test_page_element "/surveys/list/" "Survey List - Grid" "survey-grid"
+test_http_status "/surveys/take/property-taxes-services" "Survey Take - Property Taxes (GET)" "GET" ""
 
 echo ""
 echo "🔌 API Tests:"
 test_api_endpoint "/api/scope" "API - POST /api/scope" "POST" '{"industry":"tech","size":"small"}'
+test_http_status "/api/surveys/property-taxes-services/submit" "Survey Submit - Property Taxes (POST)" "POST" "selected_key=policy_1"
 
 # Summary
 echo ""
