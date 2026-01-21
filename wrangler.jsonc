@@ -4,6 +4,7 @@
 {
   "name": "grassmvtsurvey",
   "compatibility_date": "2026-01-20",
+  "main": "./src/worker.js",
   "assets": {
     "directory": "./public"
   }

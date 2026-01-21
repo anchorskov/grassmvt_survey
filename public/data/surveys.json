@@ -1,0 +1,42 @@
+[
+  {
+    "id": "wy-priorities",
+    "scope": "wy",
+    "title": "Wyoming Priorities Survey",
+    "description": "Share the issues that matter most across Wyoming communities.",
+    "status": "coming_soon",
+    "href": "/wy/surveys/wy-priorities/"
+  },
+  {
+    "id": "wy-cost-of-living",
+    "scope": "wy",
+    "title": "Cost of Living Check-In",
+    "description": "Tell us how expenses are affecting daily life in Wyoming.",
+    "status": "coming_soon",
+    "href": "/wy/surveys/cost-of-living/"
+  },
+  {
+    "id": "wy-property-tax",
+    "scope": "wy",
+    "title": "Property Tax and Local Services",
+    "description": "Help shape how property taxes support local services.",
+    "status": "coming_soon",
+    "href": "/wy/surveys/property-tax/"
+  },
+  {
+    "id": "public-national-priorities",
+    "scope": "public",
+    "title": "National Priorities Survey",
+    "description": "Share the issues that matter most nationwide.",
+    "status": "coming_soon",
+    "href": "/public/surveys/national-priorities/"
+  },
+  {
+    "id": "public-cost-of-living",
+    "scope": "public",
+    "title": "Cost of Living Pulse",
+    "description": "Let us know how prices and wages are impacting you.",
+    "status": "coming_soon",
+    "href": "/public/surveys/cost-of-living/"
+  }
+]

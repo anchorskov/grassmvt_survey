@@ -4,16 +4,40 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Surveys | Grassroots Survey Hub</title>
+    <title>Surveys | Grassroots Movement</title>
     <link rel="stylesheet" href="/css/site.css" />
   </head>
   <body>
     <div data-include="/partials/header.html"></div>
     <main>
-      <h1>Surveys</h1>
-      <p>Coming soon.</p>
+      <h1>Start a survey</h1>
+      <p>
+        We use a quick address check to route you to the right survey set. Your information is used
+        only for scope matching.
+      </p>
+      <form class="survey-form" id="scope-form">
+        <div class="form-row">
+          <label for="first-name">First name</label>
+          <input id="first-name" name="firstName" type="text" autocomplete="given-name" required />
+        </div>
+        <div class="form-row">
+          <label for="last-name">Last name</label>
+          <input id="last-name" name="lastName" type="text" autocomplete="family-name" required />
+        </div>
+        <div class="form-row">
+          <label for="zip">ZIP</label>
+          <input id="zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" required />
+        </div>
+        <div class="form-row">
+          <label for="house-number">House number</label>
+          <input id="house-number" name="houseNumber" type="text" autocomplete="address-line1" required />
+        </div>
+        <button class="button" type="submit">Continue</button>
+        <p class="form-error" id="form-error" role="alert"></p>
+      </form>
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>
+    <script src="/js/scope-gate.js"></script>
   </body>
 </html>

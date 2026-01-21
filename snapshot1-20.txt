@@ -1,0 +1,395 @@
+================================================================================
+GRASSMVT SURVEY PROJECT SNAPSHOT
+Date: January 20, 2026
+================================================================================
+
+PROJECT STATUS OVERVIEW
+=======================
+
+✅ Project initialized and configured
+✅ GitHub repository created and synced (grassmvt_survey)
+✅ Cloudflare Worker configured (worker name: grassmvtsurvey, port 8787)
+✅ Local development server configured (port 8788)
+✅ Test suite created and passing (9/9 tests)
+✅ Credits page updated with acknowledgments
+✅ Initial commit pushed to main branch
+
+Current Status: FUNCTIONAL - Ready for content development
+
+PROJECT STRUCTURE
+=================
+
+Root Level Files:
+- wrangler.jsonc          : Cloudflare Worker configuration
+- package.json            : NPM dependencies and scripts
+- README.md               : Project documentation
+- AI_CONTRACT.md          : Development rules and constraints
+- eslint.config.js        : ESLint configuration
+- startDev.sh             : Script to start local dev server (port 8788)
+- stop.sh                 : Script to stop local dev server
+
+Source Code:
+- src/worker.js           : Cloudflare Worker entry point
+
+Public Assets:
+- public/index.html       : Home page
+- public/css/site.css     : Global styles
+- public/js/
+  - include-partials.js   : Include HTML partials functionality
+  - surveys-render.js     : Survey rendering logic
+  - scope-gate.js         : Scope gating logic
+- public/partials/
+  - header.html           : Header include
+  - footer.html           : Footer include
+
+Public Routes/Pages:
+- public/surveys/index.html           : Main surveys page (with scope form)
+- public/surveys/list/index.html      : Survey listing with grid (#survey-grid)
+- public/security/index.html          : Security page
+- public/bias/index.html              : Bias page
+- public/open-source/index.html       : Open source page
+- public/donate/index.html            : Donate page
+- public/credits/index.html           : Credits page (updated with VS Code, GitHub Copilot, Codex)
+
+Sample Survey Data:
+- public/data/surveys.json            : Survey data file
+- public/public/surveys/              : Public survey samples (national-priorities, cost-of-living)
+- public/wy/surveys/                  : Wyoming survey samples (property-tax, wy-priorities, cost-of-living)
+
+Test Scripts (scripts/test/):
+- test-nav-footer.sh                  : Tests header/footer includes on 5 routes
+- survey-flow.sh                      : Full flow test for all endpoints, forms, and API
+
+API ENDPOINTS
+=============
+POST /api/scope                       : Returns JSON with scope and match_quality fields
+
+TEST RESULTS
+============
+
+Latest Test Run: survey-flow.sh
+- Page Include Tests: 6/6 PASS
+  ✅ Home (/)
+  ✅ Surveys (/surveys/)
+  ✅ Survey List (/surveys/list/)
+  ✅ Security (/security/)
+  ✅ Bias (/bias/)
+  ✅ Open Source (/open-source/)
+
+- Page Element Tests: 2/2 PASS
+  ✅ Surveys - Scope Form present
+  ✅ Survey List - #survey-grid present
+
+- API Tests: 1/1 PASS
+  ✅ POST /api/scope returns valid JSON
+
+Overall: ✅ ALL TESTS PASSED (9/9)
+
+DEVELOPMENT WORKFLOW
+====================
+
+Start Local Server (port 8788):
+  ./startDev.sh
+
+Stop Local Server:
+  ./stop.sh
+
+Test Navigation/Footer (uses 8788):
+  ./scripts/test/test-nav-footer.sh
+
+Test Survey Flow (uses 8787 - wrangler dev):
+  ./scripts/test/survey-flow.sh
+
+Required Before Commit:
+  npm run check
+
+Git Workflow:
+  git add <files>
+  git commit -m "<message>"
+  git push origin main
+
+CONSTRAINTS & RULES (AI_CONTRACT.md)
+====================================
+- Always run 'npm run check' before commit and deploy
+- Never introduce framework/build pipeline unless requested
+- Keep assets under /public with absolute paths (/css/site.css)
+- No inline CSS
+- Keep JavaScript optional and minimal
+- Add HTML comments with relative path/filename to all generated files
+- Keep URLs stable: /, /surveys/, /verify/, /privacy/
+- Create test scripts in scripts/test/
+
+GITHUB REPOSITORY
+=================
+Repository: anchorskov/grassmvt_survey
+Branch: main
+Remote URL: https://github.com/anchorskov/grassmvt_survey.git
+Latest Commit: 2bb16b7 - "initial layout"
+
+KEY FILES CONTENT
+=================
+
+
+================================================================================
+FILE: wrangler.jsonc
+================================================================================
+// Wrangler configuration for grassmvtsurvey Cloudflare Worker
+// Static assets directory: ./public
+
+{
+  "name": "grassmvtsurvey",
+  "compatibility_date": "2026-01-20",
+  "main": "./src/worker.js",
+  "assets": {
+    "directory": "./public"
+  }
+}
+
+================================================================================
+FILE: package.json (dependencies)
+================================================================================
+{
+  "name": "grassmvt_survey",
+  "version": "1.0.0",
+  "description": "Static site tooling for Cloudflare Pages.",
+  "scripts": {
+    "format": "prettier --write \"public/**/*.{html,css,js,md}\"",
+    "lint": "eslint \"public/**/*.js\" && stylelint \"public/**/*.css\" && htmlhint \"public/**/*.html\"",
+    "check": "npm run lint && prettier --check \"public/**/*.{html,css,js,md}\"",
+    "dev": "http-server ./public -p 8788 -c-1",
+    "deploy": "wrangler pages deploy public --project-name grassrootsmvt",
+    "cf:login": "wrangler login"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "globals": "^17.0.0",
+    "htmlhint": "^1.8.0",
+    "http-server": "^14.1.1",
+    "prettier": "^3.8.0",
+    "stylelint": "^17.0.0",
+    "stylelint-config-standard": "^40.0.0",
+    "wrangler": "^4.59.2"
+  }
+}
+
+================================================================================
+FILE: startDev.sh
+================================================================================
+#!/bin/bash
+
+# startDev.sh - Start local development server for public/ on port 8788
+
+PID_FILE=".dev-server.pid"
+LOG_FILE=".dev-server.log"
+PORT=8788
+PUBLIC_DIR="public"
+
+# Check if server is already running and stop it
+if [ -f "$PID_FILE" ]; then
+  OLD_PID=$(cat "$PID_FILE")
+  if kill -0 "$OLD_PID" 2>/dev/null; then
+    echo "⏹️  Stopping existing dev server (PID: $OLD_PID)"
+    kill "$OLD_PID"
+    sleep 1
+    # Force kill if still running
+    if kill -0 "$OLD_PID" 2>/dev/null; then
+      kill -9 "$OLD_PID"
+    fi
+  fi
+  # Clean up old PID file
+  rm "$PID_FILE"
+fi
+
+# Check if public directory exists
+if [ ! -d "$PUBLIC_DIR" ]; then
+  echo "❌ Error: $PUBLIC_DIR directory not found"
+  exit 1
+fi
+
+# Start the server
+echo "🚀 Starting dev server on http://localhost:$PORT"
+echo "📂 Serving from: $PUBLIC_DIR"
+
+# Use Python's http.server if available (WSL-friendly)
+if command -v python3 &> /dev/null; then
+  cd "$PUBLIC_DIR"
+  python3 -m http.server $PORT > "../$LOG_FILE" 2>&1 &
+  PID=$!
+  cd - > /dev/null
+elif command -v python &> /dev/null; then
+  cd "$PUBLIC_DIR"
+  python -m SimpleHTTPServer $PORT > "../$LOG_FILE" 2>&1 &
+  PID=$!
+  cd - > /dev/null
+else
+  echo "❌ Error: python3 or python not found"
+  exit 1
+fi
+
+# Save PID
+echo "$PID" > "$PID_FILE"
+
+echo "✅ Server started (PID: $PID)"
+echo "📝 Logs: $LOG_FILE"
+echo "🛑 To stop: kill $PID or run: kill \$(cat $PID_FILE)"
+
+================================================================================
+FILE: stop.sh
+================================================================================
+#!/bin/bash
+
+# stop.sh - Stop the local development server
+
+PID_FILE=".dev-server.pid"
+LOG_FILE=".dev-server.log"
+
+# Check if PID file exists
+if [ ! -f "$PID_FILE" ]; then
+  echo "❌ No dev server running (PID file not found)"
+  exit 0
+fi
+
+# Read PID
+PID=$(cat "$PID_FILE")
+
+# Check if process is running
+if ! kill -0 "$PID" 2>/dev/null; then
+  echo "⚠️  Process $PID is not running"
+  rm "$PID_FILE"
+  exit 0
+fi
+
+# Kill the process
+kill "$PID"
+
+# Wait a moment for it to shut down
+sleep 1
+
+# Check if it actually died
+if kill -0 "$PID" 2>/dev/null; then
+  echo "⚠️  Process didn't stop gracefully, force killing..."
+  kill -9 "$PID"
+fi
+
+# Remove PID file
+rm "$PID_FILE"
+
+echo "✅ Dev server stopped (PID: $PID)"
+echo "📝 Logs saved in: $LOG_FILE"
+
+================================================================================
+FILE: scripts/test/survey-flow.sh (test configuration)
+================================================================================
+#!/bin/bash
+
+# scripts/test/survey-flow.sh - Test survey flow endpoints with wrangler dev
+
+PORT=8787
+BASE_URL="http://localhost:$PORT"
+SERVER_PID=""
+STARTED_SERVER=false
+PASS_COUNT=0
+FAIL_COUNT=0
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Cleanup function
+cleanup() {
+  if [ "$STARTED_SERVER" = true ] && [ -n "$SERVER_PID" ]; then
+    echo ""
+    echo "🛑 Stopping wrangler dev (PID: $SERVER_PID)..."
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
+}
+
+trap cleanup EXIT
+
+# Check if wrangler dev is already running
+echo "🔍 Checking if wrangler dev is running on $BASE_URL..."
+if curl -s "$BASE_URL/" > /dev/null 2>&1; then
+  echo "✅ Wrangler dev already running"
+else
+  echo "🚀 Starting npx wrangler dev..."
+  if npx wrangler dev > /tmp/wrangler-dev.log 2>&1 &
+  then
+    SERVER_PID=$!
+    STARTED_SERVER=true
+    echo "   PID: $SERVER_PID"
+    # Wait for server to be ready
+    echo "⏳ Waiting for wrangler to be ready..."
+    for i in {1..30}; do
+      if curl -s "$BASE_URL/" > /dev/null 2>&1; then
+        echo "✅ Wrangler ready"
+        break
+      fi
+      if [ $i -eq 30 ]; then
+        echo "❌ Wrangler failed to start"
+        echo "Log output:"
+[... rest of survey-flow.sh script ...]
+
+================================================================================
+FILE: public/credits/index.html
+================================================================================
+<!-- public/credits/index.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Credits | Grassroots Survey Hub</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <div data-include="/partials/header.html"></div>
+    <main>
+      <h1>Credits</h1>
+      <p>We would like to thank the following tools and technologies that made this project possible:</p>
+      
+      <section>
+        <h2>Development Tools</h2>
+        <ul>
+          <li><strong>Microsoft Visual Studio Code</strong> - A powerful and lightweight source code editor</li>
+          <li><strong>GitHub Copilot</strong> - AI-powered code completion and suggestions</li>
+          <li><strong>Codex by OpenAI</strong> - Advanced language model powering AI assistance features</li>
+        </ul>
+      </section>
+    </main>
+    <div data-include="/partials/footer.html"></div>
+    <script src="/js/include-partials.js"></script>
+  </body>
+</html>
+
+================================================================================
+FILE: AI_CONTRACT.md
+================================================================================
+# AI Contract
+
+These rules apply to all work in this repository.
+
+## Workflow rules
+
+- Always run `npm run check` before commit and before deploy.
+- Never introduce a framework or build pipeline unless explicitly requested.
+- Keep assets under `/public` and use absolute paths like `/css/site.css`.
+- No inline CSS.
+- Keep JavaScript optional and minimal.
+- When generating or modifying files, always add an HTML comment at the top with the relative path and filename for HTML, and a block comment for CSS/JS.
+- Keep URLs stable: `/`, `/surveys/`, `/verify/`, `/privacy/`.
+- Create and run test scripts from `scripts/test/`.
+
+================================================================================
+END OF SNAPSHOT
+Generated: January 20, 2026
+Project: Grassroots MVT Survey
+Status: FUNCTIONAL - All tests passing
+================================================================================
