@@ -38,5 +38,13 @@
     "description": "Let us know how prices and wages are impacting you.",
     "status": "coming_soon",
     "href": "/public/surveys/cost-of-living/"
+  },
+  {
+    "id": "wy-abortion-policy",
+    "scope": "wy",
+    "title": "Abortion Policy Survey",
+    "description": "Share your perspective on abortion policy approaches in Wyoming.",
+    "status": "active",
+    "href": "/surveys/take/abortion-policy"
   }
 ]

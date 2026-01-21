@@ -65,7 +65,7 @@ echo "🧪 Testing header and footer includes"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Test routes
-ROUTES=("/" "/surveys/" "/donate/" "/security/" "/credits/")
+ROUTES=("/" "/surveys/" "/surveys/list/" "/donate/" "/security/" "/credits/")
 
 test_route() {
   local route=$1
@@ -108,8 +108,18 @@ test_route() {
     has_footer=true
   fi
   
+  # Optional route-specific checks
+  has_grid=true
+  if [ "$route" = "/surveys/list/" ]; then
+    if echo "$response" | grep -q "id=\"survey-grid\""; then
+      has_grid=true
+    else
+      has_grid=false
+    fi
+  fi
+
   # Determine pass/fail
-  if [ "$has_header" = true ] && [ "$has_footer" = true ]; then
+  if [ "$has_header" = true ] && [ "$has_footer" = true ] && [ "$has_grid" = true ]; then
     echo -e "${GREEN}PASS${NC}"
     ((PASS_COUNT++))
   else
@@ -119,6 +129,9 @@ test_route() {
     fi
     if [ "$has_footer" = false ]; then
       echo "  ❌ Footer include not found"
+    fi
+    if [ "$has_grid" = false ]; then
+      echo "  ❌ Survey grid not found"
     fi
     ((FAIL_COUNT++))
   fi

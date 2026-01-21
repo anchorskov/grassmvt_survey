@@ -26,4 +26,5 @@ npm run dev
 
 - No framework or build step is required or expected.
 - Keep all assets in `public/` and reference them with absolute paths like `/css/site.css`.
+- Wrangler commands should use `--config wrangler.jsonc`.
 - See `AI_CONTRACT.md` for workflow rules.

@@ -33,7 +33,7 @@ if curl -s "$BASE_URL/" > /dev/null 2>&1; then
   echo "✅ Wrangler dev already running"
 else
   echo "🚀 Starting npx wrangler dev..."
-  if npx wrangler dev > /tmp/wrangler-dev.log 2>&1 &
+  if npx wrangler dev --config wrangler.jsonc > /tmp/wrangler-dev.log 2>&1 &
   then
     SERVER_PID=$!
     STARTED_SERVER=true

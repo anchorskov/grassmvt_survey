@@ -7,5 +7,25 @@
   "main": "./src/worker.js",
   "assets": {
     "directory": "./public"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wy_local",
+      "database_id": "de78cb41-176d-40e8-bd3b-e053e347ac3f",
+      "migrations_dir": "db/migrations"
+    }
+  ],
+  "env": {
+    "production": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "wy",
+          "database_id": "4b4227f1-bf30-4fcf-8a08-6967b536a5ab",
+          "migrations_dir": "db/migrations"
+        }
+      ]
+    }
   }
 }
