@@ -5,6 +5,9 @@
   const url = new URL(window.location.href);
   const initialSlug = url.searchParams.get('survey');
   const sessionKey = 'scope_session_id';
+  const nameKey = 'gm_fn';
+  const lastNameKey = 'gm_ln';
+  const emailKey = 'gm_email';
 
   if (!form) {
     return;
@@ -13,6 +16,27 @@
   const setError = (message) => {
     if (errorEl) {
       errorEl.textContent = message;
+    }
+  };
+
+  const isValidEmail = (input) => {
+    if (!input) {
+      return false;
+    }
+    if (typeof input.checkValidity === 'function') {
+      return input.checkValidity();
+    }
+    const value = input.value || '';
+    return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value);
+  };
+
+  const storeUserInfo = (fn, ln, email) => {
+    try {
+      sessionStorage.setItem(nameKey, fn);
+      sessionStorage.setItem(lastNameKey, ln);
+      sessionStorage.setItem(emailKey, email);
+    } catch (error) {
+      return;
     }
   };
 
@@ -98,6 +122,17 @@
     };
 
     try {
+      const fn = form.elements.firstName.value.trim();
+      const ln = form.elements.lastName.value.trim();
+      const emailInput = form.elements.email;
+      const email = emailInput.value.trim();
+      emailInput.value = email;
+      if (!email || !isValidEmail(emailInput)) {
+        setError('Please provide a valid email address.');
+        return;
+      }
+      storeUserInfo(fn, ln, email);
+
       if (!payload.session_id) {
         payload.session_id = await startSession();
       }

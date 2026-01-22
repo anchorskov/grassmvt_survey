@@ -270,6 +270,11 @@ main {
   gap: 1.25rem;
 }
 
+.survey-hello {
+  font-weight: 600;
+  margin: 0;
+}
+
 .option-list {
   border: none;
   margin: 0;

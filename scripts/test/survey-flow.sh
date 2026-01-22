@@ -251,11 +251,48 @@ test_page_includes "/open-source/" "Open Source (/open-source/)"
 echo ""
 echo "🔍 Page Element Tests:"
 test_page_element "/surveys/" "Surveys - Scope Form" "scope"
+test_page_element "/surveys/" "Surveys - Email Required" "id=\"email\""
+test_page_element "/surveys/" "Surveys - Email Required Attribute" "type=\"email\""
 test_page_element "/surveys/list/" "Survey List - Grid" "survey-grid"
 test_http_status "/surveys/take/property-taxes-services" "Survey Take - Property Taxes (GET)" "GET" ""
 test_page_element "/surveys/take/property-taxes-services" "Survey Take - Radio Options" "name=\"selected_key\""
 test_page_element "/surveys/take/property-taxes-services" "Survey Take - Bias Checkbox" "id=\"biased\""
 test_page_element "/surveys/take/property-taxes-services" "Survey Take - Bias Label" "for=\"biased\""
+test_page_element "/surveys/take/property-taxes-services" "Survey Take - Email Required" "type=\"email\""
+
+echo -n "Testing Surveys - Email Required Attribute (Exact)... "
+email_check=$(curl -s -m 5 "$BASE_URL/surveys/" 2>/dev/null)
+email_check_flat=$(echo "$email_check" | tr '\n' ' ')
+if echo "$email_check_flat" | grep -q "id=\"email\"[^>]*required"; then
+  echo -e "${GREEN}PASS${NC}"
+  ((PASS_COUNT++))
+else
+  echo -e "${RED}FAIL${NC}"
+  echo "  ❌ Email input missing required attribute"
+  ((FAIL_COUNT++))
+fi
+
+echo -n "Testing Survey Take - No First/Last Name Inputs... "
+name_check=$(curl -s -m 5 "$BASE_URL/surveys/take/property-taxes-services" 2>/dev/null)
+name_check_flat=$(echo "$name_check" | tr '\n' ' ')
+if echo "$name_check" | grep -q "name=\"fn\"" || echo "$name_check" | grep -q "name=\"ln\""; then
+  echo -e "${RED}FAIL${NC}"
+  echo "  ❌ Found fn/ln inputs on take page"
+  ((FAIL_COUNT++))
+else
+  echo -e "${GREEN}PASS${NC}"
+  ((PASS_COUNT++))
+fi
+
+echo -n "Testing Survey Take - Email Required Attribute (Exact)... "
+if echo "$name_check_flat" | grep -q "type=\"email\"[^>]*required"; then
+  echo -e "${GREEN}PASS${NC}"
+  ((PASS_COUNT++))
+else
+  echo -e "${RED}FAIL${NC}"
+  echo "  ❌ Email input missing required attribute"
+  ((FAIL_COUNT++))
+fi
 
 echo ""
 echo "🔌 API Tests:"

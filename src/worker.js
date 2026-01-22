@@ -105,6 +105,113 @@ const buildScopePayload = ({ sessionId, matchQuality, scopes, geo, districts }) 
   districts,
 });
 
+const generateToken = () => crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+
+const ensureSurveyToken = async (env, token) => {
+  if (token) {
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO survey_tokens (token, status)
+       VALUES (?, 'active')`
+    )
+      .bind(token)
+      .run();
+    return token;
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = generateToken();
+    const result = await env.DB.prepare(
+      `INSERT OR IGNORE INTO survey_tokens (token, status)
+       VALUES (?, 'active')`
+    )
+      .bind(candidate)
+      .run();
+    if (result.success) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Unable to create survey token');
+};
+
+const getActiveSurveys = async (env) => {
+  const result = await env.DB.prepare(
+    `SELECT id, slug, title
+     FROM surveys
+     WHERE status = 'active'
+     ORDER BY id ASC`
+  ).all();
+  return result.results || [];
+};
+
+const getNextSurveySlug = (surveys, currentId) => {
+  const index = surveys.findIndex((survey) => survey.id === currentId);
+  if (index === -1) {
+    return '';
+  }
+  return surveys[index + 1] ? surveys[index + 1].slug : '';
+};
+
+const getResumeSurveySlug = async (env, token) => {
+  const surveys = await getActiveSurveys(env);
+  const answered = await env.DB.prepare(
+    `SELECT DISTINCT survey_id
+     FROM survey_token_submissions
+     WHERE token = ?`
+  )
+    .bind(token)
+    .all();
+  const answeredIds = new Set(
+    (answered.results || []).map((row) => row.survey_id)
+  );
+  const nextSurvey = surveys.find((survey) => !answeredIds.has(survey.id));
+  return nextSurvey ? nextSurvey.slug : '';
+};
+
+const getSurveySummaryByToken = async (env, token) => {
+  const result = await env.DB.prepare(
+    `SELECT s.id AS survey_id,
+            s.title AS survey_title,
+            s.slug AS survey_slug,
+            q.question_json,
+            a.selected_key,
+            sub.created_at
+     FROM survey_token_submissions t
+     JOIN survey_submissions sub ON sub.id = t.submission_id
+     JOIN survey_answers a ON a.submission_id = sub.id
+     JOIN survey_questions q ON q.id = a.question_id
+     JOIN surveys s ON s.id = t.survey_id
+     WHERE t.token = ?
+     ORDER BY s.id ASC, sub.created_at DESC`
+  )
+    .bind(token)
+    .all();
+
+  const summaryBySurvey = new Map();
+  for (const row of result.results || []) {
+    if (summaryBySurvey.has(row.survey_id)) {
+      continue;
+    }
+    let prompt = '';
+    let answer = row.selected_key;
+    try {
+      const payload = JSON.parse(row.question_json || '{}');
+      prompt = payload.prompt || '';
+      answer = payload[row.selected_key] || row.selected_key;
+    } catch (error) {
+      prompt = '';
+    }
+    summaryBySurvey.set(row.survey_id, {
+      title: row.survey_title,
+      slug: row.survey_slug,
+      prompt,
+      answer,
+    });
+  }
+
+  return Array.from(summaryBySurvey.values());
+};
+
 const handleScopeStart = async (request, env, overrides = {}) => {
   const body = overrides.body || (await parseJsonBody(request));
   const zip = body.zip ? body.zip.toString().trim() : '';
@@ -367,10 +474,10 @@ const renderSurveyForm = ({
   fn,
   ln,
   email,
+  token,
 }) => {
-  const privacyLine = email
-    ? `We will only use ${escapeHtml(email)} to send survey updates and follow-ups.`
-    : 'We will only use your email to send survey updates and follow-ups.';
+  const privacyLine =
+    'We will only use your email to send survey updates and follow-ups.';
   const optionInputs = options
     .map(
       (option, index) => `
@@ -399,6 +506,20 @@ const renderSurveyForm = ({
     `;
   };
 
+  const renderEmailField = (value) => `
+    <label>
+      Email
+      <input
+        type="email"
+        name="email"
+        autocomplete="email"
+        required
+        value="${escapeHtml(value || '')}"
+      />
+    </label>
+    <p class="helper-text">Please provide your email for your receipt.</p>
+  `;
+
   return `
     <form
       class="survey-response"
@@ -408,6 +529,8 @@ const renderSurveyForm = ({
     >
       <input type="hidden" name="survey_id" value="${surveyId}" />
       <input type="hidden" name="question_id" value="${questionId}" />
+      <input type="hidden" name="token" value="${escapeHtml(token || '')}" />
+      <p class="survey-hello">Hello,<span id="survey-hello-name"></span></p>
       <fieldset class="option-list">
         <legend>Select one option</legend>
         <div class="option-cards">
@@ -416,11 +539,9 @@ const renderSurveyForm = ({
       </fieldset>
       <p class="form-error is-hidden" id="survey-error" role="alert"></p>
       <p class="privacy-note">${privacyLine}</p>
-      <h3>Your info (optional for now)</h3>
+      <h3>Your info (email required for receipt)</h3>
       <div class="survey-info">
-        ${renderUserField('fn', 'First name', fn)}
-        ${renderUserField('ln', 'Last name', ln)}
-        ${renderUserField('email', 'Email', email)}
+        ${renderEmailField(email)}
       </div>
       <div class="bias-section">
         <div class="bias-check">
@@ -547,6 +668,7 @@ export default {
 
     if (request.method === 'GET' && pathParts[0] === 'surveys' && pathParts[1] === 'take' && pathParts[2]) {
       const slug = decodeURIComponent(pathParts[2]);
+      const token = url.searchParams.get('token')?.trim() || '';
       const survey = await env.DB.prepare(
         'SELECT id, title, status FROM surveys WHERE slug = ?'
       )
@@ -613,6 +735,7 @@ export default {
         fn,
         ln,
         email,
+        token,
       });
 
       const bodyHtml = `
@@ -633,6 +756,30 @@ export default {
 
     if (request.method !== 'GET' && pathParts[0] === 'surveys' && pathParts[1] === 'take' && pathParts[2]) {
       return new Response('Method Not Allowed', { status: 405 });
+    }
+
+    if (request.method === 'GET' && pathParts[0] === 'surveys' && pathParts[1] === 'resume') {
+      const token = pathParts[2]
+        ? decodeURIComponent(pathParts[2])
+        : url.searchParams.get('token')?.trim();
+      if (!token) {
+        return new Response('Survey token is required.', { status: 400 });
+      }
+      const nextSlug = await getResumeSurveySlug(env, token);
+      if (!nextSlug) {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: `/surveys/complete/${encodeURIComponent(token)}` },
+        });
+      }
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: `/surveys/take/${encodeURIComponent(nextSlug)}?token=${encodeURIComponent(
+            token
+          )}`,
+        },
+      });
     }
 
     if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'surveys' && pathParts[2] && pathParts[3] === 'submit') {
@@ -669,6 +816,7 @@ export default {
       const fn = formData.get('fn')?.toString().trim() || null;
       const ln = formData.get('ln')?.toString().trim() || null;
       const email = formData.get('email')?.toString().trim() || null;
+      const token = formData.get('token')?.toString().trim() || '';
       const biased = formData.get('biased') ? 1 : 0;
       const biasNote = formData.get('bias_note')?.toString().trim() || null;
 
@@ -695,10 +843,27 @@ export default {
           .run();
       }
 
-      const receiptUrl = `/receipt/${submissionId}`;
+      const receiptToken = await ensureSurveyToken(env, token);
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO survey_token_submissions (token, submission_id, survey_id)
+         VALUES (?, ?, ?)`
+      )
+        .bind(receiptToken, submissionId, survey.id)
+        .run();
+
+      const activeSurveys = await getActiveSurveys(env);
+      const nextSurveySlug = getNextSurveySlug(activeSurveys, survey.id);
+      const receiptUrl = nextSurveySlug
+        ? `/surveys/take/${encodeURIComponent(nextSurveySlug)}?token=${encodeURIComponent(
+            receiptToken
+          )}`
+        : `/surveys/complete/${encodeURIComponent(receiptToken)}`;
       return jsonResponse({
         submission_id: submissionId,
         receipt_url: receiptUrl,
+        token: receiptToken,
+        next_survey_slug: nextSurveySlug || null,
+        complete: !nextSurveySlug,
       });
     }
 
@@ -711,6 +876,51 @@ export default {
       `;
       const page = await renderPage(env, url, {
         title: 'Submission receipt',
+        bodyHtml,
+      });
+      return new Response(page, {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    if (request.method === 'GET' && pathParts[0] === 'surveys' && pathParts[1] === 'complete' && pathParts[2]) {
+      const token = decodeURIComponent(pathParts[2]);
+      const summary = await getSurveySummaryByToken(env, token);
+      const summaryHtml = summary.length
+        ? summary
+            .map(
+              (item) => `
+                <article class="card">
+                  <h2>${escapeHtml(item.title)}</h2>
+                  <p><strong>${escapeHtml(item.prompt)}</strong></p>
+                  <p>${escapeHtml(item.answer)}</p>
+                </article>
+              `
+            )
+            .join('')
+        : '<p>No responses found for this token yet.</p>';
+
+      const bodyHtml = `
+        <h1>Survey summary</h1>
+        <p>Your survey token: <strong>${escapeHtml(token)}</strong></p>
+        <p>Keep this token if you want to revisit or update your responses later.</p>
+        <div class="grid">
+          ${summaryHtml}
+        </div>
+        <div class="hero-actions">
+          <a class="button button--primary" href="/surveys/list/">Looks OK</a>
+        </div>
+        <form class="survey-form" method="get" action="/surveys/resume">
+          <div class="form-row">
+            <label for="resume-token">Resume with token</label>
+            <input id="resume-token" name="token" type="text" autocomplete="one-time-code" />
+          </div>
+          <button class="button button--small" type="submit">Resume surveys</button>
+        </form>
+      `;
+
+      const page = await renderPage(env, url, {
+        title: 'Survey summary',
         bodyHtml,
       });
       return new Response(page, {
