@@ -810,9 +810,18 @@ const getSurveySummaryByToken = async (env, token) => {
 };
 
 const handleScopeStart = async (request, env, overrides = {}) => {
+  if (!env.DB) {
+    throw new Error('SCOPE_MISCONFIGURED: Database not available');
+  }
+
   const body = overrides.body || (await parseJsonBody(request));
   const zip = body.zip ? body.zip.toString().trim() : '';
   const surveySlug = body.survey ? body.survey.toString().trim() : '';
+
+  // Basic input validation
+  if (zip && !/^\d{5}(-\d{4})?$/.test(zip)) {
+    throw new Error('SCOPE_INVALID_INPUT: Invalid ZIP format');
+  }
 
   const sessionId = crypto.randomUUID();
   const scopes = ['public'];
@@ -830,27 +839,37 @@ const handleScopeStart = async (request, env, overrides = {}) => {
   };
   const scopeLevel = 'public';
 
-  await env.DB.prepare(
-    `INSERT INTO scope_sessions
-     (id, status, match_source, match_quality, scope_level, scopes_json, geo_json, districts_json, risk_json, survey_slug)
-     VALUES (?, 'active', 'none', 'none', ?, ?, ?, ?, '{}', ?)`
-  )
-    .bind(
-      sessionId,
-      scopeLevel,
-      JSON.stringify(scopes),
-      JSON.stringify(geo),
-      JSON.stringify(districts),
-      surveySlug || null
+  try {
+    await env.DB.prepare(
+      `INSERT INTO scope_sessions
+       (id, status, match_source, match_quality, scope_level, scopes_json, geo_json, districts_json, risk_json, survey_slug)
+       VALUES (?, 'active', 'none', 'none', ?, ?, ?, ?, '{}', ?)`
     )
-    .run();
+      .bind(
+        sessionId,
+        scopeLevel,
+        JSON.stringify(scopes),
+        JSON.stringify(geo),
+        JSON.stringify(districts),
+        surveySlug || null
+      )
+      .run();
+  } catch (err) {
+    console.error('[Scope] Failed to insert scope_sessions:', err.message);
+    throw err;
+  }
 
-  await env.DB.prepare(
-    `INSERT INTO scope_events (session_id, event_type, details_json)
-     VALUES (?, 'scope_created', ?)`
-  )
-    .bind(sessionId, JSON.stringify({ reason: 'initial' }))
-    .run();
+  try {
+    await env.DB.prepare(
+      `INSERT INTO scope_events (session_id, event_type, details_json)
+       VALUES (?, 'scope_created', ?)`
+    )
+      .bind(sessionId, JSON.stringify({ reason: 'initial' }))
+      .run();
+  } catch (err) {
+    console.error('[Scope] Failed to insert scope_events:', err.message);
+    throw err;
+  }
 
   const payload = buildScopePayload({
     sessionId,
@@ -1514,14 +1533,37 @@ export default {
     if (request.method === 'POST' && url.pathname === '/api/scope/start') {
       try {
         if (!env.DB) {
-          throw new Error('Database binding not available');
+          console.error('[Scope] Database binding not available');
+          return jsonResponse(
+            { ok: false, code: 'SCOPE_MISCONFIGURED', error: 'Service temporarily unavailable.' },
+            { status: 500 }
+          );
         }
         const { payload, cookie } = await handleScopeStart(request, env);
         return jsonResponse(payload, {
           headers: { 'Set-Cookie': cookie },
         });
       } catch (error) {
-        return jsonResponse({ error: error.message }, { status: 500 });
+        console.error('[Scope] Error in handleScopeStart:', error.message, error.stack);
+        // Map common error patterns to specific codes
+        let code = 'SCOPE_UNKNOWN_ERROR';
+        let status = 500;
+        
+        if (error.message.includes('SQLITE_CONSTRAINT') || error.message.includes('unique constraint')) {
+          code = 'SCOPE_DUPLICATE_SESSION';
+          status = 409;
+        } else if (error.message.includes('SQLITE_IOERR') || error.message.includes('database disk image is malformed')) {
+          code = 'SCOPE_DB_ERROR';
+          status = 503;
+        } else if (error.message.includes('JSON.parse')) {
+          code = 'SCOPE_INVALID_INPUT';
+          status = 400;
+        }
+        
+        return jsonResponse(
+          { ok: false, code, error: 'Unable to create scope session.' },
+          { status }
+        );
       }
     }
 

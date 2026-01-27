@@ -1,5 +1,20 @@
 /* public/js/auth-modal.js */
 (() => {
+  // Safe debug helper - only log on localhost
+  const isLocalRequest = (url) => {
+    try {
+      return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const logDebug = (message) => {
+    if (isLocalRequest(window.location)) {
+      console.log(message);
+    }
+  };
+
   const modal = document.getElementById('auth-modal');
   if (!modal) {
     return;
@@ -125,20 +140,41 @@
     );
   };
 
-  const loadTurnstileScript = () =>
-    new Promise((resolve, reject) => {
-      if (window.turnstile) {
-        resolve();
-        return;
-      }
+  const loadTurnstileScript = () => {
+    // Return existing promise if script is already loading or loaded
+    if (window.__turnstilePromise) {
+      logDebug('[Turnstile] Reusing existing promise');
+      return window.__turnstilePromise;
+    }
+    
+    // Return immediately if script is already loaded
+    if (window.turnstile) {
+      logDebug('[Turnstile] Script already loaded');
+      return Promise.resolve();
+    }
+
+    logDebug('[Turnstile] Injecting script tag');
+    // Create and cache the loading promise
+    window.__turnstilePromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
       script.async = true;
       script.defer = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Turnstile failed to load.'));
+      script.onload = () => {
+        logDebug('[Turnstile] Script loaded successfully');
+        resolve();
+      };
+      script.onerror = () => {
+        // Clear the promise on error so it can be retried
+        window.__turnstilePromise = null;
+        logDebug('[Turnstile] Script failed to load');
+        reject(new Error('Turnstile failed to load.'));
+      };
       document.head.appendChild(script);
     });
+
+    return window.__turnstilePromise;
+  };
 
   const resetTurnstile = () => {
     if (window.turnstile && turnstileWidgetId !== null) {
@@ -150,48 +186,88 @@
   };
 
   const renderTurnstile = async () => {
+    logDebug('[Turnstile] renderTurnstile called');
     if (!turnstileContainer || !tokenInput) {
+      logDebug('[Turnstile] Missing container or token input');
       return;
     }
     const config = await fetchTurnstileConfig();
     if (config.bypass) {
+      logDebug('[Turnstile] Bypass enabled, hiding widget');
       turnstileContainer.classList.add('is-hidden');
       return;
     }
     if (!config.siteKey) {
+      logDebug('[Turnstile] No site key configured');
       showError('Turnstile is not configured.');
       return;
     }
     turnstileContainer.classList.remove('is-hidden');
+    
+    // Check if widget is already rendered in this container
+    if (turnstileWidgetId !== null && turnstileContainer.querySelector('iframe')) {
+      logDebug('[Turnstile] Widget already rendered, resetting');
+      // Widget already rendered, just reset the token
+      if (window.turnstile) {
+        try {
+          window.turnstile.reset(turnstileWidgetId);
+        } catch (error) {
+          // Widget may be in invalid state, remove and re-render
+          logDebug('[Turnstile] Reset failed, will re-render:', error.message);
+          turnstileWidgetId = null;
+        }
+      }
+      if (turnstileWidgetId !== null) {
+        return;
+      }
+    }
+    
     if (!turnstileReady) {
       try {
         await loadTurnstileScript();
         turnstileReady = true;
       } catch (error) {
+        logDebug('[Turnstile] Script load failed:', error.message);
         showError('Turnstile failed to load.');
         return;
       }
     }
     if (!window.turnstile) {
+      logDebug('[Turnstile] window.turnstile not available after load');
       showError('Turnstile failed to load.');
       return;
     }
     if (turnstileWidgetId !== null) {
-      window.turnstile.remove(turnstileWidgetId);
+      try {
+        window.turnstile.remove(turnstileWidgetId);
+      } catch (error) {
+        logDebug('[Turnstile] Remove failed:', error.message);
+      }
     }
-    turnstileWidgetId = window.turnstile.render(turnstileContainer, {
-      sitekey: config.siteKey,
-      callback: (token) => {
-        tokenInput.value = token || '';
-      },
-      'error-callback': () => {
-        tokenInput.value = '';
-        showError('Turnstile validation failed.');
-      },
-      'expired-callback': () => {
-        tokenInput.value = '';
-      },
-    });
+    try {
+      logDebug('[Turnstile] Rendering widget');
+      turnstileWidgetId = window.turnstile.render(turnstileContainer, {
+        sitekey: config.siteKey,
+        callback: (token) => {
+          tokenInput.value = token || '';
+          logDebug('[Turnstile] Token received');
+        },
+        'error-callback': () => {
+          tokenInput.value = '';
+          showError('Turnstile validation failed.');
+          logDebug('[Turnstile] Error callback');
+        },
+        'expired-callback': () => {
+          tokenInput.value = '';
+          logDebug('[Turnstile] Token expired');
+        },
+      });
+      logDebug('[Turnstile] Widget rendered with ID:', turnstileWidgetId);
+    } catch (error) {
+      logDebug('[Turnstile] Render failed:', error.message);
+      showError('Turnstile render failed.');
+      turnstileWidgetId = null;
+    }
   };
 
   const setMode = async (nextMode) => {
@@ -291,6 +367,13 @@
         showError('Please complete the Turnstile check.');
         return;
       }
+      
+      const turnstileToken = tokenInput ? tokenInput.value : '';
+      // Safe debug logging: show token presence and length, never the token value
+      if (isLocalRequest(window.location)) {
+        console.log(`[Auth] ${mode} submit - turnstile token present: ${!!turnstileToken}, length: ${turnstileToken.length}`);
+      }
+      
       const response = await fetch(`/api/auth/${mode}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -298,7 +381,7 @@
         body: JSON.stringify({
           email,
           password,
-          turnstileToken: tokenInput ? tokenInput.value : '',
+          turnstileToken,
         }),
       });
       if (!response.ok) {
