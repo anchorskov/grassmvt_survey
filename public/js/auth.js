@@ -75,38 +75,52 @@
     }
   };
 
+  const logDebug = (message) => {
+    // Only log in debug environments
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      console.log('[Auth Debug]', message);
+    }
+  };
+
   const renderTurnstile = async () => {
     if (!form || !tokenInput) {
       return;
     }
     const config = await fetchTurnstileConfig();
     if (config.bypass) {
+      logDebug('Turnstile bypass enabled (local dev mode)');
       return;
     }
     if (!config.siteKey) {
       showError('Turnstile is not configured.');
+      logDebug('Turnstile site key missing');
       return;
     }
     if (!window.turnstile) {
       showError('Turnstile failed to load.');
+      logDebug('Turnstile script failed to load');
       return;
     }
     const containerId = authMode === 'signup' ? 'turnstile-signup' : 'turnstile-login';
     const container = document.getElementById(containerId);
     if (!container) {
+      logDebug('Turnstile container not found: ' + containerId);
       return;
     }
     turnstileWidgetId = window.turnstile.render(container, {
       sitekey: config.siteKey,
       callback: (token) => {
         tokenInput.value = token || '';
+        logDebug('Turnstile token received, length: ' + (token ? token.length : 0));
       },
       'error-callback': () => {
         tokenInput.value = '';
+        logDebug('Turnstile widget error');
         showError('Turnstile validation failed.');
       },
       'expired-callback': () => {
         tokenInput.value = '';
+        logDebug('Turnstile token expired');
       },
     });
   };
@@ -157,8 +171,11 @@
         return;
       }
       const config = await fetchTurnstileConfig();
-      if (!config.bypass && (!tokenInput || !tokenInput.value)) {
+      const hasToken = tokenInput && tokenInput.value;
+      logDebug('Submitting ' + authMode + ', token present: ' + (hasToken ? 'yes (' + tokenInput.value.length + ' chars)' : 'no'));
+      if (!config.bypass && !hasToken) {
         showError('Please complete the Turnstile check.');
+        logDebug('Submission blocked: no token and bypass disabled');
         return;
       }
       const response = await submitAuth({
@@ -167,6 +184,8 @@
         turnstileToken: tokenInput ? tokenInput.value : '',
       });
       if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        logDebug('Server error: ' + (errorBody.code || 'unknown') + ' - ' + errorBody.error);
         showError(authMode === 'signup' ? 'Unable to create account.' : 'Unable to sign in.');
         if (window.turnstile && turnstileWidgetId !== null) {
           window.turnstile.reset(turnstileWidgetId);
@@ -178,6 +197,7 @@
         window.turnstile.reset(turnstileWidgetId);
       }
       tokenInput.value = '';
+      logDebug(authMode + ' successful');
       await fetchAuthState();
     });
   }

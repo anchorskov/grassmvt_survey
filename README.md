@@ -64,29 +64,91 @@ Visit:
 
 ## Auth setup
 
-Required environment variables:
+### Environment variables
 
-- `TURNSTILE_SITE_KEY`
-- `TURNSTILE_SECRET_KEY`
-- `HASH_SALT`
-- `ENVIRONMENT` set to `local` or `production`
-- `TURNSTILE_BYPASS` set to `true` for local development
+Required in `.dev.vars` (local) and via `wrangler secret` (production):
 
-Run migrations after adding the auth tables:
-
-```bash
-wrangler d1 migrations apply wy_local --local --config wrangler.jsonc
+```plaintext
+TURNSTILE_SITE_KEY=0x4AAAAAACUGQXNTcuo9SlgJ
+TURNSTILE_SECRET_KEY=<paste secret from Cloudflare Turnstile dashboard>
+HASH_SALT=<random salt for password hashing>
+ENVIRONMENT=local
+TURNSTILE_BYPASS=true
 ```
 
-Local auth flow:
+- `TURNSTILE_SITE_KEY`: Public key, in `wrangler.jsonc` [vars] section
+- `TURNSTILE_SECRET_KEY`: Private key, set via `wrangler secret put` (never commit)
+- `HASH_SALT`: Random string for password hashing
+- `ENVIRONMENT`: Set to 'production' to enforce Turnstile (disable bypass)
+- `TURNSTILE_BYPASS`: Set to 'true' for local dev only (ignored in production)
 
-1. Set `ENVIRONMENT=local` and `TURNSTILE_BYPASS=true` in `.dev.vars`.
-2. Start the Worker with `npm run dev:worker`.
-3. Visit `http://localhost:8787/auth/signup/` to create an account.
-4. Visit `http://localhost:8787/auth/login/` to sign in.
-5. Call `http://localhost:8787/api/auth/me` to confirm authentication state.
+### Setting up Turnstile in production
 
-Turnstile is required in production. Requests must include a matching Origin header unless `ENVIRONMENT=local`.
+1. Get keys from https://dash.cloudflare.com/?to=/:account/security/turnstile
+2. Register required hostnames in widget settings:
+   - `grassmvtsurvey-production.anchorskov.workers.dev`
+   - Any custom domains pointing to this Worker
+3. Update `wrangler.jsonc`:
+   ```jsonc
+   "vars": {
+     "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ"
+   }
+   ```
+4. Set secret key via Wrangler:
+   ```bash
+   wrangler secret put TURNSTILE_SECRET_KEY --env production --config wrangler.jsonc
+   ```
+5. Verify secret is set:
+   ```bash
+   wrangler secret list --env production --config wrangler.jsonc
+   ```
+
+### Local authentication flow
+
+With bypass enabled (default):
+
+1. Set `ENVIRONMENT=local` and `TURNSTILE_BYPASS=true` in `.dev.vars`
+2. Run `npm run dev:worker`
+3. Visit `http://localhost:8787/auth/signup/` to create account
+4. Widget will not appear (bypass active)
+5. Form submits directly without Turnstile validation
+6. Visit `http://localhost:8787/auth/login/` to sign in
+7. Call `http://localhost:8787/api/auth/me` to verify authentication
+
+### Remote authentication testing
+
+1. Deploy with `wrangler deploy --env production`
+2. Visit `https://grassmvtsurvey-production.anchorskov.workers.dev`
+3. Click "Sign in"
+4. Complete Turnstile challenge (widget appears)
+5. Fill form and submit
+6. Open browser DevTools Console (F12) for debug logs:
+   ```
+   [Auth Debug] Turnstile token received, length: 300
+   ```
+7. Confirm user created and session established
+
+### Debugging Turnstile issues
+
+See [TURNSTILE_SECURITY_HARDENING.md](TURNSTILE_SECURITY_HARDENING.md) for:
+- Widget not rendering
+- Token submission failures
+- Error code reference
+- Server-side logging
+- Hostname configuration
+
+Key debug commands:
+
+```bash
+# Check local Turnstile config
+curl -s http://localhost:8787/api/auth/turnstile | jq .
+
+# Check remote config
+curl -s https://grassmvtsurvey-production.anchorskov.workers.dev/api/auth/turnstile | jq .
+
+# View browser console logs
+# Press F12, click Console tab, look for [Auth Debug] messages
+```
 
 ## JSONC survey seeding
 

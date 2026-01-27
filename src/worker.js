@@ -169,18 +169,27 @@ const requireSameOrigin = (request, env) => {
   return null;
 };
 
-const shouldBypassTurnstile = (env) =>
-  isLocalEnv(env) && (env.TURNSTILE_BYPASS || '').toLowerCase() === 'true';
+const shouldBypassTurnstile = (env) => {
+  const isLocal = isLocalEnv(env);
+  const bypassEnabled = (env.TURNSTILE_BYPASS || '').toLowerCase() === 'true';
+  const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
+  // Never bypass in production, even if flag is set
+  if (isProduction) {
+    return false;
+  }
+  return isLocal && bypassEnabled;
+};
 
 const verifyTurnstile = async (token, request, env) => {
   if (shouldBypassTurnstile(env)) {
     return { ok: true, bypassed: true };
   }
   if (!token) {
-    return { ok: false, error: 'Missing Turnstile token.' };
+    return { ok: false, code: 'TURNSTILE_TOKEN_MISSING', error: 'Missing Turnstile token.' };
   }
   if (!env.TURNSTILE_SECRET_KEY) {
-    return { ok: false, error: 'Turnstile secret not configured.' };
+    console.error('[Turnstile] TURNSTILE_SECRET_KEY is not configured');
+    return { ok: false, code: 'TURNSTILE_MISCONFIGURED', error: 'Turnstile secret not configured.' };
   }
   const body = new FormData();
   body.set('secret', env.TURNSTILE_SECRET_KEY);
@@ -189,15 +198,23 @@ const verifyTurnstile = async (token, request, env) => {
   if (ip) {
     body.set('remoteip', ip);
   }
-  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-    method: 'POST',
-    body,
-  });
-  const result = await response.json();
-  if (!result.success) {
-    return { ok: false, error: 'Turnstile verification failed.' };
+  try {
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body,
+    });
+    const result = await response.json();
+    if (!result.success) {
+      // Log error codes without exposing to client
+      const errorCodes = result['error-codes'] || [];
+      console.error('[Turnstile] Verification failed:', errorCodes.join(', '));
+      return { ok: false, code: 'TURNSTILE_VALIDATION_FAILED', error: 'Turnstile verification failed.' };
+    }
+    return { ok: true, bypassed: false };
+  } catch (err) {
+    console.error('[Turnstile] Verification error:', err.message);
+    return { ok: false, code: 'TURNSTILE_API_ERROR', error: 'Turnstile service error. Please try again.' };
   }
-  return { ok: true };
 };
 
 const cleanupExpiredSessions = async (env) => {
@@ -414,9 +431,9 @@ const handleAuthSignup = async (request, env) => {
   if (!turnstile.ok) {
     await writeAuditEvent(env, request, {
       eventType: 'signup_failed',
-      metadata: { reason: 'turnstile_failed' },
+      metadata: { reason: 'turnstile_failed', code: turnstile.code },
     });
-    return jsonResponse({ error: 'Unable to verify request.' }, { status: 403 });
+    return jsonResponse({ error: 'Unable to verify request.', code: turnstile.code }, { status: 403 });
   }
 
   await cleanupExpiredSessions(env);
@@ -480,9 +497,9 @@ const handleAuthLogin = async (request, env) => {
   if (!turnstile.ok) {
     await writeAuditEvent(env, request, {
       eventType: 'login_failed',
-      metadata: { reason: 'turnstile_failed' },
+      metadata: { reason: 'turnstile_failed', code: turnstile.code },
     });
-    return jsonResponse({ error: 'Unable to verify request.' }, { status: 403 });
+    return jsonResponse({ error: 'Unable to verify request.', code: turnstile.code }, { status: 403 });
   }
 
   await cleanupExpiredSessions(env);
@@ -1143,6 +1160,16 @@ const renderSurveyForm = ({
 
 export default {
   async fetch(request, env) {
+    // Production environment safety check
+    const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
+    if (isProduction && !env.TURNSTILE_SECRET_KEY) {
+      console.error('[ERROR] Production environment requires TURNSTILE_SECRET_KEY to be set via wrangler secret put');
+      return jsonResponse(
+        { error: 'Server configuration error.', code: 'TURNSTILE_MISCONFIGURED' },
+        { status: 500 }
+      );
+    }
+
     const url = new URL(request.url);
     const pathParts = parsePathParts(url.pathname);
 
