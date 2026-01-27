@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "description": "Static site tooling for Cloudflare Pages.",
   "scripts": {
+    "build:surveyjs": "node scripts/build-surveyjs.js",
     "format": "prettier --write \"public/**/*.{html,css,js,md}\"",
     "lint": "eslint \"public/**/*.js\" && stylelint \"public/**/*.css\" && htmlhint \"public/**/*.html\"",
     "check": "npm run lint && prettier --check \"public/**/*.{html,css,js,md}\"",
     "dev": "http-server ./public -p 8788 -c-1",
+    "dev:worker": "wrangler dev --config wrangler.jsonc",
     "deploy": "wrangler pages deploy public --project-name grassrootsmvt --config wrangler.jsonc",
     "cf:login": "wrangler login --config wrangler.jsonc"
   },
@@ -15,10 +17,16 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "snarkdown": "^2.0.0"
+    "@lucia-auth/adapter-sqlite": "^3.0.0",
+    "@noble/hashes": "^1.8.0",
+    "lucia": "^3.2.2",
+    "snarkdown": "^2.0.0",
+    "survey-core": "^1.12.19",
+    "survey-js-ui": "^1.12.19"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "esbuild": "^0.25.0",
     "eslint": "^9.39.2",
     "globals": "^17.0.0",
     "htmlhint": "^1.8.0",

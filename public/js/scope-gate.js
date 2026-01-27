@@ -158,7 +158,7 @@
         window.location.href = '/surveys/list/';
         return;
       }
-      window.location.href = `/surveys/take/${encodeURIComponent(surveySlug)}`;
+      window.location.href = `/surveys/${encodeURIComponent(surveySlug)}`;
     } catch (error) {
       setError('We could not verify your scope yet. Please try again.');
     }

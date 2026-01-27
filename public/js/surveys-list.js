@@ -69,14 +69,14 @@
 
     grid.innerHTML = surveys
       .map((survey) => {
-        const prompt = escapeHtml(survey.main_prompt || '');
+        const description = escapeHtml(survey.description || '');
         const title = escapeHtml(survey.title || 'Survey');
         const scopeLabel = survey.scope === 'wy' ? 'Wyoming' : 'General';
-        const link = `/surveys/?survey=${encodeURIComponent(survey.slug)}`;
+        const link = `/surveys/${encodeURIComponent(survey.slug)}`;
         return `
           <article class="card">
             <h2>${title}</h2>
-            <p class="card__meta">${prompt}</p>
+            <p class="card__meta">${description}</p>
             <span class="card__status status-active">${scopeLabel}</span>
             <div class="card__actions">
               <a class="button button--small" href="${link}">Continue</a>
@@ -87,23 +87,55 @@
       .join('');
   };
 
+  const isAuthenticated = async () => {
+    try {
+      const response = await fetch('/api/auth/me', { credentials: 'include' });
+      if (!response.ok) {
+        return false;
+      }
+      const data = await response.json();
+      return !!data.authenticated;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const loadSurveys = async () => {
+    try {
+      const response = await fetch('/api/surveys/list', { credentials: 'same-origin' });
+      if (!response.ok) {
+        throw new Error('Failed to load survey data');
+      }
+      const surveys = await response.json();
+      const activeSurveys = Array.isArray(surveys)
+        ? surveys.filter((survey) => survey.status === 'active')
+        : [];
+      renderSurveys(activeSurveys);
+    } catch (error) {
+      renderError();
+    }
+  };
+
+  const handleAuthChange = (authed) => {
+    if (!authed) {
+      grid.classList.add('is-hidden');
+      return;
+    }
+    grid.classList.remove('is-hidden');
+    loadSurveys();
+  };
+
+  window.addEventListener('auth:changed', (event) => {
+    const authed = !!event.detail?.authenticated;
+    handleAuthChange(authed);
+  });
+
   ensureScopeSession()
-    .finally(() =>
-      fetch('/api/surveys/list', { credentials: 'same-origin' })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error('Failed to load survey data');
-          }
-          return response.json();
-        })
-        .then((surveys) => {
-          const activeSurveys = Array.isArray(surveys)
-            ? surveys.filter((survey) => survey.status === 'active')
-            : [];
-          renderSurveys(activeSurveys);
-        })
-        .catch(() => {
-          renderError();
-        })
-    );
+    .then(isAuthenticated)
+    .then((authed) => {
+      handleAuthChange(authed);
+    })
+    .catch(() => {
+      renderError();
+    });
 })();

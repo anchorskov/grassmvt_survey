@@ -8,3 +8,45 @@
     <span>Powered by Cloudflare Pages</span>
   </div>
 </footer>
+<div class="auth-modal is-hidden" id="auth-modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="auth-modal__backdrop" data-auth-close></div>
+  <div class="auth-modal__panel" role="document">
+    <button class="auth-modal__close" type="button" data-auth-close aria-label="Close">
+      ×
+    </button>
+    <div class="auth-modal__content" id="auth-modal-content">
+      <h2 id="auth-modal-title">Sign in</h2>
+      <p class="helper-text" id="auth-modal-subtitle">
+        Use your account to continue.
+      </p>
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab is-active" type="button" data-auth-mode="login" role="tab">
+          Sign in
+        </button>
+        <button class="auth-tab" type="button" data-auth-mode="signup" role="tab">
+          Create account
+        </button>
+      </div>
+      <section class="survey-form is-hidden" id="auth-modal-logged-in" aria-live="polite">
+        <p>You are signed in.</p>
+        <button class="button button--primary" type="button" id="auth-modal-logout">Sign out</button>
+      </section>
+      <form class="survey-form" id="auth-modal-form">
+        <div class="form-row">
+          <label for="auth-modal-email">Email</label>
+          <input id="auth-modal-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="form-row">
+          <label for="auth-modal-password">Password</label>
+          <input id="auth-modal-password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="form-row" id="auth-modal-turnstile"></div>
+        <input type="hidden" id="auth-modal-token" name="turnstileToken" />
+        <p class="form-error is-hidden" id="auth-modal-error" role="alert"></p>
+        <button class="button button--primary" type="submit" id="auth-modal-submit">
+          Sign in
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

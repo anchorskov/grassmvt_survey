@@ -12,7 +12,11 @@
     <main>
       <h1>Available surveys</h1>
       <p class="helper-text">Choose a survey to begin verification.</p>
-      <div id="survey-grid" class="grid"></div>
+      <p class="helper-text" id="auth-required-note">
+        Please sign in to see available surveys.
+        <button class="link-button" type="button" data-auth-open>Sign in</button>.
+      </p>
+      <div id="survey-grid" class="grid is-hidden" data-auth-required></div>
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>

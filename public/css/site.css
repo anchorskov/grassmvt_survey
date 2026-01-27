@@ -166,6 +166,106 @@ main {
   font-size: 0.95rem;
 }
 
+.site-nav__button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--link-color);
+  font: inherit;
+  cursor: pointer;
+}
+
+.link-button:hover,
+.link-button:focus {
+  color: var(--link-hover);
+}
+
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.auth-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 16, 12, 0.45);
+}
+
+.auth-modal__panel {
+  position: relative;
+  z-index: 1;
+  background: #fffaf3;
+  border-radius: 16px;
+  padding: 2rem;
+  width: min(520px, 90vw);
+  box-shadow: 0 24px 60px rgba(25, 18, 12, 0.25);
+}
+
+.auth-modal__close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #3a2a1a;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.auth-tab {
+  border: 1px solid var(--header-border);
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-tab.is-active {
+  background: var(--link-color);
+  color: #fffaf3;
+  border-color: var(--link-color);
+}
+
+.auth-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: #efe5d8;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.no-scroll {
+  overflow: hidden;
+}
+
+.auth-modal .survey-form {
+  max-width: none;
+}
+
+[data-auth-required].is-hidden {
+  display: none;
+}
 .survey-form {
   margin-top: 1.5rem;
   display: grid;
@@ -344,6 +444,18 @@ main {
   border-radius: 12px;
   background: #d7efe2;
   color: #12402f;
+}
+
+#surveyjs-root {
+  margin-top: 1.5rem;
+}
+
+#surveyjs-status {
+  margin-bottom: 1rem;
+}
+
+.survey-actions {
+  margin-top: 1rem;
 }
 
 @media (max-width: 640px) {

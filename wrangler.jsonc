@@ -10,12 +10,25 @@
     "directory": "./public",
     "binding": "ASSETS"
   },
+  "vars": {
+    "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ"
+  },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "wy_local",
       "database_id": "de78cb41-176d-40e8-bd3b-e053e347ac3f",
       "migrations_dir": "db/migrations"
+    },
+    {
+      "binding": "WY_VOTERS_DB",
+      "database_name": "wy_local",
+      "database_id": "de78cb41-176d-40e8-bd3b-e053e347ac3f"
+    },
+    {
+      "binding": "SIBIDRIFT_DB",
+      "database_name": "sibidrift.db",
+      "database_id": "aeedccf4-14bb-48f8-91c0-a9023c9f153c"
     }
   ],
   "env": {
@@ -26,6 +39,16 @@
           "database_name": "wy",
           "database_id": "4b4227f1-bf30-4fcf-8a08-6967b536a5ab",
           "migrations_dir": "db/migrations"
+        },
+        {
+          "binding": "WY_VOTERS_DB",
+          "database_name": "wy",
+          "database_id": "4b4227f1-bf30-4fcf-8a08-6967b536a5ab"
+        },
+        {
+          "binding": "SIBIDRIFT_DB",
+          "database_name": "sibidrift.db",
+          "database_id": "aeedccf4-14bb-48f8-91c0-a9023c9f153c"
         }
       ]
     }

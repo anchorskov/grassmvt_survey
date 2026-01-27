@@ -22,7 +22,15 @@
     }
   };
 
-  includeTargets.forEach((target) => {
-    loadInclude(target);
+  const includePromises = Array.from(includeTargets, (target) => loadInclude(target));
+
+  Promise.allSettled(includePromises).then(() => {
+    if (!window.__authModalLoaded) {
+      const script = document.createElement('script');
+      script.src = '/js/auth-modal.js';
+      script.defer = true;
+      document.body.appendChild(script);
+      window.__authModalLoaded = true;
+    }
   });
 })();

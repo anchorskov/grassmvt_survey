@@ -1,0 +1,58 @@
+# survey_flow.txt
+Trust First Survey Platform Flow
+
+Goal
+Load and publish SurveyJS JSON from JSONC files into D1 in a repeatable, auditable way and verify the survey flow end to end.
+
+Source of truth
+Survey JSONC files follow a naming convention so we can scale to any number of surveys.
+Recommended pattern:
+- surveys_<slug>_v<version>.jsonc
+Example:
+- surveys_abortion_v1.jsonc
+- surveys_survey_process_v1.jsonc
+
+Working process
+1) Build the SurveyJS bundle
+   - npm run build:surveyjs
+2) Apply migrations locally
+   - wrangler d1 migrations apply wy_local --local --config wrangler.jsonc
+3) Seed surveys from JSONC into local D1
+   - node scripts/seed-surveys-from-jsonc.mjs --db=local --slug=all --version=1 --publish=true --changelog="Seed v1 from JSONC"
+4) Verify the stored JSON and hash in local D1
+   - wrangler d1 execute wy_local --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash FROM survey_versions v JOIN surveys s ON s.id = v.survey_id ORDER BY s.slug, v.version" --local --config wrangler.jsonc
+5) Start the Worker for local testing
+   - npm run dev:worker
+6) Confirm the surveys load in the browser
+   - http://localhost:8787/surveys/<slug>
+7) Submit a test response and confirm storage
+   - Complete the survey and capture the receipt ID
+   - wrangler d1 execute wy_local --command "SELECT id, survey_version_id, version_hash FROM responses ORDER BY created_at DESC LIMIT 1" --local --config wrangler.jsonc
+
+Legacy survey_questions flow
+The /surveys/take/:slug route uses survey_questions, not survey_versions. If you want that path to work, the questions must exist.
+
+Verify missing questions for a slug:
+- wrangler d1 execute wy_local --command "SELECT s.slug, q.id, q.question_key FROM survey_questions q JOIN surveys s ON s.id = q.survey_id WHERE s.slug = '<slug>'" --local --config wrangler.jsonc
+
+Clear path to update the survey data table
+SurveyJS data lives in survey_versions. Use the JSONC seed script to update it and keep hashes in sync.
+
+1) Edit the JSONC file
+   - surveys_<slug>_v<version>.jsonc
+2) Rerun the seed script with a new version number or an updated changelog
+   - node scripts/seed-surveys-from-jsonc.mjs --db=local --slug=<slug> --version=<version> --publish=true --changelog="Update survey wording"
+3) Verify the new version row
+   - wrangler d1 execute wy_local --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash, v.published_at FROM survey_versions v JOIN surveys s ON s.id = v.survey_id WHERE s.slug = '<slug>' ORDER BY v.version DESC LIMIT 2" --local --config wrangler.jsonc
+
+Production workflow
+1) Seed JSONC into production D1
+   - node scripts/seed-surveys-from-jsonc.mjs --db=prod --slug=all --version=1 --publish=true --changelog="Seed v1 from JSONC"
+2) Verify production data
+   - wrangler d1 execute wy --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash FROM survey_versions v JOIN surveys s ON s.id = v.survey_id ORDER BY s.slug, v.version" --config wrangler.jsonc
+
+Testing requirement
+Testing is required for every change to the survey flow. Use the local checklist above to confirm:
+- JSONC seeds into D1
+- Survey renders at /surveys/{slug}
+- Responses are stored with versionId and versionHash

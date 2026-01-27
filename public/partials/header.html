@@ -3,7 +3,18 @@
   <div class="site-header__inner">
     <a class="site-brand" href="/">Grassroots Movement</a>
     <nav class="site-nav" aria-label="Primary">
-      <a class="site-nav__link" href="/surveys/">Surveys</a>
+      <a class="site-nav__link" href="/surveys/list/">Surveys</a>
+      <button class="site-nav__link site-nav__button" type="button" data-auth-open id="auth-open">
+        Account
+      </button>
+      <span class="auth-badge is-hidden" id="auth-badge">Signed in</span>
+      <button
+        class="site-nav__link site-nav__button is-hidden"
+        type="button"
+        id="auth-quick-logout"
+      >
+        Log out
+      </button>
       <a class="site-nav__link" href="/donate/">Donate</a>
       <a class="site-nav__link" href="/security/">Security</a>
       <a class="site-nav__link" href="https://volunteers.grassrootsmvt.org/" rel="external">Volunteers</a>
