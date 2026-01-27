@@ -33,6 +33,9 @@
   ],
   "env": {
     "production": {
+      "vars": {
+        "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ"
+      },
       "d1_databases": [
         {
           "binding": "DB",
