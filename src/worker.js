@@ -1544,24 +1544,34 @@ export default {
           headers: { 'Set-Cookie': cookie },
         });
       } catch (error) {
-        console.error('[Scope] Error in handleScopeStart:', error.message, error.stack);
+        const errorMsg = error?.message || String(error);
+        console.error('[Scope] Error in handleScopeStart:', errorMsg);
         // Map common error patterns to specific codes
         let code = 'SCOPE_UNKNOWN_ERROR';
         let status = 500;
+        let userMessage = 'Unable to create scope session.';
         
-        if (error.message.includes('SQLITE_CONSTRAINT') || error.message.includes('unique constraint')) {
+        if (errorMsg.includes('SQLITE_CONSTRAINT') || errorMsg.includes('unique constraint')) {
           code = 'SCOPE_DUPLICATE_SESSION';
           status = 409;
-        } else if (error.message.includes('SQLITE_IOERR') || error.message.includes('database disk image is malformed')) {
+        } else if (errorMsg.includes('SQLITE_IOERR') || errorMsg.includes('database disk image is malformed')) {
           code = 'SCOPE_DB_ERROR';
           status = 503;
-        } else if (error.message.includes('JSON.parse')) {
+          userMessage = 'Database temporarily unavailable. Please try again.';
+        } else if (errorMsg.includes('no such table')) {
+          code = 'SCOPE_DB_ERROR';
+          status = 503;
+          userMessage = 'Database initialization pending. Please try again.';
+        } else if (errorMsg.includes('JSON') || errorMsg.includes('Invalid')) {
           code = 'SCOPE_INVALID_INPUT';
           status = 400;
+        } else if (errorMsg.includes('SCOPE_MISCONFIGURED') || errorMsg.includes('Database not available')) {
+          code = 'SCOPE_MISCONFIGURED';
+          status = 500;
         }
         
         return jsonResponse(
-          { ok: false, code, error: 'Unable to create scope session.' },
+          { ok: false, code, error: userMessage },
           { status }
         );
       }
