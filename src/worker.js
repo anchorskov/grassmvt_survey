@@ -341,15 +341,15 @@ const deriveFederalDistrict = async (db, meta = {}) => {
   }
   const result = await db
     .prepare(
-      `SELECT DISTINCT congressional_district
+      `SELECT DISTINCT cd
        FROM hud_zip_crosswalk
        WHERE zipcode = ?
-       ORDER BY congressional_district`
+       ORDER BY cd`
     )
     .bind(zip)
     .all();
   const districts = (result.results || [])
-    .map((row) => row.congressional_district)
+    .map((row) => row.cd)
     .filter((value) => value !== null && value !== undefined);
   if (districts.length === 1) {
     return {
