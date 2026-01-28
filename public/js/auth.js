@@ -9,6 +9,7 @@
   const logoutButton = document.getElementById('logout-button');
   const tokenInput = document.getElementById('turnstile-token');
   let turnstileWidgetId = null;
+  let lastTurnstileToken = '';
 
   const showError = (message) => {
     if (!errorEl) {
@@ -126,15 +127,21 @@
       sitekey: config.siteKey,
       callback: (token) => {
         tokenInput.value = token || '';
+        lastTurnstileToken = token || '';
+        window.__lastTurnstileToken = token || '';
         logDebug('Turnstile token received, length: ' + (token ? token.length : 0));
       },
       'error-callback': () => {
         tokenInput.value = '';
+        lastTurnstileToken = '';
+        window.__lastTurnstileToken = '';
         logDebug('Turnstile widget error');
         showError('Turnstile validation failed.');
       },
       'expired-callback': () => {
         tokenInput.value = '';
+        lastTurnstileToken = '';
+        window.__lastTurnstileToken = '';
         logDebug('Turnstile token expired');
       },
     });
@@ -193,8 +200,9 @@
         }
       }
       const config = await fetchTurnstileConfig();
-      const hasToken = tokenInput && tokenInput.value;
-      logDebug('Submitting ' + authMode + ', token present: ' + (hasToken ? 'yes (' + tokenInput.value.length + ' chars)' : 'no'));
+      const tokenValue = tokenInput && tokenInput.value ? tokenInput.value : lastTurnstileToken;
+      const hasToken = !!tokenValue;
+      logDebug('Submitting ' + authMode + ', token present: ' + (hasToken ? 'yes (' + tokenValue.length + ' chars)' : 'no'));
       if (!config.bypass && !hasToken) {
         showError('Please complete the Turnstile check.');
         logDebug('Submission blocked: no token and bypass disabled');
@@ -203,7 +211,7 @@
       const response = await submitAuth({
         email,
         password,
-        turnstileToken: tokenInput ? tokenInput.value : '',
+        turnstileToken: tokenValue || '',
       });
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));

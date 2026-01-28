@@ -41,6 +41,7 @@
   let turnstileReady = false;
   let lastCheckedEmail = '';
   let autofillTimer = null;
+  let lastTurnstileToken = '';
 
   const showError = (message) => {
     if (!errorEl) {
@@ -200,6 +201,8 @@
     if (tokenInput) {
       tokenInput.value = '';
     }
+    lastTurnstileToken = '';
+    window.__lastTurnstileToken = '';
   };
 
   const renderTurnstile = async () => {
@@ -267,15 +270,21 @@
         sitekey: config.siteKey,
         callback: (token) => {
           tokenInput.value = token || '';
+          lastTurnstileToken = token || '';
+          window.__lastTurnstileToken = token || '';
           logDebug('[Turnstile] Token received');
         },
         'error-callback': () => {
           tokenInput.value = '';
+          lastTurnstileToken = '';
+          window.__lastTurnstileToken = '';
           showError('Turnstile validation failed.');
           logDebug('[Turnstile] Error callback');
         },
         'expired-callback': () => {
           tokenInput.value = '';
+          lastTurnstileToken = '';
+          window.__lastTurnstileToken = '';
           logDebug('[Turnstile] Token expired');
         },
       });
@@ -424,12 +433,13 @@
         }
       }
       const config = await fetchTurnstileConfig();
-      if (!config.bypass && (!tokenInput || !tokenInput.value)) {
+      const tokenValue = tokenInput && tokenInput.value ? tokenInput.value : lastTurnstileToken;
+      if (!config.bypass && !tokenValue) {
         showError('Please complete the Turnstile check.');
         return;
       }
       
-      const turnstileToken = tokenInput ? tokenInput.value : '';
+      const turnstileToken = tokenValue || '';
       // Safe debug logging: show token presence and length, never the token value
       if (isLocalRequest(window.location)) {
         console.log(`[Auth] ${mode} submit - turnstile token present: ${!!turnstileToken}, length: ${turnstileToken.length}`);
@@ -474,6 +484,8 @@
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
         );
         closeModal();
+        // Redirect to survey list after successful authentication
+        window.location.href = '/surveys/list/';
         return;
       }
 
