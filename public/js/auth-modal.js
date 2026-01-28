@@ -390,11 +390,25 @@
         return;
       }
       resetTurnstile();
+      // Give the browser a moment to process the Set-Cookie header
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      
       const authenticated = await fetchAuthState();
-      window.dispatchEvent(
-        new CustomEvent('auth:changed', { detail: { authenticated: !!authenticated } })
-      );
-      closeModal();
+      if (isLocalRequest(window.location)) {
+        console.log('[Auth] Auth state after login:', authenticated);
+      }
+      
+      if (authenticated) {
+        window.dispatchEvent(
+          new CustomEvent('auth:changed', { detail: { authenticated: true } })
+        );
+        closeModal();
+        // Redirect to survey list immediately
+        window.location.href = '/surveys/list/';
+      } else {
+        showError('Authentication failed. Please try again.');
+        resetTurnstile();
+      }
     });
   }
 
