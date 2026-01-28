@@ -122,6 +122,21 @@
     }
   };
 
+  const checkAccountExists = async (email) => {
+    try {
+      const response = await fetch(`/api/auth/exists?email=${encodeURIComponent(email)}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const data = await response.json();
+      return !!data.exists;
+    } catch (error) {
+      return null;
+    }
+  };
+
   const logout = async () => {
     showError('');
     try {
@@ -362,6 +377,14 @@
         showError('Password must be at least 12 characters.');
         return;
       }
+      if (mode === 'signup') {
+        const exists = await checkAccountExists(email);
+        if (exists) {
+          await setMode('login');
+          showError('Account exists. Please sign in.');
+          return;
+        }
+      }
       const config = await fetchTurnstileConfig();
       if (!config.bypass && (!tokenInput || !tokenInput.value)) {
         showError('Please complete the Turnstile check.');
@@ -385,7 +408,11 @@
         }),
       });
       if (!response.ok) {
-        showError(mode === 'signup' ? 'Unable to create account.' : 'Unable to sign in.');
+        if (mode === 'login' && response.status === 401) {
+          showError('Account not found. Create an account to continue.');
+        } else {
+          showError(mode === 'signup' ? 'Unable to create account.' : 'Unable to sign in.');
+        }
         resetTurnstile();
         return;
       }

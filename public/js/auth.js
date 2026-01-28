@@ -75,6 +75,21 @@
     }
   };
 
+  const checkAccountExists = async (email) => {
+    try {
+      const response = await fetch(`/api/auth/exists?email=${encodeURIComponent(email)}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const data = await response.json();
+      return !!data.exists;
+    } catch (error) {
+      return null;
+    }
+  };
+
   const logDebug = (message) => {
     // Only log in debug environments
     if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
@@ -170,6 +185,13 @@
         showError('Password must be at least 12 characters.');
         return;
       }
+      if (authMode === 'signup') {
+        const exists = await checkAccountExists(email);
+        if (exists) {
+          showError('Account exists. Please sign in.');
+          return;
+        }
+      }
       const config = await fetchTurnstileConfig();
       const hasToken = tokenInput && tokenInput.value;
       logDebug('Submitting ' + authMode + ', token present: ' + (hasToken ? 'yes (' + tokenInput.value.length + ' chars)' : 'no'));
@@ -186,7 +208,11 @@
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
         logDebug('Server error: ' + (errorBody.code || 'unknown') + ' - ' + errorBody.error);
-        showError(authMode === 'signup' ? 'Unable to create account.' : 'Unable to sign in.');
+        if (authMode === 'login' && response.status === 401) {
+          showError('Account not found. Create an account to continue.');
+        } else {
+          showError(authMode === 'signup' ? 'Unable to create account.' : 'Unable to sign in.');
+        }
         if (window.turnstile && turnstileWidgetId !== null) {
           window.turnstile.reset(turnstileWidgetId);
         }

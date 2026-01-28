@@ -1200,6 +1200,20 @@ export default {
         });
       }
 
+      if (request.method === 'GET' && pathParts[2] === 'exists') {
+        if (!env.DB) {
+          return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+        }
+        const email = normalizeEmail(url.searchParams.get('email') || '');
+        if (!email || !isValidEmail(email)) {
+          return jsonResponse({ error: 'Invalid email.' }, { status: 400 });
+        }
+        const existing = await env.DB.prepare('SELECT id FROM user WHERE email = ?')
+          .bind(email)
+          .first();
+        return jsonResponse({ exists: !!existing });
+      }
+
       if (request.method === 'GET' && pathParts[2] === 'me') {
         return handleAuthMe(request, env);
       }
