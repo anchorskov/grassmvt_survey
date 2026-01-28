@@ -208,7 +208,9 @@
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
         logDebug('Server error: ' + (errorBody.code || 'unknown') + ' - ' + errorBody.error);
-        if (authMode === 'login' && response.status === 401) {
+        if (authMode === 'signup' && response.status === 409) {
+          showError('Account exists. Please sign in.');
+        } else if (authMode === 'login' && response.status === 401) {
           showError('Account not found. Create an account to continue.');
         } else {
           showError(authMode === 'signup' ? 'Unable to create account.' : 'Unable to sign in.');
@@ -224,7 +226,10 @@
       }
       tokenInput.value = '';
       logDebug(authMode + ' successful');
-      await fetchAuthState();
+      const authenticated = await fetchAuthState();
+      if (authMode === 'signup' && !authenticated) {
+        showError('Account created. Please sign in.');
+      }
     });
   }
 

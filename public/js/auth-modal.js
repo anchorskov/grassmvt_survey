@@ -39,6 +39,8 @@
   let mode = 'login';
   let turnstileWidgetId = null;
   let turnstileReady = false;
+  let lastCheckedEmail = '';
+  let autofillTimer = null;
 
   const showError = (message) => {
     if (!errorEl) {
@@ -310,6 +312,29 @@
     await renderTurnstile();
   };
 
+  const handleEmailCheck = async () => {
+    if (!emailInput) {
+      return;
+    }
+    const email = emailInput.value.trim().toLowerCase();
+    if (!email || email === lastCheckedEmail) {
+      return;
+    }
+    lastCheckedEmail = email;
+    const exists = await checkAccountExists(email);
+    if (exists === null) {
+      return;
+    }
+    if (exists && mode !== 'login') {
+      await setMode('login');
+      showError('Account found. Please sign in.');
+    }
+    if (!exists && mode !== 'signup') {
+      await setMode('signup');
+      showError('No account found. Create one to continue.');
+    }
+  };
+
   const openModal = async () => {
     modal.classList.remove('is-hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -317,6 +342,19 @@
     showError('');
     await fetchAuthState();
     await renderTurnstile();
+    await handleEmailCheck();
+    if (autofillTimer) {
+      clearInterval(autofillTimer);
+    }
+    let attempts = 0;
+    autofillTimer = setInterval(() => {
+      attempts += 1;
+      handleEmailCheck();
+      if (attempts >= 6) {
+        clearInterval(autofillTimer);
+        autofillTimer = null;
+      }
+    }, 400);
   };
 
   const closeModal = () => {
@@ -408,7 +446,10 @@
         }),
       });
       if (!response.ok) {
-        if (mode === 'login' && response.status === 401) {
+        if (mode === 'signup' && response.status === 409) {
+          await setMode('login');
+          showError('Account exists. Please sign in.');
+        } else if (mode === 'login' && response.status === 401) {
           showError('Account not found. Create an account to continue.');
         } else {
           showError(mode === 'signup' ? 'Unable to create account.' : 'Unable to sign in.');
@@ -417,6 +458,9 @@
         return;
       }
       resetTurnstile();
+      if (mode === 'signup') {
+        showError('Account created. Signing you in...');
+      }
       // Give the browser a moment to process the Set-Cookie header
       await new Promise((resolve) => setTimeout(resolve, 100));
       
@@ -430,12 +474,24 @@
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
         );
         closeModal();
-        // Redirect to survey list immediately
-        window.location.href = '/surveys/list/';
-      } else {
-        showError('Authentication failed. Please try again.');
-        resetTurnstile();
+        return;
       }
+
+      if (mode === 'signup') {
+        await setMode('login');
+        showError('Account created. Please sign in.');
+        return;
+      }
+      showError('Unable to sign in. Please try again.');
+    });
+  }
+
+  if (emailInput) {
+    emailInput.addEventListener('input', () => {
+      handleEmailCheck();
+    });
+    emailInput.addEventListener('change', () => {
+      handleEmailCheck();
     });
   }
 
