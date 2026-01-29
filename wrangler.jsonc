@@ -44,6 +44,11 @@
         "SUPPORT_EMAIL_TO": "anchorskov@gmail.com",
         "APP_BASE_URL": "https://grassrootsmvt.org"
       },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "logs": { "invocation_logs": true }
+      },
       "d1_databases": [
         {
           "binding": "DB",

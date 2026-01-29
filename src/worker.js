@@ -76,6 +76,8 @@ const PASSWORD_MIN_LENGTH = 12;
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, dkLen: 64 };
 const DEFAULT_IDLE_TIMEOUT_MINUTES = 30;
 const DEFAULT_ABSOLUTE_TIMEOUT_DAYS = 7;
+const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_SALT_BYTES = 16;
 const PASSWORD_RESET_TTL_MINUTES = 30;
 const PASSWORD_RESET_EMAIL_LIMIT = 3;
 const PASSWORD_RESET_IP_LIMIT = 5;
@@ -120,15 +122,35 @@ const timingSafeEqual = (a, b) => {
   return result === 0;
 };
 
+const derivePbkdf2Key = async (password, salt, iterations) => {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt,
+      iterations,
+    },
+    key,
+    256
+  );
+  return new Uint8Array(bits);
+};
+
 const hashPassword = async (password) => {
-  const salt = new Uint8Array(16);
+  const salt = new Uint8Array(PBKDF2_SALT_BYTES);
   crypto.getRandomValues(salt);
-  const derivedKey = scrypt(new TextEncoder().encode(password), salt, SCRYPT_PARAMS);
+  const derivedKey = await derivePbkdf2Key(password, salt, PBKDF2_ITERATIONS);
   return [
-    'scrypt',
-    SCRYPT_PARAMS.N,
-    SCRYPT_PARAMS.r,
-    SCRYPT_PARAMS.p,
+    'pbkdf2',
+    PBKDF2_ITERATIONS,
     bytesToHex(salt),
     bytesToHex(derivedKey),
   ].join('$');
@@ -139,6 +161,20 @@ const verifyPassword = async (password, stored) => {
     return false;
   }
   const parts = stored.split('$');
+  if (parts[0] === 'pbkdf2') {
+    if (parts.length !== 4) {
+      return false;
+    }
+    const [, iterationsRaw, saltHex, hashHex] = parts;
+    const iterations = Number(iterationsRaw);
+    if (!iterations) {
+      return false;
+    }
+    const salt = hexToBytes(saltHex);
+    const expected = hexToBytes(hashHex);
+    const derivedKey = await derivePbkdf2Key(password, salt, iterations);
+    return timingSafeEqual(expected, derivedKey);
+  }
   if (parts.length !== 6 || parts[0] !== 'scrypt') {
     return false;
   }
@@ -252,6 +288,12 @@ const getSessionUser = async (request, env) => {
   return { user, session, lucia, status: 'valid', headers: null };
 };
 
+const logAuthTiming = (route, rayId, step, startedAt) => {
+  const elapsed = Date.now() - startedAt;
+  const safeRay = rayId || 'unknown';
+  console.log(`[AuthTiming] route=${route} rayId=${safeRay} step=${step} elapsed_ms=${elapsed}`);
+};
+
 const requireSessionUser = async (request, env) => {
   const result = await getSessionUser(request, env);
   if (result.status === 'expired') {
@@ -313,6 +355,25 @@ const writeAuditEvent = async (env, request, { userId = null, eventType, metadat
 };
 
 const isLocalEnv = (env) => (env.ENVIRONMENT || '').toLowerCase() === 'local';
+
+let turnstileConfigLogged = false;
+
+const enforceTurnstileBypassPolicy = (env) => {
+  const envName = (env.ENVIRONMENT || '').toLowerCase();
+  const bypassEnabled = (env.TURNSTILE_BYPASS || '').toLowerCase() === 'true';
+  if (!turnstileConfigLogged) {
+    console.log(`[Turnstile] env=${envName || 'unknown'} bypass=${bypassEnabled}`);
+    turnstileConfigLogged = true;
+  }
+  if (envName === 'production' && bypassEnabled) {
+    console.error('[Turnstile] Refusing to run with TURNSTILE_BYPASS in production');
+    return jsonResponse(
+      { ok: false, code: 'TURNSTILE_BYPASS_FORBIDDEN', message: 'Refusing to run with TURNSTILE_BYPASS in production' },
+      { status: 500 }
+    );
+  }
+  return null;
+};
 
 const requireSameOrigin = (request, env) => {
   const origin = request.headers.get('Origin');
@@ -473,6 +534,24 @@ const tableExists = async (db, tableName) => {
     .bind(tableName)
     .first();
   return !!result;
+};
+
+const requirePasskeyTables = async (env) => {
+  if (!env.DB) {
+    return jsonResponse(
+      { ok: false, code: 'MIGRATION_MISSING', message: 'Server not ready for passkeys' },
+      { status: 503 }
+    );
+  }
+  const hasChallenges = await tableExists(env.DB, 'webauthn_challenges');
+  const hasCredentials = await tableExists(env.DB, 'passkey_credentials');
+  if (!hasChallenges || !hasCredentials) {
+    return jsonResponse(
+      { ok: false, code: 'MIGRATION_MISSING', message: 'Server not ready for passkeys' },
+      { status: 503 }
+    );
+  }
+  return null;
 };
 
 const deriveWyDistricts = async (db, meta = {}) => {
@@ -666,8 +745,9 @@ const handleAuthSignup = async (request, env) => {
     return jsonResponse({ ok: false, code: 'EMAIL_EXISTS' }, { status: 409 });
   }
 
+  let userId = '';
   try {
-    const userId = crypto.randomUUID();
+    userId = crypto.randomUUID();
     const passwordHash = await hashPassword(password);
     await env.DB.prepare(
       `INSERT INTO user (id, email, password_hash)
@@ -681,16 +761,6 @@ const handleAuthSignup = async (request, env) => {
     )
       .bind(userId, email)
       .run();
-
-    const lucia = initializeLucia(env);
-    const session = await lucia.createSession(userId, {});
-    await stampSessionTimestamps(env, session.id);
-    const sessionCookie = lucia.createSessionCookie(session.id);
-    await writeAuditEvent(env, request, { userId, eventType: 'signup_success' });
-
-    const headers = new Headers();
-    headers.append('Set-Cookie', sessionCookie.serialize());
-    return jsonResponse({ ok: true }, { headers });
   } catch (error) {
     await writeAuditEvent(env, request, {
       eventType: 'signup_failed',
@@ -702,6 +772,20 @@ const handleAuthSignup = async (request, env) => {
     }
     return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
   }
+
+  await writeAuditEvent(env, request, { userId, eventType: 'signup_success' });
+
+  try {
+    const lucia = initializeLucia(env);
+    const session = await lucia.createSession(userId, {});
+    await stampSessionTimestamps(env, session.id);
+    const sessionCookie = lucia.createSessionCookie(session.id);
+    const headers = new Headers();
+    headers.append('Set-Cookie', sessionCookie.serialize());
+    return jsonResponse({ ok: true }, { headers });
+  } catch (error) {
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
 };
 
 const handleAuthLogin = async (request, env) => {
@@ -712,17 +796,22 @@ const handleAuthLogin = async (request, env) => {
   if (originError) {
     return jsonResponse({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 403 });
   }
+  const route = 'POST /api/auth/login';
+  const rayId = request.headers.get('cf-ray') || '';
+  const startedAt = Date.now();
   const body = await parseJsonBody(request);
   const email = normalizeEmail(body.email || '');
   const password = body.password || '';
   const turnstileToken = body.turnstileToken || '';
+  logAuthTiming(route, rayId, 'parsed_body', startedAt);
 
   if (!email || !password) {
     await writeAuditEvent(env, request, {
       eventType: 'login_failed',
       metadata: { reason: 'generic' },
     });
-    return jsonResponse({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 400 });
+    logAuthTiming(route, rayId, 'response_sent', startedAt);
+    return jsonResponse({ ok: false, code: 'MISSING_CREDENTIALS' }, { status: 400 });
   }
 
   const turnstile = await verifyTurnstile(turnstileToken, request, env);
@@ -731,7 +820,8 @@ const handleAuthLogin = async (request, env) => {
       eventType: 'login_failed',
       metadata: { reason: 'generic' },
     });
-    return jsonResponse({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 400 });
+    logAuthTiming(route, rayId, 'response_sent', startedAt);
+    return jsonResponse({ ok: false, code: 'FORBIDDEN' }, { status: 403 });
   }
 
   await cleanupExpiredSessions(env);
@@ -739,12 +829,32 @@ const handleAuthLogin = async (request, env) => {
   const user = await env.DB.prepare('SELECT id, email, password_hash FROM user WHERE email = ?')
     .bind(email)
     .first();
-  if (!user || !(await verifyPassword(password, user.password_hash))) {
+  logAuthTiming(route, rayId, 'user_lookup_done', startedAt);
+  if (!user) {
     await writeAuditEvent(env, request, {
       eventType: 'login_failed',
       metadata: { reason: 'generic' },
     });
-    return jsonResponse({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 401 });
+    logAuthTiming(route, rayId, 'response_sent', startedAt);
+    return jsonResponse({ ok: false, code: 'ACCOUNT_NOT_FOUND' }, { status: 404 });
+  }
+  logAuthTiming(route, rayId, 'password_verify_start', startedAt);
+  const passwordOk = await verifyPassword(password, user.password_hash);
+  logAuthTiming(route, rayId, 'password_verify_done', startedAt);
+  if (!passwordOk) {
+    await writeAuditEvent(env, request, {
+      eventType: 'login_failed',
+      metadata: { reason: 'generic' },
+    });
+    logAuthTiming(route, rayId, 'response_sent', startedAt);
+    return jsonResponse({ ok: false, code: 'PASSWORD_INCORRECT' }, { status: 401 });
+  }
+
+  if (user.password_hash && user.password_hash.startsWith('scrypt$')) {
+    const upgradedHash = await hashPassword(password);
+    await env.DB.prepare('UPDATE user SET password_hash = ? WHERE id = ?')
+      .bind(upgradedHash, user.id)
+      .run();
   }
 
   const lucia = initializeLucia(env);
@@ -752,11 +862,13 @@ const handleAuthLogin = async (request, env) => {
   const session = await lucia.createSession(user.id, {});
   await stampSessionTimestamps(env, session.id);
   const sessionCookie = lucia.createSessionCookie(session.id);
+  logAuthTiming(route, rayId, 'session_created', startedAt);
 
   await writeAuditEvent(env, request, { userId: user.id, eventType: 'login_success' });
 
   const headers = new Headers();
   headers.append('Set-Cookie', sessionCookie.serialize());
+  logAuthTiming(route, rayId, 'response_sent', startedAt);
   return jsonResponse({ ok: true }, { headers });
 };
 
@@ -946,6 +1058,10 @@ const handlePasskeyRegisterOptions = async (request, env) => {
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
   }
+  const passkeyGuard = await requirePasskeyTables(env);
+  if (passkeyGuard) {
+    return passkeyGuard;
+  }
   const auth = await requireSessionUser(request, env);
   if (auth.response) {
     return auth.response;
@@ -1024,6 +1140,10 @@ const handlePasskeyRegisterVerify = async (request, env) => {
   const originError = requireSameOrigin(request, env);
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const passkeyGuard = await requirePasskeyTables(env);
+  if (passkeyGuard) {
+    return passkeyGuard;
   }
   const auth = await requireSessionUser(request, env);
   if (auth.response) {
@@ -1119,6 +1239,10 @@ const handlePasskeyLoginOptions = async (request, env) => {
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
   }
+  const passkeyGuard = await requirePasskeyTables(env);
+  if (passkeyGuard) {
+    return passkeyGuard;
+  }
   await cleanupExpiredWebauthnChallenges(env);
   const rpID = getWebAuthnRpId(request);
   const options = await generateAuthenticationOptions({
@@ -1160,6 +1284,10 @@ const handlePasskeyLoginVerify = async (request, env) => {
   const originError = requireSameOrigin(request, env);
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const passkeyGuard = await requirePasskeyTables(env);
+  if (passkeyGuard) {
+    return passkeyGuard;
   }
   const body = await parseJsonBody(request);
   const assertionResponse = body.assertionResponse;
@@ -1294,6 +1422,10 @@ const handlePasskeyList = async (request, env) => {
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
   }
+  const passkeyGuard = await requirePasskeyTables(env);
+  if (passkeyGuard) {
+    return passkeyGuard;
+  }
   const auth = await requireSessionUser(request, env);
   if (auth.response) {
     return auth.response;
@@ -1319,6 +1451,10 @@ const handlePasskeyRemove = async (request, env) => {
   const originError = requireSameOrigin(request, env);
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const passkeyGuard = await requirePasskeyTables(env);
+  if (passkeyGuard) {
+    return passkeyGuard;
   }
   const auth = await requireSessionUser(request, env);
   if (auth.response) {
@@ -2009,6 +2145,10 @@ export default {
         { error: 'Server configuration error.', code: 'TURNSTILE_MISCONFIGURED' },
         { status: 500 }
       );
+    }
+    const turnstileGuard = enforceTurnstileBypassPolicy(env);
+    if (turnstileGuard) {
+      return turnstileGuard;
     }
 
     const url = new URL(request.url);
