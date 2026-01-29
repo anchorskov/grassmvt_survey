@@ -74,7 +74,8 @@ const sha256Hex = async (text) => {
 
 const PASSWORD_MIN_LENGTH = 12;
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, dkLen: 64 };
-const SESSION_TTL_DAYS = 30;
+const DEFAULT_IDLE_TIMEOUT_MINUTES = 30;
+const DEFAULT_ABSOLUTE_TIMEOUT_DAYS = 7;
 const PASSWORD_RESET_TTL_MINUTES = 30;
 const PASSWORD_RESET_EMAIL_LIMIT = 3;
 const PASSWORD_RESET_IP_LIMIT = 5;
@@ -85,6 +86,28 @@ const WEBAUTHN_CHALLENGE_TTL_MINUTES = 10;
 const normalizeEmail = (value = '') => value.toString().trim().toLowerCase();
 
 const isValidEmail = (value = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+};
+
+const getIdleTimeoutMinutes = (env) =>
+  parsePositiveInt(env.IDLE_TIMEOUT_MINUTES, DEFAULT_IDLE_TIMEOUT_MINUTES);
+
+const getAbsoluteTimeoutDays = (env) =>
+  parsePositiveInt(env.ABSOLUTE_TIMEOUT_DAYS, DEFAULT_ABSOLUTE_TIMEOUT_DAYS);
+
+const parseIsoMs = (value) => {
+  if (!value) {
+    return null;
+  }
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : ms;
+};
 
 const timingSafeEqual = (a, b) => {
   if (a.length !== b.length) {
@@ -180,13 +203,74 @@ const getSessionUser = async (request, env) => {
   const cookieHeader = request.headers.get('Cookie') || '';
   const sessionId = lucia.readSessionCookie(cookieHeader);
   if (!sessionId) {
-    return { user: null, session: null, lucia };
+    return { user: null, session: null, lucia, status: 'missing', headers: null };
   }
+  if (!env.DB) {
+    return { user: null, session: null, lucia, status: 'invalid', headers: null };
+  }
+  const sessionRow = await env.DB.prepare(
+    `SELECT id, user_id, created_at, last_seen_at
+     FROM session
+     WHERE id = ?`
+  )
+    .bind(sessionId)
+    .first();
   const { session, user } = await lucia.validateSession(sessionId);
-  if (!session || !user) {
-    return { user: null, session: null, lucia };
+  if (!sessionRow || !session || !user) {
+    await lucia.invalidateSession(sessionId);
+    const blank = lucia.createBlankSessionCookie();
+    const headers = new Headers();
+    headers.append('Set-Cookie', blank.serialize());
+    return { user: null, session: null, lucia, status: 'invalid', headers };
   }
-  return { user, session, lucia };
+  const nowMs = Date.now();
+  const createdAtMs = parseIsoMs(sessionRow.created_at) ?? nowMs;
+  const lastSeenMs = parseIsoMs(sessionRow.last_seen_at) ?? createdAtMs;
+  const idleTimeoutMinutes = getIdleTimeoutMinutes(env);
+  const absoluteTimeoutDays = getAbsoluteTimeoutDays(env);
+  const idleMs = idleTimeoutMinutes * 60 * 1000;
+  const absoluteMs = absoluteTimeoutDays * 24 * 60 * 60 * 1000;
+  const idleExpired = nowMs - lastSeenMs > idleMs;
+  const absoluteExpired = nowMs - createdAtMs > absoluteMs;
+  if (idleExpired || absoluteExpired) {
+    await lucia.invalidateSession(sessionId);
+    const blank = lucia.createBlankSessionCookie();
+    const headers = new Headers();
+    headers.append('Set-Cookie', blank.serialize());
+    return { user: null, session: null, lucia, status: 'expired', headers };
+  }
+  const nextExpiresAtMs = Math.min(createdAtMs + absoluteMs, nowMs + idleMs);
+  await env.DB.prepare(
+    `UPDATE session
+     SET last_seen_at = ?,
+         created_at = COALESCE(created_at, ?),
+         expires_at = ?
+     WHERE id = ?`
+  )
+    .bind(new Date(nowMs).toISOString(), new Date(createdAtMs).toISOString(), Math.floor(nextExpiresAtMs / 1000), sessionId)
+    .run();
+  return { user, session, lucia, status: 'valid', headers: null };
+};
+
+const requireSessionUser = async (request, env) => {
+  const result = await getSessionUser(request, env);
+  if (result.status === 'expired') {
+    return {
+      response: jsonResponse(
+        { ok: false, code: 'SESSION_EXPIRED' },
+        { status: 401, headers: result.headers || undefined }
+      ),
+    };
+  }
+  if (result.status !== 'valid') {
+    return {
+      response: jsonResponse(
+        { error: 'Unauthorized.', code: 'UNAUTHORIZED' },
+        { status: 401, headers: result.headers || undefined }
+      ),
+    };
+  }
+  return result;
 };
 
 const cleanupExpiredWebauthnChallenges = async (env) => {
@@ -298,6 +382,27 @@ const cleanupExpiredSessions = async (env) => {
   await env.DB.prepare('DELETE FROM session WHERE expires_at <= ?').bind(nowSeconds).run();
 };
 
+const stampSessionTimestamps = async (env, sessionId) => {
+  if (!env.DB || !sessionId) {
+    return;
+  }
+  const nowMs = Date.now();
+  const idleTimeoutMinutes = getIdleTimeoutMinutes(env);
+  const absoluteTimeoutDays = getAbsoluteTimeoutDays(env);
+  const idleMs = idleTimeoutMinutes * 60 * 1000;
+  const absoluteMs = absoluteTimeoutDays * 24 * 60 * 60 * 1000;
+  const expiresAtMs = Math.min(nowMs + idleMs, nowMs + absoluteMs);
+  await env.DB.prepare(
+    `UPDATE session
+     SET created_at = COALESCE(created_at, ?),
+         last_seen_at = ?,
+         expires_at = ?
+     WHERE id = ?`
+  )
+    .bind(new Date(nowMs).toISOString(), new Date(nowMs).toISOString(), Math.floor(expiresAtMs / 1000), sessionId)
+    .run();
+};
+
 const checkPasswordResetRateLimit = async (env, { emailHash, ipHash }) => {
   if (!env.DB) {
     return { limited: false };
@@ -343,7 +448,7 @@ const initializeLucia = (env) => {
   const adapter = new D1Adapter(env.DB, { user: 'user', session: 'session' });
   const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
   return new Lucia(adapter, {
-    sessionExpiresIn: new TimeSpan(SESSION_TTL_DAYS, 'd'),
+    sessionExpiresIn: new TimeSpan(getAbsoluteTimeoutDays(env), 'd'),
     getUserAttributes: (attributes) => ({
       email: attributes.email,
     }),
@@ -579,6 +684,7 @@ const handleAuthSignup = async (request, env) => {
 
     const lucia = initializeLucia(env);
     const session = await lucia.createSession(userId, {});
+    await stampSessionTimestamps(env, session.id);
     const sessionCookie = lucia.createSessionCookie(session.id);
     await writeAuditEvent(env, request, { userId, eventType: 'signup_success' });
 
@@ -644,6 +750,7 @@ const handleAuthLogin = async (request, env) => {
   const lucia = initializeLucia(env);
   await lucia.invalidateUserSessions(user.id);
   const session = await lucia.createSession(user.id, {});
+  await stampSessionTimestamps(env, session.id);
   const sessionCookie = lucia.createSessionCookie(session.id);
 
   await writeAuditEvent(env, request, { userId: user.id, eventType: 'login_success' });
@@ -839,10 +946,11 @@ const handlePasskeyRegisterOptions = async (request, env) => {
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
   }
-  const { user } = await getSessionUser(request, env);
-  if (!user) {
-    return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
   }
+  const { user } = auth;
   const body = await parseJsonBody(request);
   const nickname = body.nickname ? body.nickname.toString().trim() : '';
   await cleanupExpiredWebauthnChallenges(env);
@@ -917,10 +1025,11 @@ const handlePasskeyRegisterVerify = async (request, env) => {
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
   }
-  const { user } = await getSessionUser(request, env);
-  if (!user) {
-    return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
   }
+  const { user } = auth;
   const body = await parseJsonBody(request);
   const attestationResponse = body.attestationResponse;
   const nickname = body.nickname ? body.nickname.toString().trim() : null;
@@ -1164,6 +1273,7 @@ const handlePasskeyLoginVerify = async (request, env) => {
   const lucia = initializeLucia(env);
   await lucia.invalidateUserSessions(credential.user_id);
   const session = await lucia.createSession(credential.user_id, {});
+  await stampSessionTimestamps(env, session.id);
   const sessionCookie = lucia.createSessionCookie(session.id);
 
   await writeAuditEvent(env, request, {
@@ -1184,10 +1294,11 @@ const handlePasskeyList = async (request, env) => {
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
   }
-  const { user } = await getSessionUser(request, env);
-  if (!user) {
-    return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
   }
+  const { user } = auth;
 
   const result = await env.DB.prepare(
     `SELECT id, nickname, created_at, last_used_at
@@ -1209,10 +1320,11 @@ const handlePasskeyRemove = async (request, env) => {
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
   }
-  const { user } = await getSessionUser(request, env);
-  if (!user) {
-    return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
   }
+  const { user } = auth;
   const body = await parseJsonBody(request);
   const id = body.id ? body.id.toString().trim() : '';
   if (!id) {
@@ -1263,19 +1375,20 @@ const handleAuthMe = async (request, env) => {
   if (!env.DB) {
     return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
   }
-  const lucia = initializeLucia(env);
-  const cookieHeader = request.headers.get('Cookie') || '';
-  const sessionId = lucia.readSessionCookie(cookieHeader);
-  if (!sessionId) {
-    return jsonResponse({ authenticated: false });
+  const sessionResult = await getSessionUser(request, env);
+  if (sessionResult.status === 'expired') {
+    return jsonResponse(
+      { ok: false, code: 'SESSION_EXPIRED' },
+      { status: 401, headers: sessionResult.headers || undefined }
+    );
   }
-  const { session, user } = await lucia.validateSession(sessionId);
-  if (!session || !user) {
-    const blank = lucia.createBlankSessionCookie();
-    const headers = new Headers();
-    headers.append('Set-Cookie', blank.serialize());
-    return jsonResponse({ authenticated: false }, { headers });
+  if (sessionResult.status !== 'valid') {
+    return jsonResponse(
+      { authenticated: false },
+      sessionResult.headers ? { headers: sessionResult.headers } : {}
+    );
   }
+  const { user } = sessionResult;
 
   const profile = await env.DB.prepare(
     `SELECT state, wy_house_district
@@ -1977,8 +2090,8 @@ export default {
         if (!env.DB) {
           throw new Error('Database binding not available');
         }
-        const { user } = await getSessionUser(request, env);
-
+        const sessionResult = await getSessionUser(request, env);
+        const user = sessionResult.status === 'valid' ? sessionResult.user : null;
         const userId = user ? user.id : '';
         const result = await env.DB.prepare(
           `SELECT s.slug,
@@ -2033,7 +2146,7 @@ export default {
           };
         });
 
-        return jsonResponse(payload);
+        return jsonResponse(payload, sessionResult.headers ? { headers: sessionResult.headers } : {});
       } catch (error) {
         return jsonResponse({ error: error.message }, { status: 500 });
       }
@@ -2044,10 +2157,11 @@ export default {
         if (!env.DB) {
           throw new Error('Database binding not available');
         }
-        const { user } = await getSessionUser(request, env);
-        if (!user) {
-          return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) {
+          return auth.response;
         }
+        const { user } = auth;
         const surveyVersionId = url.searchParams.get('surveyVersionId') || '';
         if (!surveyVersionId) {
           return jsonResponse({ error: 'Missing surveyVersionId.', code: 'MISSING_SURVEY_VERSION_ID' }, { status: 400 });
@@ -2181,10 +2295,11 @@ export default {
           return jsonResponse({ error: 'Invalid payload.' }, { status: 400 });
         }
 
-        const { user } = await getSessionUser(request, env);
-        if (!user) {
-          return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) {
+          return auth.response;
         }
+        const { user } = auth;
 
         const version = await env.DB.prepare(
           `SELECT s.id AS survey_id, v.id AS version_id, v.json_hash AS json_hash

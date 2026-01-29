@@ -17,7 +17,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@simplewebauthn/browser": "^13.2.2",
+    "@simplewebauthn/browser": "9.0.2",
     "@simplewebauthn/server": "^13.2.2",
     "@lucia-auth/adapter-sqlite": "^3.0.0",
     "@noble/hashes": "^1.8.0",

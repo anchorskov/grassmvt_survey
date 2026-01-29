@@ -107,9 +107,20 @@
     if (window.__webauthnBrowser) {
       return window.__webauthnBrowser;
     }
-    const mod = await import('https://esm.sh/@simplewebauthn/browser@9.0.2');
-    window.__webauthnBrowser = mod;
-    return mod;
+    if (window.__webauthnBrowserPromise) {
+      return window.__webauthnBrowserPromise;
+    }
+    const moduleUrl = '/vendor/simplewebauthn-browser-9.0.2.js';
+    window.__webauthnBrowserPromise = import(moduleUrl)
+      .then((mod) => {
+        window.__webauthnBrowser = mod;
+        return mod;
+      })
+      .catch((error) => {
+        console.error('[Passkey] Failed to load ' + moduleUrl + ': ' + error.message);
+        throw error;
+      });
+    return window.__webauthnBrowserPromise;
   };
 
   const resetTurnstile = () => {
