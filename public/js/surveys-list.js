@@ -72,19 +72,67 @@
         const description = escapeHtml(survey.description || '');
         const title = escapeHtml(survey.title || 'Survey');
         const scopeLabel = survey.scope === 'wy' ? 'Wyoming' : 'General';
-        const link = `/surveys/${encodeURIComponent(survey.slug)}`;
+        const link = survey.href || `/surveys/${encodeURIComponent(survey.slug)}`;
+        const hasResponse = !!survey.response;
+        const submittedAt = survey.response?.submittedAt
+          ? new Date(survey.response.submittedAt).toLocaleString()
+          : '';
+        const updatedAt = survey.response?.updatedAt
+          ? new Date(survey.response.updatedAt).toLocaleString()
+          : '';
+        const editCount = survey.response?.editCount || 0;
+        const statusLine = hasResponse
+          ? `Completed: ${escapeHtml(submittedAt)}`
+          : '';
+        const editLine = hasResponse && editCount > 0 && updatedAt
+          ? `Edited: ${escapeHtml(updatedAt)}`
+          : '';
+        const buttonLabel = hasResponse ? 'Edit responses' : 'Start survey';
         return `
           <article class="card">
             <h2>${title}</h2>
             <p class="card__meta">${description}</p>
+            ${statusLine ? `<p class="card__meta">${statusLine}</p>` : ''}
+            ${editLine ? `<p class="card__meta">${editLine}</p>` : ''}
             <span class="card__status status-active">${scopeLabel}</span>
             <div class="card__actions">
-              <a class="button button--small" href="${link}">Continue</a>
+              <a class="button button--small" href="${link}">${buttonLabel}</a>
             </div>
           </article>
         `;
       })
       .join('');
+
+    maybeAutoLaunch(surveys);
+  };
+
+  const loadStaticSurveys = async () => {
+    try {
+      const response = await fetch('/data/surveys.json', { credentials: 'same-origin' });
+      if (!response.ok) {
+        return [];
+      }
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        return [];
+      }
+      return data
+        .filter((survey) => survey.status === 'active' && typeof survey.href === 'string')
+        .map((survey) => {
+          const match = survey.href.match(/^\/surveys\/([^/]+)\/?$/);
+          return {
+            slug: match ? decodeURIComponent(match[1]) : '',
+            title: survey.title || 'Survey',
+            scope: survey.scope || 'public',
+            status: survey.status || 'active',
+            description: survey.description || '',
+            href: survey.href,
+          };
+        })
+        .filter((survey) => survey.slug);
+    } catch (error) {
+      return [];
+    }
   };
 
   const isAuthenticated = async () => {
@@ -102,18 +150,53 @@
 
   const loadSurveys = async () => {
     try {
-      const response = await fetch('/api/surveys/list', { credentials: 'same-origin' });
-      if (!response.ok) {
+      const [apiResponse, staticSurveys] = await Promise.all([
+        fetch('/api/surveys/list', { credentials: 'same-origin' }),
+        loadStaticSurveys(),
+      ]);
+      if (!apiResponse.ok) {
         throw new Error('Failed to load survey data');
       }
-      const surveys = await response.json();
+      const surveys = await apiResponse.json();
       const activeSurveys = Array.isArray(surveys)
         ? surveys.filter((survey) => survey.status === 'active')
         : [];
-      renderSurveys(activeSurveys);
+      const merged = [...activeSurveys];
+      staticSurveys.forEach((survey) => {
+        if (!merged.some((item) => item.slug === survey.slug)) {
+          merged.push(survey);
+        }
+      });
+      renderSurveys(merged);
     } catch (error) {
       renderError();
     }
+  };
+
+  const getAutoLaunchSlug = () => {
+    const params = new URLSearchParams(window.location.search || '');
+    const slug = (params.get('survey') || '').toString().trim();
+    const autoclick = (params.get('autoclick') || '').toString().trim();
+    if (!slug || autoclick !== '1') {
+      return '';
+    }
+    return slug;
+  };
+
+  const maybeAutoLaunch = (surveys) => {
+    const slug = getAutoLaunchSlug();
+    if (!slug || !Array.isArray(surveys)) {
+      return;
+    }
+    const match = surveys.find((survey) => survey.slug === slug);
+    if (!match) {
+      return;
+    }
+    const link = match.href || `/surveys/${encodeURIComponent(match.slug)}`;
+    if (!link) {
+      return;
+    }
+    window.location.href = link;
   };
 
   const handleAuthChange = (authed) => {

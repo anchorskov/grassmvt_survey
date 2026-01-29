@@ -5,6 +5,7 @@ import { renderSurvey } from 'survey-js-ui';
 const statusId = 'surveyjs-status';
 const titleId = 'surveyjs-title';
 const containerId = 'surveyjs-root';
+const editingId = 'surveyjs-editing';
 const minStateSearchLength = 2;
 
 const escapeHtml = (value = '') =>
@@ -28,6 +29,20 @@ const setStatus = (message) => {
   if (status) {
     status.textContent = message;
   }
+};
+
+const setEditingNotice = (message) => {
+  const editing = document.getElementById(editingId);
+  if (!editing) {
+    return;
+  }
+  if (!message) {
+    editing.textContent = '';
+    editing.classList.add('is-hidden');
+    return;
+  }
+  editing.textContent = message;
+  editing.classList.remove('is-hidden');
 };
 
 const setTitle = (title) => {
@@ -94,6 +109,28 @@ const initSurveyPage = async () => {
     setStatus('');
 
     const model = new Model(data.surveyJson);
+    let editingMeta = null;
+
+    try {
+      const mineResponse = await fetch(
+        `/api/responses/mine?surveyVersionId=${encodeURIComponent(data.versionId)}`,
+        { credentials: 'include' }
+      );
+      if (mineResponse.ok) {
+        const mineData = await mineResponse.json();
+        if (mineData.exists && mineData.answersJson) {
+          model.data = mineData.answersJson;
+          editingMeta = mineData;
+          const updatedAt = mineData.updatedAt || mineData.submittedAt;
+          const editText = updatedAt
+            ? `Editing mode. Last saved ${new Date(updatedAt).toLocaleString()}.`
+            : 'Editing mode.';
+          setEditingNotice(editText);
+        }
+      }
+    } catch (error) {
+      // Ignore prefill errors
+    }
     model.onChoicesSearch.add((sender, options) => {
       if (!options.question || options.question.name !== 'state') {
         return;
@@ -111,9 +148,8 @@ const initSurveyPage = async () => {
     model.onComplete.add(async (sender) => {
       setStatus('Submitting response...');
       const payload = {
-        versionId: data.versionId,
-        versionHash: data.versionHash,
-        answers: sender.data || {},
+        surveyVersionId: data.versionId,
+        answersJson: sender.data || {},
         meta: buildMeta(sender.data || {}),
       };
       const submit = await fetch(
@@ -133,6 +169,10 @@ const initSurveyPage = async () => {
       }
       container.innerHTML = '';
       renderReceipt(submitData.responseId);
+      if (submitData.updatedAt) {
+        setEditingNotice(`Saved. Last updated ${new Date(submitData.updatedAt).toLocaleString()}.`);
+      }
+      editingMeta = submitData;
     });
 
     renderSurvey(model, container);

@@ -17,6 +17,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@simplewebauthn/browser": "^13.2.2",
+    "@simplewebauthn/server": "^13.2.2",
     "@lucia-auth/adapter-sqlite": "^3.0.0",
     "@noble/hashes": "^1.8.0",
     "lucia": "^3.2.2",
@@ -34,6 +36,6 @@
     "prettier": "^3.8.0",
     "stylelint": "^17.0.0",
     "stylelint-config-standard": "^40.0.0",
-    "wrangler": "^4.59.2"
+    "wrangler": "^4.61.0"
   }
 }

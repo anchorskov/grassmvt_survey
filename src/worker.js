@@ -2,8 +2,16 @@
 import { D1Adapter } from '@lucia-auth/adapter-sqlite';
 import { scrypt } from '@noble/hashes/scrypt';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+import {
+  generateAuthenticationOptions,
+  generateRegistrationOptions,
+  verifyAuthenticationResponse,
+  verifyRegistrationResponse,
+} from '@simplewebauthn/server';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { Lucia, TimeSpan } from 'lucia';
 import snarkdown from 'snarkdown';
+import { sendEmail } from './server/email/resend.js';
 
 const escapeHtml = (value = '') =>
   value
@@ -67,6 +75,12 @@ const sha256Hex = async (text) => {
 const PASSWORD_MIN_LENGTH = 12;
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, dkLen: 64 };
 const SESSION_TTL_DAYS = 30;
+const PASSWORD_RESET_TTL_MINUTES = 30;
+const PASSWORD_RESET_EMAIL_LIMIT = 3;
+const PASSWORD_RESET_IP_LIMIT = 5;
+const PASSWORD_RESET_EMAIL_WINDOW_MINUTES = 30;
+const PASSWORD_RESET_IP_WINDOW_MINUTES = 15;
+const WEBAUTHN_CHALLENGE_TTL_MINUTES = 10;
 
 const normalizeEmail = (value = '') => value.toString().trim().toLowerCase();
 
@@ -126,6 +140,65 @@ const hashSignal = async (value, salt) => {
     return '';
   }
   return sha256Hex(`${salt}:${value}`);
+};
+
+const getHashSalt = (env) => (env.HASH_SALT || '').toString().trim();
+
+const nowIso = () => new Date().toISOString();
+
+const addMinutesIso = (minutes) => new Date(Date.now() + minutes * 60 * 1000).toISOString();
+
+const generateResetToken = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
+};
+
+const hashResetToken = async (salt, token) => sha256Hex(`${salt}${token}`);
+
+const sendPasswordResetEmail = async (env, { to, resetUrl, replyTo }) => {
+  const subject = 'Reset your Grassroots Movement password';
+  const text = `Use this link to reset your password: ${resetUrl}`;
+  const html = `Use this link to reset your password:<br />${resetUrl}`;
+  return sendEmail(env, { to, subject, text, html, replyTo });
+};
+
+const getWebAuthnRpId = (request) => {
+  const { hostname } = new URL(request.url);
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return hostname;
+  }
+  return hostname;
+};
+
+const getWebAuthnExpectedOrigin = (request) => new URL(request.url).origin;
+
+const getWebAuthnRpName = (env) => (env.WEBAUTHN_RP_NAME || 'Grassroots Movement').toString();
+
+const getSessionUser = async (request, env) => {
+  const lucia = initializeLucia(env);
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const sessionId = lucia.readSessionCookie(cookieHeader);
+  if (!sessionId) {
+    return { user: null, session: null, lucia };
+  }
+  const { session, user } = await lucia.validateSession(sessionId);
+  if (!session || !user) {
+    return { user: null, session: null, lucia };
+  }
+  return { user, session, lucia };
+};
+
+const cleanupExpiredWebauthnChallenges = async (env) => {
+  if (!env.DB) {
+    return;
+  }
+  await env.DB.prepare(
+    `DELETE FROM webauthn_challenges
+     WHERE expires_at <= ?`
+  )
+    .bind(nowIso())
+    .run();
 };
 
 const getRequestSignals = async (request, env) => {
@@ -223,6 +296,47 @@ const cleanupExpiredSessions = async (env) => {
   }
   const nowSeconds = Math.floor(Date.now() / 1000);
   await env.DB.prepare('DELETE FROM session WHERE expires_at <= ?').bind(nowSeconds).run();
+};
+
+const checkPasswordResetRateLimit = async (env, { emailHash, ipHash }) => {
+  if (!env.DB) {
+    return { limited: false };
+  }
+  let emailCount = 0;
+  let ipCount = 0;
+  if (emailHash) {
+    const result = await env.DB.prepare(
+      `SELECT COUNT(*) as count
+       FROM audit_events
+       WHERE event_type = 'password_reset_requested'
+         AND json_extract(metadata_json, '$.email_hash') = ?
+         AND datetime(created_at) >= datetime('now', ?)`
+    )
+      .bind(emailHash, `-${PASSWORD_RESET_EMAIL_WINDOW_MINUTES} minutes`)
+      .first();
+    emailCount = Number(result?.count || 0);
+  }
+  if (ipHash) {
+    const result = await env.DB.prepare(
+      `SELECT COUNT(*) as count
+       FROM audit_events
+       WHERE event_type = 'password_reset_requested'
+         AND ip_hash = ?
+         AND datetime(created_at) >= datetime('now', ?)`
+    )
+      .bind(ipHash, `-${PASSWORD_RESET_IP_WINDOW_MINUTES} minutes`)
+      .first();
+    ipCount = Number(result?.count || 0);
+  }
+  const emailLimited = emailHash && emailCount >= PASSWORD_RESET_EMAIL_LIMIT;
+  const ipLimited = ipHash && ipCount >= PASSWORD_RESET_IP_LIMIT;
+  return {
+    limited: emailLimited || ipLimited,
+    emailCount,
+    ipCount,
+    emailLimited,
+    ipLimited,
+  };
 };
 
 const initializeLucia = (env) => {
@@ -401,11 +515,11 @@ const normalizeMatchQuality = (value) => {
 
 const handleAuthSignup = async (request, env) => {
   if (!env.DB) {
-    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
   }
   const originError = requireSameOrigin(request, env);
   if (originError) {
-    return jsonResponse({ error: originError }, { status: 403 });
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
   }
   const body = await parseJsonBody(request);
   const email = normalizeEmail(body.email || '');
@@ -415,25 +529,25 @@ const handleAuthSignup = async (request, env) => {
   if (!email || !isValidEmail(email)) {
     await writeAuditEvent(env, request, {
       eventType: 'signup_failed',
-      metadata: { reason: 'invalid_email' },
+      metadata: { reason: 'generic' },
     });
-    return jsonResponse({ error: 'Invalid email.' }, { status: 400 });
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
   }
   if (!password || password.length < PASSWORD_MIN_LENGTH) {
     await writeAuditEvent(env, request, {
       eventType: 'signup_failed',
-      metadata: { reason: 'weak_password' },
+      metadata: { reason: 'generic' },
     });
-    return jsonResponse({ error: 'Password must be at least 12 characters.' }, { status: 400 });
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
   }
 
   const turnstile = await verifyTurnstile(turnstileToken, request, env);
   if (!turnstile.ok) {
     await writeAuditEvent(env, request, {
       eventType: 'signup_failed',
-      metadata: { reason: 'turnstile_failed', code: turnstile.code },
+      metadata: { reason: 'generic' },
     });
-    return jsonResponse({ error: 'Unable to verify request.', code: turnstile.code }, { status: 403 });
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
   }
 
   await cleanupExpiredSessions(env);
@@ -442,43 +556,55 @@ const handleAuthSignup = async (request, env) => {
   if (existing) {
     await writeAuditEvent(env, request, {
       eventType: 'signup_failed',
-      metadata: { reason: 'email_exists' },
+      metadata: { reason: 'generic' },
     });
-    return jsonResponse({ error: 'Unable to create account.' }, { status: 409 });
+    return jsonResponse({ ok: false, code: 'EMAIL_EXISTS' }, { status: 409 });
   }
 
-  const userId = crypto.randomUUID();
-  const passwordHash = await hashPassword(password);
-  await env.DB.prepare(
-    `INSERT INTO user (id, email, password_hash)
-     VALUES (?, ?, ?)`
-  )
-    .bind(userId, email, passwordHash)
-    .run();
-  await env.DB.prepare(
-    `INSERT INTO user_profile (user_id, email)
-     VALUES (?, ?)`
-  )
-    .bind(userId, email)
-    .run();
+  try {
+    const userId = crypto.randomUUID();
+    const passwordHash = await hashPassword(password);
+    await env.DB.prepare(
+      `INSERT INTO user (id, email, password_hash)
+       VALUES (?, ?, ?)`
+    )
+      .bind(userId, email, passwordHash)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO user_profile (user_id, email)
+       VALUES (?, ?)`
+    )
+      .bind(userId, email)
+      .run();
 
-  const lucia = initializeLucia(env);
-  const session = await lucia.createSession(userId, {});
-  const sessionCookie = lucia.createSessionCookie(session.id);
-  await writeAuditEvent(env, request, { userId, eventType: 'signup' });
+    const lucia = initializeLucia(env);
+    const session = await lucia.createSession(userId, {});
+    const sessionCookie = lucia.createSessionCookie(session.id);
+    await writeAuditEvent(env, request, { userId, eventType: 'signup_success' });
 
-  const headers = new Headers();
-  headers.append('Set-Cookie', sessionCookie.serialize());
-  return jsonResponse({ ok: true }, { headers });
+    const headers = new Headers();
+    headers.append('Set-Cookie', sessionCookie.serialize());
+    return jsonResponse({ ok: true }, { headers });
+  } catch (error) {
+    await writeAuditEvent(env, request, {
+      eventType: 'signup_failed',
+      metadata: { reason: 'generic' },
+    });
+    const message = error && typeof error.message === 'string' ? error.message : '';
+    if (message.includes('UNIQUE constraint failed: user.email') || message.includes('idx_user_email_normalized')) {
+      return jsonResponse({ ok: false, code: 'EMAIL_EXISTS' }, { status: 409 });
+    }
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
+  }
 };
 
 const handleAuthLogin = async (request, env) => {
   if (!env.DB) {
-    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+    return jsonResponse({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 500 });
   }
   const originError = requireSameOrigin(request, env);
   if (originError) {
-    return jsonResponse({ error: originError }, { status: 403 });
+    return jsonResponse({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 403 });
   }
   const body = await parseJsonBody(request);
   const email = normalizeEmail(body.email || '');
@@ -488,18 +614,18 @@ const handleAuthLogin = async (request, env) => {
   if (!email || !password) {
     await writeAuditEvent(env, request, {
       eventType: 'login_failed',
-      metadata: { reason: 'missing_credentials' },
+      metadata: { reason: 'generic' },
     });
-    return jsonResponse({ error: 'Invalid credentials.' }, { status: 400 });
+    return jsonResponse({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 400 });
   }
 
   const turnstile = await verifyTurnstile(turnstileToken, request, env);
   if (!turnstile.ok) {
     await writeAuditEvent(env, request, {
       eventType: 'login_failed',
-      metadata: { reason: 'turnstile_failed', code: turnstile.code },
+      metadata: { reason: 'generic' },
     });
-    return jsonResponse({ error: 'Unable to verify request.', code: turnstile.code }, { status: 403 });
+    return jsonResponse({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 400 });
   }
 
   await cleanupExpiredSessions(env);
@@ -510,9 +636,9 @@ const handleAuthLogin = async (request, env) => {
   if (!user || !(await verifyPassword(password, user.password_hash))) {
     await writeAuditEvent(env, request, {
       eventType: 'login_failed',
-      metadata: { reason: 'invalid_credentials' },
+      metadata: { reason: 'generic' },
     });
-    return jsonResponse({ error: 'Invalid credentials.' }, { status: 401 });
+    return jsonResponse({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 401 });
   }
 
   const lucia = initializeLucia(env);
@@ -520,11 +646,594 @@ const handleAuthLogin = async (request, env) => {
   const session = await lucia.createSession(user.id, {});
   const sessionCookie = lucia.createSessionCookie(session.id);
 
-  await writeAuditEvent(env, request, { userId: user.id, eventType: 'login' });
+  await writeAuditEvent(env, request, { userId: user.id, eventType: 'login_success' });
 
   const headers = new Headers();
   headers.append('Set-Cookie', sessionCookie.serialize());
   return jsonResponse({ ok: true }, { headers });
+};
+
+const handlePasswordResetRequest = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const body = await parseJsonBody(request);
+  const email = normalizeEmail(body.email || '');
+  const turnstileToken = body.turnstileToken || '';
+
+  const turnstile = await verifyTurnstile(turnstileToken, request, env);
+  if (!turnstile.ok) {
+    await writeAuditEvent(env, request, {
+      eventType: 'password_reset_requested',
+      metadata: { reason: 'turnstile_failed', code: turnstile.code },
+    });
+    return jsonResponse({ ok: true });
+  }
+
+  if (!email || !isValidEmail(email)) {
+    await writeAuditEvent(env, request, {
+      eventType: 'password_reset_requested',
+      metadata: { reason: 'invalid_email' },
+    });
+    return jsonResponse({ ok: true });
+  }
+
+  const salt = getHashSalt(env);
+  const signals = await getRequestSignals(request, env);
+  const emailHash = salt ? await hashSignal(email, salt) : '';
+  const rateLimit = await checkPasswordResetRateLimit(env, {
+    emailHash,
+    ipHash: signals.ipHash,
+  });
+  if (rateLimit.limited) {
+    await writeAuditEvent(env, request, {
+      eventType: 'password_reset_requested',
+      metadata: {
+        reason: 'rate_limited',
+        email_hash: emailHash || null,
+        email_limited: rateLimit.emailLimited,
+        ip_limited: rateLimit.ipLimited,
+      },
+    });
+    return jsonResponse({ ok: true });
+  }
+
+  const user = await env.DB.prepare('SELECT id, email FROM user WHERE email = ?')
+    .bind(email)
+    .first();
+  if (!user) {
+    await writeAuditEvent(env, request, {
+      eventType: 'password_reset_requested',
+      metadata: { reason: 'no_user', email_hash: emailHash || null },
+    });
+    return jsonResponse({ ok: true });
+  }
+
+  if (!salt) {
+    console.error('[Password Reset] HASH_SALT is not configured');
+    await writeAuditEvent(env, request, {
+      userId: user.id,
+      eventType: 'password_reset_requested',
+      metadata: { reason: 'missing_hash_salt', email_hash: emailHash || null },
+    });
+    return jsonResponse({ ok: true });
+  }
+
+  const token = generateResetToken();
+  const tokenHash = await hashResetToken(salt, token);
+  const tokenId = crypto.randomUUID();
+  const expiresAt = addMinutesIso(PASSWORD_RESET_TTL_MINUTES);
+  const createdAt = nowIso();
+  await env.DB.prepare(
+    `INSERT INTO password_reset_tokens
+       (id, user_id, token_hash, expires_at, used_at, created_at, request_ip_hash)
+     VALUES (?, ?, ?, ?, NULL, ?, ?)`
+  )
+    .bind(tokenId, user.id, tokenHash, expiresAt, createdAt, signals.ipHash || null)
+    .run();
+
+  const origin = new URL(request.url).origin;
+  const baseUrl = env.APP_BASE_URL || origin;
+  const resetUrl = new URL('/auth/password-reset/', baseUrl);
+  resetUrl.searchParams.set('uid', user.id);
+  resetUrl.searchParams.set('token', token);
+
+  const emailResult = await sendPasswordResetEmail(env, {
+    to: user.email,
+    resetUrl: resetUrl.toString(),
+    replyTo: env.SUPPORT_EMAIL_TO || undefined,
+  });
+
+  await writeAuditEvent(env, request, {
+    userId: user.id,
+    eventType: 'password_reset_requested',
+    metadata: { email_hash: emailHash || null, email_sent: !!emailResult.ok },
+  });
+
+  return jsonResponse({ ok: true });
+};
+
+const handlePasswordResetConfirm = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const body = await parseJsonBody(request);
+  const uid = (body.uid || '').toString().trim();
+  const token = (body.token || '').toString().trim();
+  const newPassword = body.newPassword || '';
+  const turnstileToken = body.turnstileToken || '';
+
+  if (!uid || !token) {
+    return jsonResponse({ error: 'Invalid reset link.', code: 'INVALID_RESET_LINK' }, { status: 400 });
+  }
+  if (!newPassword || newPassword.length < PASSWORD_MIN_LENGTH) {
+    return jsonResponse({ error: 'Password must be at least 12 characters.', code: 'WEAK_PASSWORD' }, { status: 400 });
+  }
+
+  const turnstile = await verifyTurnstile(turnstileToken, request, env);
+  if (!turnstile.ok) {
+    return jsonResponse({ error: 'Unable to verify request.', code: turnstile.code }, { status: 403 });
+  }
+
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[Password Reset] HASH_SALT is not configured');
+    return jsonResponse(
+      { error: 'Server configuration error.', code: 'MISCONFIGURED_SERVER' },
+      { status: 500 }
+    );
+  }
+
+  const tokenHash = await hashResetToken(salt, token);
+  const record = await env.DB.prepare(
+    `SELECT id, user_id, expires_at, used_at
+     FROM password_reset_tokens
+     WHERE user_id = ? AND token_hash = ?`
+  )
+    .bind(uid, tokenHash)
+    .first();
+  if (!record) {
+    return jsonResponse({ error: 'Invalid reset token.', code: 'INVALID_TOKEN' }, { status: 400 });
+  }
+  if (record.used_at) {
+    return jsonResponse({ error: 'Reset token already used.', code: 'TOKEN_USED' }, { status: 400 });
+  }
+  if (new Date(record.expires_at).getTime() <= Date.now()) {
+    return jsonResponse({ error: 'Reset token expired.', code: 'TOKEN_EXPIRED' }, { status: 400 });
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  await env.DB.prepare('UPDATE user SET password_hash = ? WHERE id = ?')
+    .bind(passwordHash, uid)
+    .run();
+  await env.DB.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE id = ?')
+    .bind(nowIso(), record.id)
+    .run();
+
+  const lucia = initializeLucia(env);
+  await lucia.invalidateUserSessions(uid);
+
+  await writeAuditEvent(env, request, {
+    userId: uid,
+    eventType: 'password_reset_completed',
+  });
+
+  const headers = new Headers();
+  headers.append('Set-Cookie', lucia.createBlankSessionCookie().serialize());
+  return jsonResponse({ ok: true }, { headers });
+};
+
+const handlePasskeyRegisterOptions = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const { user } = await getSessionUser(request, env);
+  if (!user) {
+    return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+  }
+  const body = await parseJsonBody(request);
+  const nickname = body.nickname ? body.nickname.toString().trim() : '';
+  await cleanupExpiredWebauthnChallenges(env);
+  const existingCredentials = await env.DB.prepare(
+    `SELECT credential_id, transports_json
+     FROM passkey_credentials
+     WHERE user_id = ?`
+  )
+    .bind(user.id)
+    .all();
+  const excludeCredentials = (existingCredentials.results || []).map((row) => ({
+    id: row.credential_id,
+    type: 'public-key',
+    transports: row.transports_json ? JSON.parse(row.transports_json) : undefined,
+  }));
+
+  const rpID = getWebAuthnRpId(request);
+  const rpName = getWebAuthnRpName(env);
+  const userID = new TextEncoder().encode(user.id);
+
+  const options = await generateRegistrationOptions({
+    rpName,
+    rpID,
+    userID,
+    userName: user.email || user.id,
+    excludeCredentials,
+    authenticatorSelection: {
+      residentKey: 'preferred',
+      userVerification: 'preferred',
+    },
+    attestationType: 'none',
+  });
+
+  const challengeId = crypto.randomUUID();
+  const createdAt = nowIso();
+  const expiresAt = addMinutesIso(WEBAUTHN_CHALLENGE_TTL_MINUTES);
+  const signals = await getRequestSignals(request, env);
+  await env.DB.prepare(
+    `INSERT INTO webauthn_challenges
+       (id, kind, user_id, challenge, created_at, expires_at, used_at, request_ip_hash, request_ua_hash)
+     VALUES (?, 'registration', ?, ?, ?, ?, NULL, ?, ?)`
+  )
+    .bind(
+      challengeId,
+      user.id,
+      options.challenge,
+      createdAt,
+      expiresAt,
+      signals.ipHash || null,
+      signals.userAgentHash || null
+    )
+    .run();
+
+  await writeAuditEvent(env, request, {
+    userId: user.id,
+    eventType: 'passkey_register_options_issued',
+  });
+
+  return jsonResponse({
+    ok: true,
+    options,
+    challengeId,
+    nickname,
+  });
+};
+
+const handlePasskeyRegisterVerify = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const { user } = await getSessionUser(request, env);
+  if (!user) {
+    return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+  }
+  const body = await parseJsonBody(request);
+  const attestationResponse = body.attestationResponse;
+  const nickname = body.nickname ? body.nickname.toString().trim() : null;
+  if (!attestationResponse) {
+    return jsonResponse({ error: 'Missing attestation response.', code: 'MISSING_ATTESTATION' }, { status: 400 });
+  }
+
+  await cleanupExpiredWebauthnChallenges(env);
+  const challengeRecord = await env.DB.prepare(
+    `SELECT id, challenge, expires_at, used_at
+     FROM webauthn_challenges
+     WHERE user_id = ? AND kind = 'registration' AND used_at IS NULL
+     ORDER BY created_at DESC
+     LIMIT 1`
+  )
+    .bind(user.id)
+    .first();
+  if (!challengeRecord) {
+    return jsonResponse({ error: 'Registration challenge missing.', code: 'CHALLENGE_MISSING' }, { status: 400 });
+  }
+  if (new Date(challengeRecord.expires_at).getTime() <= Date.now()) {
+    return jsonResponse({ error: 'Registration challenge expired.', code: 'CHALLENGE_EXPIRED' }, { status: 400 });
+  }
+
+  const rpID = getWebAuthnRpId(request);
+  const expectedOrigin = getWebAuthnExpectedOrigin(request);
+
+  let verification;
+  try {
+    verification = await verifyRegistrationResponse({
+      response: attestationResponse,
+      expectedChallenge: challengeRecord.challenge,
+      expectedOrigin,
+      expectedRPID: rpID,
+      requireUserVerification: false,
+    });
+  } catch (error) {
+    return jsonResponse({ ok: false, code: 'VERIFY_FAILED' }, { status: 400 });
+  }
+
+  if (!verification.verified || !verification.registrationInfo) {
+    return jsonResponse({ ok: false, code: 'VERIFY_FAILED' }, { status: 400 });
+  }
+
+  const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+  const credentialId = isoBase64URL.fromBuffer(credentialID);
+  const publicKey = isoBase64URL.fromBuffer(credentialPublicKey);
+  const transports = Array.isArray(attestationResponse?.response?.transports)
+    ? attestationResponse.response.transports
+    : null;
+
+  const createdAt = nowIso();
+  await env.DB.prepare(
+    `INSERT INTO passkey_credentials
+       (id, user_id, credential_id, public_key, counter, transports_json, created_at, last_used_at, nickname)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)`
+  )
+    .bind(
+      crypto.randomUUID(),
+      user.id,
+      credentialId,
+      publicKey,
+      counter || 0,
+      transports ? JSON.stringify(transports) : null,
+      createdAt,
+      nickname
+    )
+    .run();
+
+  await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+    .bind(nowIso(), challengeRecord.id)
+    .run();
+
+  await writeAuditEvent(env, request, {
+    userId: user.id,
+    eventType: 'passkey_register_completed',
+  });
+
+  return jsonResponse({ ok: true });
+};
+
+const handlePasskeyLoginOptions = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  await cleanupExpiredWebauthnChallenges(env);
+  const rpID = getWebAuthnRpId(request);
+  const options = await generateAuthenticationOptions({
+    rpID,
+    allowCredentials: [],
+    userVerification: 'preferred',
+  });
+
+  const challengeId = crypto.randomUUID();
+  const createdAt = nowIso();
+  const expiresAt = addMinutesIso(WEBAUTHN_CHALLENGE_TTL_MINUTES);
+  const signals = await getRequestSignals(request, env);
+  await env.DB.prepare(
+    `INSERT INTO webauthn_challenges
+       (id, kind, user_id, challenge, created_at, expires_at, used_at, request_ip_hash, request_ua_hash)
+     VALUES (?, 'authentication', NULL, ?, ?, ?, NULL, ?, ?)`
+  )
+    .bind(
+      challengeId,
+      options.challenge,
+      createdAt,
+      expiresAt,
+      signals.ipHash || null,
+      signals.userAgentHash || null
+    )
+    .run();
+
+  await writeAuditEvent(env, request, {
+    eventType: 'passkey_auth_options_issued',
+  });
+
+  return jsonResponse({ ok: true, options, challengeId });
+};
+
+const handlePasskeyLoginVerify = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const body = await parseJsonBody(request);
+  const assertionResponse = body.assertionResponse;
+  const challengeId = body.challengeId ? body.challengeId.toString().trim() : '';
+  if (!assertionResponse || !challengeId) {
+    return jsonResponse({ error: 'Missing passkey assertion.', code: 'MISSING_ASSERTION' }, { status: 400 });
+  }
+
+  await cleanupExpiredWebauthnChallenges(env);
+  const challengeRecord = await env.DB.prepare(
+    `SELECT id, challenge, expires_at, used_at
+     FROM webauthn_challenges
+     WHERE id = ? AND kind = 'authentication'`
+  )
+    .bind(challengeId)
+    .first();
+  if (!challengeRecord || challengeRecord.used_at) {
+    await writeAuditEvent(env, request, {
+      eventType: 'passkey_login_failed',
+      metadata: { reason: 'challenge_invalid' },
+    });
+    return jsonResponse({ ok: false, code: 'CHALLENGE_INVALID' }, { status: 400 });
+  }
+  if (new Date(challengeRecord.expires_at).getTime() <= Date.now()) {
+    await writeAuditEvent(env, request, {
+      eventType: 'passkey_login_failed',
+      metadata: { reason: 'challenge_expired' },
+    });
+    return jsonResponse({ ok: false, code: 'CHALLENGE_EXPIRED' }, { status: 400 });
+  }
+
+  const credentialId = assertionResponse?.id || assertionResponse?.rawId || '';
+  if (!credentialId) {
+    await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+      .bind(nowIso(), challengeRecord.id)
+      .run();
+    return jsonResponse({ ok: false, code: 'UNKNOWN_CREDENTIAL' }, { status: 400 });
+  }
+
+  const credential = await env.DB.prepare(
+    `SELECT id, user_id, credential_id, public_key, counter
+     FROM passkey_credentials
+     WHERE credential_id = ?`
+  )
+    .bind(credentialId)
+    .first();
+  if (!credential) {
+    await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+      .bind(nowIso(), challengeRecord.id)
+      .run();
+    await writeAuditEvent(env, request, {
+      eventType: 'passkey_login_failed',
+      metadata: { reason: 'unknown_credential' },
+    });
+    return jsonResponse({ ok: false, code: 'UNKNOWN_CREDENTIAL' }, { status: 400 });
+  }
+
+  const rpID = getWebAuthnRpId(request);
+  const expectedOrigin = getWebAuthnExpectedOrigin(request);
+  const authenticator = {
+    credentialID: isoBase64URL.toBuffer(credential.credential_id),
+    credentialPublicKey: isoBase64URL.toBuffer(credential.public_key),
+    counter: Number(credential.counter || 0),
+  };
+
+  let verification;
+  try {
+    verification = await verifyAuthenticationResponse({
+      response: assertionResponse,
+      expectedChallenge: challengeRecord.challenge,
+      expectedOrigin,
+      expectedRPID: rpID,
+      authenticator,
+      requireUserVerification: false,
+    });
+  } catch (error) {
+    await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+      .bind(nowIso(), challengeRecord.id)
+      .run();
+    await writeAuditEvent(env, request, {
+      eventType: 'passkey_login_failed',
+      metadata: { reason: 'verify_failed' },
+    });
+    return jsonResponse({ ok: false, code: 'VERIFY_FAILED' }, { status: 400 });
+  }
+
+  if (!verification.verified || !verification.authenticationInfo) {
+    await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+      .bind(nowIso(), challengeRecord.id)
+      .run();
+    await writeAuditEvent(env, request, {
+      eventType: 'passkey_login_failed',
+      metadata: { reason: 'not_verified' },
+    });
+    return jsonResponse({ ok: false, code: 'VERIFY_FAILED' }, { status: 400 });
+  }
+
+  const { newCounter } = verification.authenticationInfo;
+  await env.DB.prepare(
+    `UPDATE passkey_credentials
+     SET counter = ?, last_used_at = ?
+     WHERE id = ?`
+  )
+    .bind(newCounter || 0, nowIso(), credential.id)
+    .run();
+
+  await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+    .bind(nowIso(), challengeRecord.id)
+    .run();
+
+  const lucia = initializeLucia(env);
+  await lucia.invalidateUserSessions(credential.user_id);
+  const session = await lucia.createSession(credential.user_id, {});
+  const sessionCookie = lucia.createSessionCookie(session.id);
+
+  await writeAuditEvent(env, request, {
+    userId: credential.user_id,
+    eventType: 'passkey_login_success',
+  });
+
+  const headers = new Headers();
+  headers.append('Set-Cookie', sessionCookie.serialize());
+  return jsonResponse({ ok: true }, { headers });
+};
+
+const handlePasskeyList = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const { user } = await getSessionUser(request, env);
+  if (!user) {
+    return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+  }
+
+  const result = await env.DB.prepare(
+    `SELECT id, nickname, created_at, last_used_at
+     FROM passkey_credentials
+     WHERE user_id = ?
+     ORDER BY created_at DESC`
+  )
+    .bind(user.id)
+    .all();
+
+  return jsonResponse({ ok: true, credentials: result.results || [] });
+};
+
+const handlePasskeyRemove = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const { user } = await getSessionUser(request, env);
+  if (!user) {
+    return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+  }
+  const body = await parseJsonBody(request);
+  const id = body.id ? body.id.toString().trim() : '';
+  if (!id) {
+    return jsonResponse({ error: 'Missing passkey id.', code: 'MISSING_ID' }, { status: 400 });
+  }
+  const result = await env.DB.prepare(
+    `DELETE FROM passkey_credentials
+     WHERE id = ? AND user_id = ?`
+  )
+    .bind(id, user.id)
+    .run();
+  const changes = result?.meta?.changes || 0;
+  if (!result.success || changes === 0) {
+    return jsonResponse({ error: 'Unable to remove passkey.', code: 'REMOVE_FAILED' }, { status: 400 });
+  }
+  await writeAuditEvent(env, request, {
+    userId: user.id,
+    eventType: 'passkey_removed',
+    metadata: { passkey_id: id },
+  });
+  return jsonResponse({ ok: true });
 };
 
 const handleAuthLogout = async (request, env) => {
@@ -1206,7 +1915,7 @@ export default {
         }
         const email = normalizeEmail(url.searchParams.get('email') || '');
         if (!email || !isValidEmail(email)) {
-          return jsonResponse({ error: 'Invalid email.' }, { status: 400 });
+          return jsonResponse({ error: 'Invalid email.', code: 'INVALID_EMAIL' }, { status: 400 });
         }
         const existing = await env.DB.prepare('SELECT id FROM user WHERE email = ?')
           .bind(email)
@@ -1226,6 +1935,38 @@ export default {
         return handleAuthLogin(request, env);
       }
 
+      if (request.method === 'POST' && pathParts[2] === 'password-reset' && pathParts[3] === 'request') {
+        return handlePasswordResetRequest(request, env);
+      }
+
+      if (request.method === 'POST' && pathParts[2] === 'password-reset' && pathParts[3] === 'confirm') {
+        return handlePasswordResetConfirm(request, env);
+      }
+
+      if (request.method === 'POST' && pathParts[2] === 'passkey' && pathParts[3] === 'register' && pathParts[4] === 'options') {
+        return handlePasskeyRegisterOptions(request, env);
+      }
+
+      if (request.method === 'POST' && pathParts[2] === 'passkey' && pathParts[3] === 'register' && pathParts[4] === 'verify') {
+        return handlePasskeyRegisterVerify(request, env);
+      }
+
+      if (request.method === 'POST' && pathParts[2] === 'passkey' && pathParts[3] === 'login' && pathParts[4] === 'options') {
+        return handlePasskeyLoginOptions(request, env);
+      }
+
+      if (request.method === 'POST' && pathParts[2] === 'passkey' && pathParts[3] === 'login' && pathParts[4] === 'verify') {
+        return handlePasskeyLoginVerify(request, env);
+      }
+
+      if (request.method === 'GET' && pathParts[2] === 'passkey' && pathParts[3] === 'list') {
+        return handlePasskeyList(request, env);
+      }
+
+      if (request.method === 'DELETE' && pathParts[2] === 'passkey' && pathParts[3] === 'remove') {
+        return handlePasskeyRemove(request, env);
+      }
+
       if (request.method === 'POST' && pathParts[2] === 'logout') {
         return handleAuthLogout(request, env);
       }
@@ -1236,7 +1977,9 @@ export default {
         if (!env.DB) {
           throw new Error('Database binding not available');
         }
+        const { user } = await getSessionUser(request, env);
 
+        const userId = user ? user.id : '';
         const result = await env.DB.prepare(
           `SELECT s.slug,
                   s.title,
@@ -1244,7 +1987,10 @@ export default {
                   s.status,
                   v.id AS version_id,
                   v.json_hash,
-                  v.json_text
+                  v.json_text,
+                  r.submitted_at AS submitted_at,
+                  r.updated_at AS updated_at,
+                  r.edit_count AS edit_count
            FROM surveys s
            JOIN survey_versions v ON v.id = (
              SELECT v2.id
@@ -1253,8 +1999,13 @@ export default {
              ORDER BY v2.published_at DESC, v2.version DESC, v2.id DESC
              LIMIT 1
            )
+           LEFT JOIN responses r
+             ON r.survey_version_id = v.id
+            AND r.user_id = ?
            ORDER BY s.created_at DESC`
-        ).all();
+        )
+          .bind(userId)
+          .all();
 
         const payload = (result.results || []).map((row) => {
           let description = '';
@@ -1272,10 +2023,73 @@ export default {
             description,
             versionId: row.version_id,
             versionHash: row.json_hash,
+            response: row.submitted_at
+              ? {
+                  submittedAt: row.submitted_at,
+                  updatedAt: row.updated_at || row.submitted_at,
+                  editCount: row.edit_count || 0,
+                }
+              : null,
           };
         });
 
         return jsonResponse(payload);
+      } catch (error) {
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/responses/mine') {
+      try {
+        if (!env.DB) {
+          throw new Error('Database binding not available');
+        }
+        const { user } = await getSessionUser(request, env);
+        if (!user) {
+          return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
+        }
+        const surveyVersionId = url.searchParams.get('surveyVersionId') || '';
+        if (!surveyVersionId) {
+          return jsonResponse({ error: 'Missing surveyVersionId.', code: 'MISSING_SURVEY_VERSION_ID' }, { status: 400 });
+        }
+
+        const responseRow = await env.DB.prepare(
+          `SELECT id, submitted_at, updated_at, edit_count
+           FROM responses
+           WHERE user_id = ? AND survey_version_id = ?
+           LIMIT 1`
+        )
+          .bind(user.id, surveyVersionId)
+          .first();
+
+        if (!responseRow) {
+          return jsonResponse({ exists: false });
+        }
+
+        const answersResult = await env.DB.prepare(
+          `SELECT question_name, value_json
+           FROM response_answers
+           WHERE response_id = ?`
+        )
+          .bind(responseRow.id)
+          .all();
+
+        const answersJson = {};
+        (answersResult.results || []).forEach((row) => {
+          try {
+            answersJson[row.question_name] = JSON.parse(row.value_json);
+          } catch (error) {
+            answersJson[row.question_name] = null;
+          }
+        });
+
+        return jsonResponse({
+          exists: true,
+          submittedAt: responseRow.submitted_at,
+          updatedAt: responseRow.updated_at || responseRow.submitted_at,
+          editCount: responseRow.edit_count || 0,
+          answersJson,
+        });
       } catch (error) {
         return jsonResponse({ error: error.message }, { status: 500 });
       }
@@ -1358,13 +2172,18 @@ export default {
         }
         const slug = decodeURIComponent(pathParts[2]);
         const body = await parseJsonBody(request);
-        const versionId = body.versionId;
+        const versionId = body.surveyVersionId || body.versionId;
         const versionHash = body.versionHash;
-        const answers = body.answers;
+        const answers = body.answersJson || body.answers;
         const meta = body.meta || {};
 
-        if (!versionId || !versionHash || !answers || typeof answers !== 'object') {
+        if (!versionId || !answers || typeof answers !== 'object') {
           return jsonResponse({ error: 'Invalid payload.' }, { status: 400 });
+        }
+
+        const { user } = await getSessionUser(request, env);
+        if (!user) {
+          return jsonResponse({ error: 'Unauthorized.', code: 'UNAUTHORIZED' }, { status: 401 });
         }
 
         const version = await env.DB.prepare(
@@ -1381,11 +2200,10 @@ export default {
           return jsonResponse({ error: 'Survey version not found.' }, { status: 404 });
         }
 
-        if (version.json_hash !== versionHash) {
-          return jsonResponse({ error: 'Survey version hash mismatch.' }, { status: 400 });
+        if (versionHash && versionHash !== version.json_hash) {
+          return jsonResponse({ error: 'Survey version hash mismatch.', code: 'VERSION_HASH_MISMATCH' }, { status: 400 });
         }
 
-        const responseId = crypto.randomUUID();
         const districtMeta =
           meta.district && typeof meta.district === 'string'
             ? meta.district.trim()
@@ -1415,21 +2233,70 @@ export default {
             ? JSON.stringify(combinedDistricts)
             : districtMeta;
 
-        await env.DB.prepare(
-          `INSERT INTO responses
-           (id, survey_id, survey_version_id, version_hash, verified_flag, district, ip_hash, user_hash)
-           VALUES (?, ?, ?, ?, 0, ?, ?, ?)`
+        const existing = await env.DB.prepare(
+          `SELECT id, submitted_at, updated_at, edit_count
+           FROM responses
+           WHERE user_id = ? AND survey_version_id = ?
+           LIMIT 1`
         )
-          .bind(
-            responseId,
-            version.survey_id,
-            version.version_id,
-            versionHash,
-            districtPayload,
-            ipHash,
-            userHash
+          .bind(user.id, version.version_id)
+          .first();
+
+        const now = nowIso();
+        let responseId = existing ? existing.id : crypto.randomUUID();
+        let submittedAt = existing?.submitted_at || now;
+        let updatedAt = now;
+        let editCount = existing?.edit_count || 0;
+
+        if (!existing) {
+          await env.DB.prepare(
+            `INSERT INTO responses
+             (id, user_id, survey_id, survey_version_id, version_hash, verified_flag, district, ip_hash, user_hash, submitted_at, updated_at, edit_count)
+             VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0)`
           )
-          .run();
+            .bind(
+              responseId,
+              user.id,
+              version.survey_id,
+              version.version_id,
+              version.json_hash,
+              districtPayload,
+              ipHash,
+              userHash,
+              now,
+              now
+            )
+            .run();
+          await writeAuditEvent(env, request, {
+            userId: user.id,
+            eventType: 'response_created',
+            metadata: { survey_version_id: version.version_id, response_id: responseId },
+          });
+          await writeAuditEvent(env, request, {
+            userId: user.id,
+            eventType: 'response_submitted',
+            metadata: { survey_version_id: version.version_id, response_id: responseId },
+          });
+        } else {
+          editCount += 1;
+          await env.DB.prepare(
+            `UPDATE responses
+             SET updated_at = ?, edit_count = ?
+             WHERE id = ?`
+          )
+            .bind(updatedAt, editCount, responseId)
+            .run();
+          await env.DB.prepare(
+            `DELETE FROM response_answers WHERE response_id = ?`
+          )
+            .bind(responseId)
+            .run();
+          await writeAuditEvent(env, request, {
+            userId: user.id,
+            eventType: 'response_updated',
+            metadata: { survey_version_id: version.version_id, response_id: responseId },
+          });
+        }
 
         const entries = Object.entries(answers);
         for (const [questionName, value] of entries) {
@@ -1445,7 +2312,14 @@ export default {
             .run();
         }
 
-        return jsonResponse({ ok: true, responseId });
+        return jsonResponse({
+          ok: true,
+          responseId,
+          existedBefore: !!existing,
+          submittedAt,
+          updatedAt,
+          editCount,
+        });
       } catch (error) {
         return jsonResponse({ error: error.message }, { status: 500 });
       }
@@ -1648,6 +2522,7 @@ export default {
       const slug = decodeURIComponent(pathParts[1]);
       const bodyHtml = `
         <h1 id="surveyjs-title">Survey</h1>
+        <p class="helper-text is-hidden" id="surveyjs-editing"></p>
         <p class="helper-text" id="surveyjs-status">Loading survey...</p>
         <div id="surveyjs-root" data-slug="${escapeHtml(slug)}"></div>
         <script src="/js/surveyjs-bundle.js"></script>

@@ -11,7 +11,11 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ"
+    "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ",
+    "EMAIL_FROM": "noreply@grassrootsmvt.org",
+    "SUPPORT_EMAIL_TO": "anchorskov@gmail.com",
+    "APP_BASE_URL": "http://localhost:8787",
+    "ENVIRONMENT": "local"
   },
   "d1_databases": [
     {
@@ -35,7 +39,10 @@
     "production": {
       "vars": {
         "ENVIRONMENT": "production",
-        "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ"
+        "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ",
+        "EMAIL_FROM": "noreply@grassrootsmvt.org",
+        "SUPPORT_EMAIL_TO": "anchorskov@gmail.com",
+        "APP_BASE_URL": "https://grassrootsmvt.org"
       },
       "d1_databases": [
         {

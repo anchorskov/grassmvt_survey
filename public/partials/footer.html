@@ -8,44 +8,111 @@
     <span>Powered by Cloudflare Pages</span>
   </div>
 </footer>
-<div class="auth-modal is-hidden" id="auth-modal" aria-hidden="true" role="dialog" aria-modal="true">
+<div class="auth-modal is-hidden" id="login-modal" aria-hidden="true" role="dialog" aria-modal="true">
   <div class="auth-modal__backdrop" data-auth-close></div>
   <div class="auth-modal__panel" role="document">
     <button class="auth-modal__close" type="button" data-auth-close aria-label="Close">
       ×
     </button>
-    <div class="auth-modal__content" id="auth-modal-content">
-      <h2 id="auth-modal-title">Sign in</h2>
-      <p class="helper-text" id="auth-modal-subtitle">
-        Use your account to continue.
-      </p>
-      <div class="auth-tabs" role="tablist">
-        <button class="auth-tab is-active" type="button" data-auth-mode="login" role="tab">
-          Sign in
-        </button>
-        <button class="auth-tab" type="button" data-auth-mode="signup" role="tab">
-          Create account
-        </button>
-      </div>
-      <section class="survey-form is-hidden" id="auth-modal-logged-in" aria-live="polite">
+    <div class="auth-modal__content">
+      <h2>Sign in</h2>
+      <p class="helper-text">Use your account to continue.</p>
+      <section class="survey-form is-hidden" id="login-modal-logged-in" aria-live="polite">
         <p>You are signed in.</p>
-        <button class="button button--primary" type="button" id="auth-modal-logout">Sign out</button>
+        <button class="button button--primary" type="button" id="login-modal-logout">Sign out</button>
+        <a class="button button--small" href="/account/">Manage passkeys</a>
       </section>
-      <form class="survey-form" id="auth-modal-form">
-        <div class="form-row">
-          <label for="auth-modal-email">Email</label>
-          <input id="auth-modal-email" name="email" type="email" autocomplete="email" required />
+      <form class="survey-form" id="login-modal-form">
+        <div class="passkey-actions">
+          <button class="button button--primary" type="button" id="login-passkey-button">
+            Sign in with passkey
+          </button>
+          <p class="helper-text">Use a passkey for faster sign-in, or use your password below.</p>
         </div>
         <div class="form-row">
-          <label for="auth-modal-password">Password</label>
-          <input id="auth-modal-password" name="password" type="password" autocomplete="current-password" required />
+          <label for="login-modal-email">Email</label>
+          <input id="login-modal-email" name="email" type="email" autocomplete="email" required />
         </div>
-        <div class="form-row" id="auth-modal-turnstile"></div>
-        <input type="hidden" id="auth-modal-token" name="turnstileToken" />
-        <p class="form-error is-hidden" id="auth-modal-error" role="alert"></p>
-        <button class="button button--primary" type="submit" id="auth-modal-submit">
-          Sign in
-        </button>
+        <div class="form-row">
+          <label for="login-modal-password">Password</label>
+          <input id="login-modal-password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="form-row" id="login-modal-turnstile"></div>
+        <input type="hidden" id="login-modal-token" name="turnstileToken" />
+        <p class="form-error is-hidden" id="login-modal-error" role="alert"></p>
+        <button class="button button--primary" type="submit">Sign in</button>
+        <p class="helper-text auth-modal__links">
+          <button class="link-button" type="button" data-auth-open="password-reset">
+            Forgot password?
+          </button>
+        </p>
+        <p class="helper-text auth-modal__links">
+          New here?
+          <button class="link-button" type="button" data-auth-open="signup">Create account</button>
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="auth-modal is-hidden" id="signup-modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="auth-modal__backdrop" data-auth-close></div>
+  <div class="auth-modal__panel" role="document">
+    <button class="auth-modal__close" type="button" data-auth-close aria-label="Close">
+      ×
+    </button>
+    <div class="auth-modal__content">
+      <h2>Create account</h2>
+      <p class="helper-text">Use a strong password with at least 12 characters.</p>
+      <form class="survey-form" id="signup-modal-form">
+        <div class="form-row">
+          <label for="signup-modal-email">Email</label>
+          <input id="signup-modal-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="form-row">
+          <label for="signup-modal-password">Password</label>
+          <input id="signup-modal-password" name="password" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="form-row">
+          <label for="signup-modal-password-confirm">Verify password</label>
+          <input
+            id="signup-modal-password-confirm"
+            name="passwordConfirm"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </div>
+        <div class="form-row" id="signup-modal-turnstile"></div>
+        <input type="hidden" id="signup-modal-token" name="turnstileToken" />
+        <p class="form-error is-hidden" id="signup-modal-error" role="alert"></p>
+        <button class="button button--primary" type="submit">Create account</button>
+        <p class="helper-text auth-modal__links">
+          Already have an account?
+          <button class="link-button" type="button" data-auth-open="login">Sign in</button>
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="auth-modal is-hidden" id="password-reset-modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="auth-modal__backdrop" data-auth-close></div>
+  <div class="auth-modal__panel" role="document">
+    <button class="auth-modal__close" type="button" data-auth-close aria-label="Close">
+      ×
+    </button>
+    <div class="auth-modal__content">
+      <h2>Reset password</h2>
+      <p class="helper-text">We will email a one-time link to reset your password.</p>
+      <form class="survey-form" id="password-reset-modal-form">
+        <div class="form-row">
+          <label for="password-reset-modal-email">Email</label>
+          <input id="password-reset-modal-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="form-row" id="password-reset-modal-turnstile"></div>
+        <input type="hidden" id="password-reset-modal-token" name="turnstileToken" />
+        <p class="form-error is-hidden" id="password-reset-modal-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="password-reset-modal-success" role="status"></p>
+        <button class="button button--primary" type="submit">Send reset link</button>
       </form>
     </div>
   </div>

@@ -16,6 +16,10 @@ const surveySources = {
     slug: 'survey-process',
     file: 'surveys_survey_process_v1.jsonc',
   },
+  security: {
+    slug: 'security',
+    file: 'surveys_security_v1.jsonc',
+  },
 };
 
 const parseArgs = (argv) => {
@@ -220,7 +224,7 @@ const main = () => {
       : [surveySources[slugArg]].filter(Boolean);
 
   if (!targets.length) {
-    throw new Error('Invalid --slug, use abortion, survey-process, or all');
+    throw new Error('Invalid --slug, use abortion, survey-process, security, or all');
   }
 
   const dbName = dbTarget === 'local' ? 'wy_local' : 'wy';

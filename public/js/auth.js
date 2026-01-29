@@ -4,24 +4,41 @@
   const authMode = form ? form.dataset.authMode : '';
   const emailInput = document.getElementById('auth-email');
   const passwordInput = document.getElementById('auth-password');
+  const passwordConfirmInput = document.getElementById('auth-password-confirm');
   const errorEl = document.getElementById('auth-error');
   const loggedInEl = document.getElementById('auth-logged-in');
   const logoutButton = document.getElementById('logout-button');
   const tokenInput = document.getElementById('turnstile-token');
+  const passkeyButton = document.getElementById('passkey-login-button');
   let turnstileWidgetId = null;
   let lastTurnstileToken = '';
 
-  const showError = (message) => {
+  const showError = (message, allowHtml = false) => {
     if (!errorEl) {
       return;
     }
     if (!message) {
       errorEl.textContent = '';
+      errorEl.innerHTML = '';
       errorEl.classList.add('is-hidden');
       return;
     }
-    errorEl.textContent = message;
+    if (allowHtml) {
+      errorEl.innerHTML = message;
+    } else {
+      errorEl.textContent = message;
+    }
     errorEl.classList.remove('is-hidden');
+  };
+
+  const showDuplicateEmailMessage = () => {
+    const message = [
+      'That email already has an account. ',
+      '<a href="/auth/login/">Sign in</a>',
+      ' or ',
+      '<a href="/auth/password-reset/">reset your password</a>.',
+    ].join('');
+    showError(message, true);
   };
 
   const setLoggedInState = (isLoggedIn, email) => {
@@ -98,6 +115,32 @@
     }
   };
 
+  const loadWebAuthnBrowser = async () => {
+    if (window.__webauthnBrowser) {
+      return window.__webauthnBrowser;
+    }
+    const mod = await import('https://esm.sh/@simplewebauthn/browser@9.0.2');
+    window.__webauthnBrowser = mod;
+    return mod;
+  };
+
+  const ensureTurnstileLoaded = async () => {
+    if (window.turnstile) {
+      return true;
+    }
+    if (!window.TurnstileLoader) {
+      logDebug('Turnstile loader not available');
+      return false;
+    }
+    try {
+      await window.TurnstileLoader.load();
+      return !!window.turnstile;
+    } catch (error) {
+      logDebug('Turnstile loader failed: ' + error.message);
+      return false;
+    }
+  };
+
   const renderTurnstile = async () => {
     if (!form || !tokenInput) {
       return;
@@ -112,7 +155,8 @@
       logDebug('Turnstile site key missing');
       return;
     }
-    if (!window.turnstile) {
+    const loaded = await ensureTurnstileLoaded();
+    if (!loaded) {
       showError('Turnstile failed to load.');
       logDebug('Turnstile script failed to load');
       return;
@@ -184,8 +228,13 @@
       showError('');
       const email = emailInput ? emailInput.value.trim() : '';
       const password = passwordInput ? passwordInput.value : '';
+      const passwordConfirm = passwordConfirmInput ? passwordConfirmInput.value : '';
       if (!email || !password) {
         showError('Email and password are required.');
+        return;
+      }
+      if (authMode === 'signup' && password !== passwordConfirm) {
+        showError('Passwords do not match.');
         return;
       }
       if (authMode === 'signup' && password.length < 12) {
@@ -195,7 +244,7 @@
       if (authMode === 'signup') {
         const exists = await checkAccountExists(email);
         if (exists) {
-          showError('Account exists. Please sign in.');
+          showDuplicateEmailMessage();
           return;
         }
       }
@@ -215,11 +264,11 @@
       });
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
-        logDebug('Server error: ' + (errorBody.code || 'unknown') + ' - ' + errorBody.error);
-        if (authMode === 'signup' && response.status === 409) {
-          showError('Account exists. Please sign in.');
-        } else if (authMode === 'login' && response.status === 401) {
-          showError('Account not found. Create an account to continue.');
+        logDebug('Server error: ' + (errorBody.code || 'unknown'));
+        if (authMode === 'signup' && response.status === 409 && errorBody.code === 'EMAIL_EXISTS') {
+          showDuplicateEmailMessage();
+        } else if (authMode === 'login' && response.status === 401 && errorBody.code === 'INVALID_CREDENTIALS') {
+          showError('Email or password is incorrect.');
         } else {
           showError(authMode === 'signup' ? 'Unable to create account.' : 'Unable to sign in.');
         }
@@ -235,8 +284,80 @@
       tokenInput.value = '';
       logDebug(authMode + ' successful');
       const authenticated = await fetchAuthState();
+      if (window.AuthUI && typeof window.AuthUI.fetchAuthState === 'function') {
+        await window.AuthUI.fetchAuthState();
+      }
+      window.dispatchEvent(
+        new CustomEvent('auth:changed', { detail: { authenticated: !!authenticated } })
+      );
+      if (authMode === 'signup' && authenticated) {
+        showError('Account created. Add a passkey from your account page.');
+      }
       if (authMode === 'signup' && !authenticated) {
         showError('Account created. Please sign in.');
+      }
+    });
+  }
+
+  if (passkeyButton && authMode === 'login') {
+    if (!window.PublicKeyCredential) {
+      passkeyButton.disabled = true;
+      passkeyButton.textContent = 'Passkey not supported on this device';
+    }
+    passkeyButton.addEventListener('click', async () => {
+      showError('');
+      let browser;
+      try {
+        browser = await loadWebAuthnBrowser();
+      } catch (error) {
+        showError('Passkey support is unavailable.');
+        return;
+      }
+      const optionsResponse = await fetch('/api/auth/passkey/login/options', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      });
+      if (!optionsResponse.ok) {
+        showError('Unable to start passkey sign-in.');
+        return;
+      }
+      const optionsData = await optionsResponse.json();
+      if (!optionsData.options || !optionsData.challengeId) {
+        showError('Unable to start passkey sign-in.');
+        return;
+      }
+      let assertionResponse;
+      try {
+        assertionResponse = await browser.startAuthentication(optionsData.options);
+      } catch (error) {
+        showError('Passkey sign-in was cancelled.');
+        return;
+      }
+      const verifyResponse = await fetch('/api/auth/passkey/login/verify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          assertionResponse,
+          challengeId: optionsData.challengeId,
+        }),
+      });
+      if (!verifyResponse.ok) {
+        showError('Passkey sign-in failed.');
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const authenticated = await fetchAuthState();
+      if (window.AuthUI && typeof window.AuthUI.fetchAuthState === 'function') {
+        await window.AuthUI.fetchAuthState();
+      }
+      window.dispatchEvent(
+        new CustomEvent('auth:changed', { detail: { authenticated: !!authenticated } })
+      );
+      if (!authenticated) {
+        showError('Passkey sign-in failed.');
       }
     });
   }

@@ -24,13 +24,22 @@
 
   const includePromises = Array.from(includeTargets, (target) => loadInclude(target));
 
-  Promise.allSettled(includePromises).then(() => {
-    if (!window.__authModalLoaded) {
-      const script = document.createElement('script');
-      script.src = '/js/auth-modal.js';
-      script.defer = true;
-      document.body.appendChild(script);
-      window.__authModalLoaded = true;
+  const loadScriptOnce = (src, flagName) => {
+    if (window[flagName]) {
+      return;
     }
+    const script = document.createElement('script');
+    script.src = src;
+    script.defer = true;
+    document.body.appendChild(script);
+    window[flagName] = true;
+  };
+
+  Promise.allSettled(includePromises).then(() => {
+    loadScriptOnce('/js/turnstile-loader.js', '__turnstileLoaderLoaded');
+    loadScriptOnce('/js/auth-shared.js', '__authSharedLoaded');
+    loadScriptOnce('/js/login-modal.js', '__loginModalLoaded');
+    loadScriptOnce('/js/signup-modal.js', '__signupModalLoaded');
+    loadScriptOnce('/js/password-reset-modal.js', '__passwordResetModalLoaded');
   });
 })();

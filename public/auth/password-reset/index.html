@@ -1,0 +1,46 @@
+<!-- public/auth/password-reset/index.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reset Password | Grassroots Movement</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <div data-include="/partials/header.html"></div>
+    <main>
+      <h1>Reset password</h1>
+      <p class="helper-text">Enter your new password to finish the reset.</p>
+
+      <section id="password-reset-missing" class="survey-form is-hidden" aria-live="polite">
+        <p class="form-error">The reset link is missing or invalid.</p>
+        <a class="button button--primary" href="/">Return home</a>
+      </section>
+
+      <form id="password-reset-confirm-form" class="survey-form">
+        <input type="hidden" id="password-reset-uid" name="uid" />
+        <input type="hidden" id="password-reset-token" name="token" />
+        <div class="form-row">
+          <label for="password-reset-new-password">New password</label>
+          <input
+            id="password-reset-new-password"
+            name="newPassword"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </div>
+        <div class="form-row" id="password-reset-turnstile"></div>
+        <input type="hidden" id="password-reset-turnstile-token" name="turnstileToken" />
+        <p class="form-error is-hidden" id="password-reset-confirm-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="password-reset-confirm-success" role="status"></p>
+        <button class="button button--primary" type="submit">Reset password</button>
+      </form>
+    </main>
+    <div data-include="/partials/footer.html"></div>
+    <script src="/js/include-partials.js"></script>
+    <script src="/js/turnstile-loader.js"></script>
+    <script src="/js/password-reset-confirm.js"></script>
+  </body>
+</html>

@@ -17,9 +17,16 @@
         <p>You are signed in.</p>
         <button class="button button--primary" type="button" id="logout-button">Sign out</button>
         <a class="button button--small" href="/surveys/list/">Back to surveys</a>
+        <a class="button button--small" href="/account/">Manage passkeys</a>
       </section>
 
       <form id="auth-form" class="survey-form" data-auth-mode="login">
+        <div class="passkey-actions">
+          <button class="button button--primary" type="button" id="passkey-login-button">
+            Sign in with passkey
+          </button>
+          <p class="helper-text">Use a passkey for faster sign-in, or use your password below.</p>
+        </div>
         <div class="form-row">
           <label for="auth-email">Email</label>
           <input id="auth-email" name="email" type="email" autocomplete="email" required />
@@ -40,7 +47,7 @@
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
+    <script src="/js/turnstile-loader.js"></script>
     <script src="/js/auth.js"></script>
   </body>
 </html>

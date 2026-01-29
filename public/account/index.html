@@ -1,0 +1,42 @@
+<!-- public/account/index.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Account | Grassroots Movement</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <div data-include="/partials/header.html"></div>
+    <main>
+      <h1>Your account</h1>
+      <p class="helper-text">Manage passkeys for faster sign-in.</p>
+
+      <section id="account-auth-required" class="survey-form is-hidden" aria-live="polite">
+        <p class="form-error">Please sign in to manage your passkeys.</p>
+        <button class="button button--primary" type="button" data-auth-open="login">
+          Sign in
+        </button>
+      </section>
+
+      <section id="account-passkeys" class="survey-form is-hidden" aria-live="polite">
+        <div class="form-row">
+          <label for="passkey-nickname">Passkey nickname (optional)</label>
+          <input id="passkey-nickname" name="passkey-nickname" type="text" maxlength="60" />
+        </div>
+        <button class="button button--primary" type="button" id="add-passkey-button">
+          Add passkey
+        </button>
+        <p class="form-error is-hidden" id="passkey-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="passkey-success" role="status"></p>
+
+        <h2>Registered passkeys</h2>
+        <ul id="passkey-list" class="passkey-list"></ul>
+      </section>
+    </main>
+    <div data-include="/partials/footer.html"></div>
+    <script src="/js/include-partials.js"></script>
+    <script src="/js/passkey-account.js"></script>
+  </body>
+</html>

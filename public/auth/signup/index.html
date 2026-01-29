@@ -17,6 +17,7 @@
         <p>You are signed in.</p>
         <button class="button button--primary" type="button" id="logout-button">Sign out</button>
         <a class="button button--small" href="/surveys/list/">Back to surveys</a>
+        <a class="button button--small" href="/account/">Add a passkey</a>
       </section>
 
       <form id="auth-form" class="survey-form" data-auth-mode="signup">
@@ -27,6 +28,16 @@
         <div class="form-row">
           <label for="auth-password">Password</label>
           <input id="auth-password" name="password" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="form-row">
+          <label for="auth-password-confirm">Verify password</label>
+          <input
+            id="auth-password-confirm"
+            name="passwordConfirm"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
         </div>
         <div class="form-row" id="turnstile-signup"></div>
         <input type="hidden" id="turnstile-token" name="turnstileToken" />
@@ -40,7 +51,7 @@
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
+    <script src="/js/turnstile-loader.js"></script>
     <script src="/js/auth.js"></script>
   </body>
 </html>

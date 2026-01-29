@@ -1,0 +1,27 @@
+=== Test 1: Signup #1 ===
+HTTP/1.1 409 Conflict
+Content-Length: 34
+Content-Type: application/json
+
+{"ok":false,"code":"EMAIL_EXISTS"}
+
+=== Test 2: Signup #2 (same email, different password) ===
+HTTP/1.1 409 Conflict
+Content-Length: 34
+Content-Type: application/json
+
+{"ok":false,"code":"EMAIL_EXISTS"}
+
+=== Test 3: Login wrong password ===
+HTTP/1.1 401 Unauthorized
+Content-Length: 41
+Content-Type: application/json
+
+{"ok":false,"code":"INVALID_CREDENTIALS"}
+
+=== Test 4: Login non-existent email ===
+HTTP/1.1 401 Unauthorized
+Content-Length: 41
+Content-Type: application/json
+
+{"ok":false,"code":"INVALID_CREDENTIALS"}

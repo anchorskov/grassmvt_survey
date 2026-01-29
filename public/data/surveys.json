@@ -46,5 +46,13 @@
     "description": "Share your perspective on abortion policy approaches in Wyoming.",
     "status": "active",
     "href": "/surveys/take/abortion-policy"
+  },
+  {
+    "id": "public-security",
+    "scope": "public",
+    "title": "Security and Trust Feedback",
+    "description": "Tell us what builds trust, what feels acceptable, and what feels like a step too far.",
+    "status": "active",
+    "href": "/surveys/security"
   }
 ]

@@ -4,22 +4,182 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Security | Grassroots Movement</title>
+    <title>Security, Privacy, and Trust | Grassroots Movement</title>
     <link rel="stylesheet" href="/css/site.css" />
   </head>
   <body>
     <div data-include="/partials/header.html"></div>
     <main>
-      <h1>Security and integrity</h1>
+      <h1>Security, Privacy, and Trust</h1>
       <p>
-        We use verification steps and rate limits to protect survey results from spam and automated
-        manipulation.
+        We built GrassrootsMVT to gather civic input without letting spam, bots, or coordinated
+        manipulation drown out real voices. We also protect privacy by collecting only what we need
+        to run the platform and publish results with integrity.
+      </p>
+      <p>This page explains:</p>
+      <ul class="info-list">
+        <li>how accounts and sessions work</li>
+        <li>how surveys are published and versioned</li>
+        <li>how responses are stored and counted</li>
+        <li>how location and address verification works, and what we store and do not store</li>
+        <li>how results are displayed by tier</li>
+        <li>how we audit the system</li>
+      </ul>
+
+      <h2>Our reporting tiers</h2>
+      <p>
+        We publish results in tiers so the public can see the difference between broad participation
+        and higher confidence participation.
+      </p>
+
+      <h3>Tier 1: General Public, no verified address</h3>
+      <p>This tier includes responses from all accounts including those that have not completed address verification.</p>
+
+      <h3>Tier 2: General Public, verified address</h3>
+      <p>This tier includes responses from accounts that completed address verification.</p>
+      <p>From this tier, we offer filters so we can see results at different levels:</p>
+      <ul class="info-list">
+        <li>State</li>
+        <li>Federal House District</li>
+        <li>State House District</li>
+        <li>State Senate District</li>
+      </ul>
+      <p>
+        We display these filters as a dropdown so we can view the same verified address dataset at
+        different jurisdiction levels. Our plan is to scale down to wards within cities and counties
+        as those data become available.
+      </p>
+
+      <h2>What we store</h2>
+
+      <h3>Account basics</h3>
+      <ul class="info-list">
+        <li>Email</li>
+        <li>Password hash, not the password</li>
+        <li>Session records to keep us logged in across page loads</li>
+      </ul>
+
+      <h3>Survey integrity</h3>
+      <ul class="info-list">
+        <li>The exact survey definition used, SurveyJS JSON</li>
+        <li>Survey versions and hashes so wording changes are visible and auditable</li>
+        <li>Response records with timestamps</li>
+      </ul>
+      <h4>Response editing without duplicate counting</h4>
+      <ul class="info-list">
+        <li>Each account has one counted response per survey version.</li>
+        <li>Users can revise answers.</li>
+        <li>Revisions update the existing response and create an audit record.</li>
+        <li>The survey list shows completion date and edit status.</li>
+      </ul>
+
+      <h3>Jurisdiction keys for aggregation</h3>
+      <p>When we verify an address, we store the jurisdiction keys needed for aggregation, for example:</p>
+      <ul class="info-list">
+        <li>state</li>
+        <li>federal house district</li>
+        <li>state house district</li>
+        <li>state senate district</li>
+      </ul>
+      <p>We store these keys so responses can aggregate correctly across multiple sessions.</p>
+
+      <h3>Audit trail</h3>
+      <p>
+        We record security relevant events so we can investigate problems and show a clear history
+        of what happened.
+      </p>
+
+      <h2>What we do not store</h2>
+
+      <h3>Passwords</h3>
+      <p>We never store plaintext passwords.</p>
+
+      <h3>Precise device location</h3>
+      <p>
+        If we run a home of record proximity check, we do not store your location. We store only
+        outcomes and buckets, for example:
       </p>
       <ul class="info-list">
-        <li>Address checks are used only to match the right survey scope.</li>
-        <li>Responses are monitored for unusual patterns and flagged for review.</li>
-        <li>Access is protected with basic abuse controls and audit logging.</li>
+        <li>pass or fail</li>
+        <li>distance bucket</li>
+        <li>accuracy bucket</li>
+        <li>timestamp</li>
       </ul>
+
+      <h2>Verification, plain language</h2>
+      <p>Verification helps us reduce manipulation without turning the platform into a surveillance system.</p>
+
+      <h3>Address verification outcome</h3>
+      <p>For verified address tiering, we focus on three things:</p>
+      <ol class="info-list">
+        <li>The address we use to derive districts</li>
+        <li>The districts we derive from that address</li>
+        <li>A verification outcome, stored as status plus audit events</li>
+      </ol>
+
+      <h3>Wyoming</h3>
+      <p>
+        Wyoming provides candidates access to a voter file. For Wyoming, we can verify eligibility
+        using that dataset and then store a salted hash that prevents one person from verifying
+        multiple accounts. Candidates wishing to participate may contact me Jimmy Skovgard via email
+        at skovgard2026.org.
+      </p>
+      <p>
+        We do not publish or track personally identifying information. We use the voter file data
+        provided by your elected secretary of state.
+      </p>
+
+      <h3>National</h3>
+      <p>
+        For broader participation across the country, we use an address based jurisdiction method.
+        We ask for an address, derive districts, and store only the jurisdiction keys needed for
+        aggregation. We can also store an address hash for deduplication signals and for internal
+        consistency checks.
+      </p>
+      <p>
+        If we add a proximity check, we ask the user to verify location once at the home of record
+        address. We do not store your location, latitude, or longitude.
+      </p>
+
+      <h2>Anti spam protections</h2>
+      <p>We use multiple layers:</p>
+      <ul class="info-list">
+        <li>bot challenge on sensitive actions, signup and other high risk endpoints</li>
+        <li>rate limits on abuse prone endpoints</li>
+        <li>one counted response per user per survey version, unless the survey design explicitly allows updates</li>
+        <li>audit events that flag suspicious patterns</li>
+      </ul>
+
+      <h2>Survey transparency and versioning</h2>
+      <p>We treat survey wording as a public artifact.</p>
+      <ul class="info-list">
+        <li>We publish surveys from JSONC source file for use on grassrootsmvt.org.</li>
+        <li>Each version gets a hash.</li>
+        <li>Any change to wording creates a new version and a new hash.</li>
+      </ul>
+      <p>This means anyone can compare versions and see what changed.</p>
+
+      <h2>Your control and consent</h2>
+      <ul class="info-list">
+        <li>Participation stays optional.</li>
+        <li>Verification stays optional.</li>
+        <li>Verified tiers strengthen aggregation quality.</li>
+        <li>We keep location checks one time and store only outcomes.</li>
+        <li>You will receive an email receipt with a token which you may use to revise your answers unless the survey sunsets. Most surveys are dynamic, not all.</li>
+      </ul>
+
+      <h2>Feedback</h2>
+      <p>
+        Security is not a static promise, it is a process. We invite feedback and we publish the
+        results.
+      </p>
+      <p>
+        Below is a short survey to gather input on what builds trust, what feels acceptable, and
+        what feels like a step too far.
+      </p>
+      <p>
+        <a class="button button--primary" href="/surveys/list/?survey=security&autoclick=1">Take the security feedback survey</a>
+      </p>
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>
