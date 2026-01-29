@@ -122,7 +122,7 @@
     if (window.__webauthnBrowserPromise) {
       return window.__webauthnBrowserPromise;
     }
-    const moduleUrl = '/vendor/simplewebauthn-browser-9.0.2.js';
+    const moduleUrl = '/vendor/simplewebauthn-browser-9.0.1.bundle.js';
     window.__webauthnBrowserPromise = import(moduleUrl)
       .then((mod) => {
         window.__webauthnBrowser = mod;
