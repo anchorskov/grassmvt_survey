@@ -1194,11 +1194,12 @@ const handlePasskeyRegisterVerify = async (request, env) => {
     return jsonResponse({ ok: false, code: 'VERIFY_FAILED' }, { status: 400 });
   }
 
-  // Log the actual structure to debug
-  console.log('[PasskeyReg] registrationInfo keys:', Object.keys(verification.registrationInfo));
-  console.log('[PasskeyReg] registrationInfo:', JSON.stringify(verification.registrationInfo).substring(0, 500));
-
-  const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+  // @simplewebauthn v13+ returns credential data nested under 'credential' key
+  const regInfo = verification.registrationInfo;
+  const credentialData = regInfo.credential || {};
+  const credentialID = credentialData.id || regInfo.credentialID;
+  const credentialPublicKey = credentialData.publicKey || regInfo.credentialPublicKey;
+  const counter = regInfo.counter;
   
   // Handle credential ID - can be string or Uint8Array
   let credentialId = '';
@@ -1210,19 +1211,32 @@ const handlePasskeyRegisterVerify = async (request, env) => {
     credentialId = credentialID.toString();
   }
   
-  // Handle public key - can be string or Uint8Array
+  // Handle public key - can be string or Uint8Array or object
   let publicKey = '';
   if (typeof credentialPublicKey === 'string') {
     publicKey = credentialPublicKey;
   } else if (credentialPublicKey instanceof Uint8Array || ArrayBuffer.isView(credentialPublicKey)) {
     publicKey = isoBase64URL.fromBuffer(credentialPublicKey);
+  } else if (credentialPublicKey && typeof credentialPublicKey === 'object') {
+    // It's a CBOR-encoded object, serialize to CBOR bytes
+    try {
+      publicKey = isoBase64URL.fromBuffer(new Uint8Array(Object.values(credentialPublicKey)));
+    } catch (e) {
+      // Fallback: try to convert object to string
+      publicKey = JSON.stringify(credentialPublicKey);
+    }
   } else if (credentialPublicKey && credentialPublicKey.toString) {
     publicKey = credentialPublicKey.toString();
   }
   
   // Validate we have required values
   if (!credentialId || !publicKey) {
-    console.error('[PasskeyReg] Missing credential data', { credentialId: credentialId?.substring(0, 20), publicKey: publicKey?.substring(0, 20) });
+    console.error('[PasskeyReg] Missing credential data after extraction', { 
+      credentialId: credentialId?.substring(0, 20), 
+      publicKey: publicKey?.substring(0, 20),
+      credentialIDType: typeof credentialID,
+      publicKeyType: typeof credentialPublicKey
+    });
     return jsonResponse({ ok: false, code: 'CREDENTIAL_DATA_MISSING' }, { status: 400 });
   }
   const transports = Array.isArray(attestationResponse?.response?.transports)
