@@ -1195,8 +1195,12 @@ const handlePasskeyRegisterVerify = async (request, env) => {
   }
 
   const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
-  const credentialId = isoBase64URL.fromBuffer(credentialID);
-  const publicKey = isoBase64URL.fromBuffer(credentialPublicKey);
+  const credentialId = typeof credentialID === 'string' 
+    ? credentialID 
+    : isoBase64URL.fromBuffer(credentialID);
+  const publicKey = typeof credentialPublicKey === 'string'
+    ? credentialPublicKey
+    : isoBase64URL.fromBuffer(credentialPublicKey);
   const transports = Array.isArray(attestationResponse?.response?.transports)
     ? attestationResponse.response.transports
     : null;
