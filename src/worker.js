@@ -1194,13 +1194,37 @@ const handlePasskeyRegisterVerify = async (request, env) => {
     return jsonResponse({ ok: false, code: 'VERIFY_FAILED' }, { status: 400 });
   }
 
+  // Log the actual structure to debug
+  console.log('[PasskeyReg] registrationInfo keys:', Object.keys(verification.registrationInfo));
+  console.log('[PasskeyReg] registrationInfo:', JSON.stringify(verification.registrationInfo).substring(0, 500));
+
   const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
-  const credentialId = typeof credentialID === 'string' 
-    ? credentialID 
-    : isoBase64URL.fromBuffer(credentialID);
-  const publicKey = typeof credentialPublicKey === 'string'
-    ? credentialPublicKey
-    : isoBase64URL.fromBuffer(credentialPublicKey);
+  
+  // Handle credential ID - can be string or Uint8Array
+  let credentialId = '';
+  if (typeof credentialID === 'string') {
+    credentialId = credentialID;
+  } else if (credentialID instanceof Uint8Array || ArrayBuffer.isView(credentialID)) {
+    credentialId = isoBase64URL.fromBuffer(credentialID);
+  } else if (credentialID && credentialID.toString) {
+    credentialId = credentialID.toString();
+  }
+  
+  // Handle public key - can be string or Uint8Array
+  let publicKey = '';
+  if (typeof credentialPublicKey === 'string') {
+    publicKey = credentialPublicKey;
+  } else if (credentialPublicKey instanceof Uint8Array || ArrayBuffer.isView(credentialPublicKey)) {
+    publicKey = isoBase64URL.fromBuffer(credentialPublicKey);
+  } else if (credentialPublicKey && credentialPublicKey.toString) {
+    publicKey = credentialPublicKey.toString();
+  }
+  
+  // Validate we have required values
+  if (!credentialId || !publicKey) {
+    console.error('[PasskeyReg] Missing credential data', { credentialId: credentialId?.substring(0, 20), publicKey: publicKey?.substring(0, 20) });
+    return jsonResponse({ ok: false, code: 'CREDENTIAL_DATA_MISSING' }, { status: 400 });
+  }
   const transports = Array.isArray(attestationResponse?.response?.transports)
     ? attestationResponse.response.transports
     : null;
