@@ -62,19 +62,22 @@
     try {
       const response = await fetch('/api/auth/me', {
         credentials: 'include',
+        cache: 'no-store',
       });
       if (!response.ok) {
         setLoggedInState(false);
-        return;
+        return false;
       }
       const data = await response.json();
       if (data.authenticated) {
         setLoggedInState(true, data.user?.email);
-      } else {
-        setLoggedInState(false);
+        return true;
       }
+      setLoggedInState(false);
+      return false;
     } catch (error) {
       setLoggedInState(false);
+      return false;
     }
   };
 
@@ -202,6 +205,18 @@
     });
   };
 
+  const waitForAuthState = async (options = {}) => {
+    const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 2500;
+    const intervalMs = Number.isFinite(options.intervalMs) ? options.intervalMs : 200;
+    const deadline = Date.now() + timeoutMs;
+    let authenticated = await fetchAuthState();
+    while (!authenticated && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      authenticated = await fetchAuthState();
+    }
+    return authenticated;
+  };
+
   const submitAuth = async (payload) => {
     const response = await fetch(`/api/auth/${authMode}`, {
       method: 'POST',
@@ -230,6 +245,7 @@
         showError('Unable to sign out.');
       }
       await fetchAuthState();
+      window.location.href = '/';
     });
   }
 
@@ -294,7 +310,7 @@
       }
       tokenInput.value = '';
       logDebug(authMode + ' successful');
-      const authenticated = await fetchAuthState();
+      const authenticated = await waitForAuthState();
       if (window.AuthUI && typeof window.AuthUI.fetchAuthState === 'function') {
         await window.AuthUI.fetchAuthState();
       }
@@ -359,8 +375,7 @@
         showError('Passkey sign-in failed.');
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const authenticated = await fetchAuthState();
+      const authenticated = await waitForAuthState();
       if (window.AuthUI && typeof window.AuthUI.fetchAuthState === 'function') {
         await window.AuthUI.fetchAuthState();
       }

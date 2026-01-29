@@ -156,6 +156,7 @@
     window.dispatchEvent(
       new CustomEvent('auth:changed', { detail: { authenticated: !!authenticated } })
     );
+    window.location.href = '/';
   };
 
   const loadTurnstileScript = () => {

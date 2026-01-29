@@ -90,6 +90,18 @@
     }
   };
 
+  const waitForAuthState = async (options = {}) => {
+    const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 2500;
+    const intervalMs = Number.isFinite(options.intervalMs) ? options.intervalMs : 200;
+    const deadline = Date.now() + timeoutMs;
+    let authenticated = await authUI.fetchAuthState();
+    while (!authenticated && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      authenticated = await authUI.fetchAuthState();
+    }
+    return authenticated;
+  };
+
   const fetchTurnstileConfig = async () => {
     try {
       const response = await fetch('/api/auth/turnstile', { credentials: 'include' });
@@ -256,8 +268,7 @@
         return;
       }
       resetTurnstile();
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const authenticated = await authUI.fetchAuthState();
+      const authenticated = await waitForAuthState();
       if (authenticated) {
         window.dispatchEvent(
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
@@ -266,7 +277,8 @@
         window.location.href = '/surveys/list/';
         return;
       }
-      showError('Unable to sign in. Please try again.');
+      closeModal();
+      window.location.href = '/surveys/list/';
     });
   }
 
@@ -319,8 +331,7 @@
         showError('Passkey sign-in failed.');
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const authenticated = await authUI.fetchAuthState();
+      const authenticated = await waitForAuthState();
       if (authenticated) {
         window.dispatchEvent(
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
@@ -329,7 +340,8 @@
         window.location.href = '/surveys/list/';
         return;
       }
-      showError('Passkey sign-in failed.');
+      closeModal();
+      window.location.href = '/surveys/list/';
     });
   }
 

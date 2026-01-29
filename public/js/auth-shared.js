@@ -73,7 +73,10 @@
 
   const fetchAuthState = async () => {
     try {
-      const response = await fetch('/api/auth/me', { credentials: 'include' });
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
       if (!response.ok) {
         setLoggedInState(false, '');
         return false;
@@ -106,6 +109,7 @@
     window.dispatchEvent(
       new CustomEvent('auth:changed', { detail: { authenticated: !!authenticated } })
     );
+    window.location.href = '/';
   };
 
   const gateSurveyList = async () => {
