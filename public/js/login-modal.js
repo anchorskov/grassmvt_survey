@@ -56,8 +56,6 @@
   const logoutButton = document.getElementById('login-modal-logout');
   const turnstileContainer = document.getElementById('login-modal-turnstile');
   const passkeyButton = document.getElementById('login-passkey-button');
-  const oauthGoogleButton = document.getElementById('login-modal-oauth-google');
-  const oauthAppleButton = document.getElementById('login-modal-oauth-apple');
   const submitButton = document.getElementById('login-modal-submit');
   const turnstileStatusEl = document.getElementById('login-modal-turnstile-status');
   const turnstileLabelEl = document.getElementById('login-modal-turnstile-label');
@@ -406,21 +404,6 @@
       await authUI.logout();
       setLoggedInState(false, '');
     });
-  }
-
-  const startOauth = (provider) => {
-    if (!provider) {
-      return;
-    }
-    window.location.href = `/api/auth/oauth/${provider}/start`;
-  };
-
-  if (oauthGoogleButton) {
-    oauthGoogleButton.addEventListener('click', () => startOauth('google'));
-  }
-
-  if (oauthAppleButton) {
-    oauthAppleButton.addEventListener('click', () => startOauth('apple'));
   }
 
   if (passkeyNudgeAdd) {
