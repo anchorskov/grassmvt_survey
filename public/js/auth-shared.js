@@ -48,6 +48,110 @@
     email: '',
   };
 
+  const PASSKEY_PROMPT_SUPPRESS_KEY = 'passkey_prompt_dismissed_at';
+  const PASSKEY_PROMPT_PENDING_KEY = 'passkey_prompt_pending';
+  const PASSKEY_PROMPT_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
+
+  const isPromptSuppressed = () => {
+    try {
+      const last = Number(localStorage.getItem(PASSKEY_PROMPT_SUPPRESS_KEY) || 0);
+      return !!last && Date.now() - last < PASSKEY_PROMPT_SUPPRESS_MS;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const markPromptDismissed = () => {
+    try {
+      localStorage.setItem(PASSKEY_PROMPT_SUPPRESS_KEY, String(Date.now()));
+    } catch (error) {
+      // Ignore storage failures
+    }
+  };
+
+  const setPromptPending = () => {
+    try {
+      localStorage.setItem(PASSKEY_PROMPT_PENDING_KEY, '1');
+    } catch (error) {
+      // Ignore storage failures
+    }
+  };
+
+  const clearPromptPending = () => {
+    try {
+      localStorage.removeItem(PASSKEY_PROMPT_PENDING_KEY);
+    } catch (error) {
+      // Ignore storage failures
+    }
+  };
+
+  const isPromptPending = () => {
+    try {
+      return localStorage.getItem(PASSKEY_PROMPT_PENDING_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const fetchPasskeys = async () => {
+    try {
+      const response = await fetch('/api/auth/passkey/list', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const data = await response.json();
+      return data.credentials || [];
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const renderPasskeyPrompt = () => {
+    if (document.getElementById('passkey-prompt')) {
+      return;
+    }
+    const prompt = document.createElement('div');
+    prompt.id = 'passkey-prompt';
+    prompt.className = 'passkey-prompt';
+    prompt.setAttribute('role', 'status');
+    prompt.innerHTML = `
+      <div class="passkey-prompt__content">
+        <p>Add a passkey for faster sign in.</p>
+        <div class="passkey-prompt__actions">
+          <a class="button button--primary" href="/account/#passkeys">Add passkey</a>
+          <button class="button button--secondary" type="button" data-passkey-prompt-dismiss>Not now</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(prompt);
+    const dismissButton = prompt.querySelector('[data-passkey-prompt-dismiss]');
+    if (dismissButton) {
+      dismissButton.addEventListener('click', () => {
+        markPromptDismissed();
+        clearPromptPending();
+        prompt.remove();
+      });
+    }
+  };
+
+  const maybeShowPasskeyPrompt = async () => {
+    if (!state.authenticated || !isPromptPending() || isPromptSuppressed()) {
+      return;
+    }
+    const credentials = await fetchPasskeys();
+    if (credentials === null) {
+      return;
+    }
+    clearPromptPending();
+    if (credentials.length > 0) {
+      return;
+    }
+    renderPasskeyPrompt();
+  };
+
   const setLoggedInState = (isLoggedIn, email) => {
     state.authenticated = !!isLoggedIn;
     state.email = email || '';
@@ -84,6 +188,7 @@
       const data = await response.json();
       if (data.authenticated) {
         setLoggedInState(true, data.user?.email || '');
+        await maybeShowPasskeyPrompt();
         return true;
       }
       setLoggedInState(false, '');
@@ -150,6 +255,12 @@
     });
   }
 
+  window.addEventListener('auth:changed', async (event) => {
+    if (event.detail && event.detail.authenticated) {
+      await maybeShowPasskeyPrompt();
+    }
+  });
+
   window.AuthUI = {
     state,
     fetchAuthState,
@@ -157,6 +268,11 @@
     openLogin: () => AuthModals.open('login'),
     openSignup: () => AuthModals.open('signup'),
     openResetRequest: () => AuthModals.open('password-reset'),
+  };
+
+  window.PasskeyPrompt = {
+    queueAfterPasswordLogin: setPromptPending,
+    maybeShow: maybeShowPasskeyPrompt,
   };
 
   gateSurveyList();

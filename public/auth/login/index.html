@@ -35,7 +35,7 @@
           <label for="auth-password">Password</label>
           <input id="auth-password" name="password" type="password" autocomplete="current-password" required />
         </div>
-        <p class="helper-text is-hidden" id="turnstile-login-label">Verify you are human</p>
+        <p class="helper-text is-hidden" id="turnstile-login-label">Complete the human check to continue.</p>
         <div class="form-row is-hidden" id="turnstile-login"></div>
         <input type="hidden" id="turnstile-token" name="turnstileToken" />
         <p class="form-error is-hidden" id="auth-error" role="alert"></p>
@@ -64,6 +64,7 @@
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>
     <script src="/js/turnstile-loader.js"></script>
+    <script src="/js/auth/turnstile-client.js"></script>
     <script src="/js/passkey-debug.js"></script>
     <script src="/js/auth.js"></script>
   </body>

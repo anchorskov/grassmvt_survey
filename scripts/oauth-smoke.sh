@@ -19,4 +19,3 @@ check_redirect() {
 }
 
 check_redirect "google"
-check_redirect "apple"

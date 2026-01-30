@@ -53,9 +53,12 @@
   const tokenInput = document.getElementById('signup-modal-token');
   const errorEl = document.getElementById('signup-modal-error');
   const turnstileContainer = document.getElementById('signup-modal-turnstile');
+  const turnstileClient = window.TurnstileClient;
 
   let turnstileWidgetId = null;
   let lastTurnstileToken = '';
+  let turnstileExecuted = false;
+  let turnstileSubmitted = false;
 
   const showError = (message, allowHtml = false) => {
     if (!errorEl) {
@@ -114,13 +117,15 @@
   };
 
   const resetTurnstile = () => {
-    if (window.turnstile && turnstileWidgetId !== null) {
-      window.turnstile.reset(turnstileWidgetId);
+    if (turnstileClient && turnstileWidgetId !== null) {
+      turnstileClient.resetWidget(turnstileWidgetId);
     }
     if (tokenInput) {
       tokenInput.value = '';
     }
     lastTurnstileToken = '';
+    turnstileExecuted = false;
+    turnstileSubmitted = false;
   };
 
   const renderTurnstile = async () => {
@@ -137,47 +142,38 @@
       return;
     }
     turnstileContainer.classList.remove('is-hidden');
-
-    try {
-      if (!window.TurnstileLoader) {
-        showError('Turnstile failed to load.');
-        return;
-      }
-      await window.TurnstileLoader.load();
-    } catch (error) {
+    if (!turnstileClient) {
       showError('Turnstile failed to load.');
       return;
     }
-
-    if (!window.turnstile) {
+    const loaded = await turnstileClient.loadTurnstileOnce({ siteKey: config.siteKey });
+    if (!loaded) {
       showError('Turnstile failed to load.');
       return;
     }
-
-    if (turnstileWidgetId !== null) {
-      try {
-        window.turnstile.remove(turnstileWidgetId);
-      } catch (error) {
-        // Ignore removal failures
-      }
+    if (turnstileWidgetId === null) {
+      turnstileWidgetId = await turnstileClient.renderTurnstile({
+        container: turnstileContainer,
+        siteKey: config.siteKey,
+        appearance: 'interaction-only',
+        size: 'flexible',
+        onSuccess: (token) => {
+          tokenInput.value = token || '';
+          lastTurnstileToken = token || '';
+        },
+        onError: () => {
+          tokenInput.value = '';
+          lastTurnstileToken = '';
+          turnstileExecuted = false;
+          showError('Turnstile validation failed.');
+        },
+        onExpire: () => {
+          tokenInput.value = '';
+          lastTurnstileToken = '';
+          turnstileExecuted = false;
+        },
+      });
     }
-
-    turnstileWidgetId = window.turnstile.render(turnstileContainer, {
-      sitekey: config.siteKey,
-      callback: (token) => {
-        tokenInput.value = token || '';
-        lastTurnstileToken = token || '';
-      },
-      'error-callback': () => {
-        tokenInput.value = '';
-        lastTurnstileToken = '';
-        showError('Turnstile validation failed.');
-      },
-      'expired-callback': () => {
-        tokenInput.value = '';
-        lastTurnstileToken = '';
-      },
-    });
   };
 
   const openModal = async () => {
@@ -185,6 +181,8 @@
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('no-scroll');
     showError('');
+    turnstileExecuted = false;
+    turnstileSubmitted = false;
     await renderTurnstile();
   };
 
@@ -193,12 +191,17 @@
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('no-scroll');
     showError('');
+    resetTurnstile();
+    if (turnstileContainer) {
+      turnstileContainer.classList.add('is-hidden');
+    }
   };
 
   if (form) {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       showError('');
+      turnstileSubmitted = true;
       const email = emailInput ? emailInput.value.trim() : '';
       const password = passwordInput ? passwordInput.value : '';
       const passwordConfirm = passwordConfirmInput ? passwordConfirmInput.value : '';
@@ -222,7 +225,14 @@
       const config = await fetchTurnstileConfig();
       const tokenValue = tokenInput && tokenInput.value ? tokenInput.value : lastTurnstileToken;
       if (!config.bypass && !tokenValue) {
-        showError('Please complete the Turnstile check.');
+        showError('Complete the human check to continue.');
+        if (turnstileClient && !turnstileExecuted && turnstileWidgetId !== null) {
+          turnstileExecuted = true;
+          const token = await turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
+          if (!token) {
+            turnstileExecuted = false;
+          }
+        }
         return;
       }
       const response = await fetch('/api/auth/signup', {

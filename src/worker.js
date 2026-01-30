@@ -509,66 +509,6 @@ const pemToArrayBuffer = (pem) => {
   return bytes.buffer;
 };
 
-const derToJoseSignature = (derSig, size = 32) => {
-  if (!derSig || derSig[0] !== 0x30) {
-    return derSig;
-  }
-  let offset = 2;
-  if (derSig[1] > 0x80) {
-    offset += derSig[1] - 0x80;
-  }
-  if (derSig[offset] !== 0x02) {
-    return derSig;
-  }
-  const rLen = derSig[offset + 1];
-  const rStart = offset + 2;
-  const r = derSig.slice(rStart, rStart + rLen);
-  offset = rStart + rLen;
-  if (derSig[offset] !== 0x02) {
-    return derSig;
-  }
-  const sLen = derSig[offset + 1];
-  const sStart = offset + 2;
-  const s = derSig.slice(sStart, sStart + sLen);
-  const rPad = r.length > size ? r.slice(r.length - size) : r;
-  const sPad = s.length > size ? s.slice(s.length - size) : s;
-  const out = new Uint8Array(size * 2);
-  out.set(rPad, size - rPad.length);
-  out.set(sPad, size * 2 - sPad.length);
-  return out;
-};
-
-const createAppleClientSecret = async (env) => {
-  const privateKey = normalizePem(env.APPLE_PRIVATE_KEY || '');
-  if (!privateKey || !env.APPLE_TEAM_ID || !env.APPLE_CLIENT_ID || !env.APPLE_KEY_ID) {
-    throw new Error('APPLE_CONFIG_MISSING');
-  }
-  const keyData = pemToArrayBuffer(privateKey);
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    keyData,
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    false,
-    ['sign']
-  );
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'ES256', kid: env.APPLE_KEY_ID, typ: 'JWT' };
-  const payload = {
-    iss: env.APPLE_TEAM_ID,
-    iat: now,
-    exp: now + 300,
-    aud: 'https://appleid.apple.com',
-    sub: env.APPLE_CLIENT_ID,
-  };
-  const tokenBase = `${encodeJsonBase64Url(header)}.${encodeJsonBase64Url(payload)}`;
-  const signature = new Uint8Array(await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
-    key,
-    new TextEncoder().encode(tokenBase)
-  ));
-  const joseSig = signature.length === 64 ? signature : derToJoseSignature(signature);
-  return `${tokenBase}.${base64UrlEncode(joseSig)}`;
-};
 
 const fetchJwks = async (url) => {
   const cached = oauthJwksCache.get(url);
@@ -1179,26 +1119,6 @@ const exchangeGoogleCode = async (code, codeVerifier, redirectUri, env) => {
   return response.json();
 };
 
-const exchangeAppleCode = async (code, codeVerifier, redirectUri, env) => {
-  const clientSecret = await createAppleClientSecret(env);
-  const body = new URLSearchParams();
-  body.set('code', code);
-  body.set('client_id', env.APPLE_CLIENT_ID || '');
-  body.set('client_secret', clientSecret);
-  body.set('redirect_uri', redirectUri);
-  body.set('grant_type', 'authorization_code');
-  body.set('code_verifier', codeVerifier);
-  const response = await fetch('https://appleid.apple.com/auth/token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-  if (!response.ok) {
-    return null;
-  }
-  return response.json();
-};
-
 const handleOAuthStart = async (request, env, provider) => {
   if (!env.DB) {
     return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
@@ -1213,45 +1133,26 @@ const handleOAuthStart = async (request, env, provider) => {
   const state = await createOAuthState(env, provider, codeVerifier);
 
   let authUrl = '';
-  if (provider === 'google') {
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'oauth_unavailable') });
-      clearOauthReturnCookie(headers, env);
-      return new Response(null, { status: 302, headers });
-    }
-    const redirectUri = env.GOOGLE_REDIRECT_URI || `${base}/api/auth/oauth/google/callback`;
-    const params = new URLSearchParams({
-      client_id: env.GOOGLE_CLIENT_ID,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: 'openid email profile',
-      state,
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-      prompt: 'select_account',
-    });
-    authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-  } else if (provider === 'apple') {
-    if (!env.APPLE_CLIENT_ID || !env.APPLE_TEAM_ID || !env.APPLE_KEY_ID || !env.APPLE_PRIVATE_KEY) {
-      const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'oauth_unavailable') });
-      clearOauthReturnCookie(headers, env);
-      return new Response(null, { status: 302, headers });
-    }
-    const redirectUri = env.APPLE_REDIRECT_URI || `${base}/api/auth/oauth/apple/callback`;
-    const params = new URLSearchParams({
-      client_id: env.APPLE_CLIENT_ID,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      response_mode: 'form_post',
-      scope: 'openid email name',
-      state,
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-    });
-    authUrl = `https://appleid.apple.com/auth/authorize?${params.toString()}`;
-  } else {
+  if (provider !== 'google') {
     return jsonResponse({ error: 'Unsupported provider.' }, { status: 400 });
   }
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+    const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'oauth_unavailable') });
+    clearOauthReturnCookie(headers, env);
+    return new Response(null, { status: 302, headers });
+  }
+  const redirectUri = env.GOOGLE_REDIRECT_URI || `${base}/api/auth/oauth/google/callback`;
+  const params = new URLSearchParams({
+    client_id: env.GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'openid email profile',
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+    prompt: 'select_account',
+  });
+  authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
   const headers = new Headers({ Location: authUrl });
   setOauthReturnCookie(headers, returnTo, env);
@@ -1288,9 +1189,6 @@ const handleOAuthCallback = async (request, env, provider) => {
     if (provider === 'google') {
       const redirectUri = env.GOOGLE_REDIRECT_URI || `${base}/api/auth/oauth/google/callback`;
       tokens = await exchangeGoogleCode(code, stateRecord.code_verifier, redirectUri, env);
-    } else if (provider === 'apple') {
-      const redirectUri = env.APPLE_REDIRECT_URI || `${base}/api/auth/oauth/apple/callback`;
-      tokens = await exchangeAppleCode(code, stateRecord.code_verifier, redirectUri, env);
     }
   } catch (error) {
     tokens = null;
@@ -1315,12 +1213,6 @@ const handleOAuthCallback = async (request, env, provider) => {
           audience: env.GOOGLE_CLIENT_ID,
         });
       }
-    } else if (provider === 'apple') {
-      claims = await verifyJwt(tokens.id_token, {
-        jwksUrl: 'https://appleid.apple.com/auth/keys',
-        issuer: 'https://appleid.apple.com',
-        audience: env.APPLE_CLIENT_ID,
-      });
     }
   } catch (error) {
     claims = null;
@@ -2765,17 +2657,6 @@ export default {
 
       if (request.method === 'GET' && pathParts[2] === 'oauth' && pathParts[3] === 'google' && pathParts[4] === 'callback') {
         return handleOAuthCallback(request, env, 'google');
-      }
-
-      if (request.method === 'GET' && pathParts[2] === 'oauth' && pathParts[3] === 'apple' && pathParts[4] === 'start') {
-        return handleOAuthStart(request, env, 'apple');
-      }
-
-      if ((request.method === 'GET' || request.method === 'POST')
-        && pathParts[2] === 'oauth'
-        && pathParts[3] === 'apple'
-        && pathParts[4] === 'callback') {
-        return handleOAuthCallback(request, env, 'apple');
       }
 
       if (request.method === 'POST' && pathParts[2] === 'password-reset' && pathParts[3] === 'request') {

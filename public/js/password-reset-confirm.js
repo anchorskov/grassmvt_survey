@@ -13,9 +13,12 @@
   const missingEl = document.getElementById('password-reset-missing');
   const turnstileContainer = document.getElementById('password-reset-turnstile');
   const turnstileTokenInput = document.getElementById('password-reset-turnstile-token');
+  const turnstileClient = window.TurnstileClient;
 
   let turnstileWidgetId = null;
   let lastTurnstileToken = '';
+  let turnstileExecuted = false;
+  let turnstileSubmitted = false;
 
   const showError = (message) => {
     if (!errorEl) {
@@ -57,13 +60,15 @@
   };
 
   const resetTurnstile = () => {
-    if (window.turnstile && turnstileWidgetId !== null) {
-      window.turnstile.reset(turnstileWidgetId);
+    if (turnstileClient && turnstileWidgetId !== null) {
+      turnstileClient.resetWidget(turnstileWidgetId);
     }
     if (turnstileTokenInput) {
       turnstileTokenInput.value = '';
     }
     lastTurnstileToken = '';
+    turnstileExecuted = false;
+    turnstileSubmitted = false;
   };
 
   const renderTurnstile = async () => {
@@ -80,47 +85,38 @@
       return;
     }
     turnstileContainer.classList.remove('is-hidden');
-
-    try {
-      if (!window.TurnstileLoader) {
-        showError('Turnstile failed to load.');
-        return;
-      }
-      await window.TurnstileLoader.load();
-    } catch (error) {
+    if (!turnstileClient) {
       showError('Turnstile failed to load.');
       return;
     }
-
-    if (!window.turnstile) {
+    const loaded = await turnstileClient.loadTurnstileOnce({ siteKey: config.siteKey });
+    if (!loaded) {
       showError('Turnstile failed to load.');
       return;
     }
-
-    if (turnstileWidgetId !== null) {
-      try {
-        window.turnstile.remove(turnstileWidgetId);
-      } catch (error) {
-        // Ignore removal failures
-      }
+    if (turnstileWidgetId === null) {
+      turnstileWidgetId = await turnstileClient.renderTurnstile({
+        container: turnstileContainer,
+        siteKey: config.siteKey,
+        appearance: 'interaction-only',
+        size: 'flexible',
+        onSuccess: (token) => {
+          turnstileTokenInput.value = token || '';
+          lastTurnstileToken = token || '';
+        },
+        onError: () => {
+          turnstileTokenInput.value = '';
+          lastTurnstileToken = '';
+          turnstileExecuted = false;
+          showError('Turnstile validation failed.');
+        },
+        onExpire: () => {
+          turnstileTokenInput.value = '';
+          lastTurnstileToken = '';
+          turnstileExecuted = false;
+        },
+      });
     }
-
-    turnstileWidgetId = window.turnstile.render(turnstileContainer, {
-      sitekey: config.siteKey,
-      callback: (token) => {
-        turnstileTokenInput.value = token || '';
-        lastTurnstileToken = token || '';
-      },
-      'error-callback': () => {
-        turnstileTokenInput.value = '';
-        lastTurnstileToken = '';
-        showError('Turnstile validation failed.');
-      },
-      'expired-callback': () => {
-        turnstileTokenInput.value = '';
-        lastTurnstileToken = '';
-      },
-    });
   };
 
   const params = new URLSearchParams(window.location.search);
@@ -147,6 +143,7 @@
     event.preventDefault();
     showError('');
     showSuccess('');
+    turnstileSubmitted = true;
     const newPassword = passwordInput ? passwordInput.value : '';
     if (!newPassword) {
       showError('Password is required.');
@@ -161,7 +158,14 @@
       ? turnstileTokenInput.value
       : lastTurnstileToken;
     if (!config.bypass && !tokenValue) {
-      showError('Please complete the Turnstile check.');
+      showError('Complete the human check to continue.');
+      if (turnstileClient && !turnstileExecuted && turnstileWidgetId !== null) {
+        turnstileExecuted = true;
+        const token = await turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
+        if (!token) {
+          turnstileExecuted = false;
+        }
+      }
       return;
     }
     const response = await fetch('/api/auth/password-reset/confirm', {

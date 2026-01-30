@@ -19,12 +19,7 @@
     "OAUTH_REDIRECT_BASE": "",
     "GOOGLE_CLIENT_ID": "",
     "GOOGLE_CLIENT_SECRET": "",
-    "GOOGLE_REDIRECT_URI": "",
-    "APPLE_CLIENT_ID": "",
-    "APPLE_TEAM_ID": "",
-    "APPLE_KEY_ID": "",
-    "APPLE_PRIVATE_KEY": "",
-    "APPLE_REDIRECT_URI": ""
+    "GOOGLE_REDIRECT_URI": ""
   },
   "d1_databases": [
     {
@@ -55,12 +50,7 @@
         "OAUTH_REDIRECT_BASE": "",
         "GOOGLE_CLIENT_ID": "",
         "GOOGLE_CLIENT_SECRET": "",
-        "GOOGLE_REDIRECT_URI": "",
-        "APPLE_CLIENT_ID": "",
-        "APPLE_TEAM_ID": "",
-        "APPLE_KEY_ID": "",
-        "APPLE_PRIVATE_KEY": "",
-        "APPLE_REDIRECT_URI": ""
+        "GOOGLE_REDIRECT_URI": ""
       },
       "observability": {
         "enabled": true,

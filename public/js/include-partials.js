@@ -26,20 +26,29 @@
 
   const loadScriptOnce = (src, flagName) => {
     if (window[flagName]) {
-      return;
+      return Promise.resolve(true);
     }
-    const script = document.createElement('script');
-    script.src = src;
-    script.defer = true;
-    document.body.appendChild(script);
-    window[flagName] = true;
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.defer = true;
+      script.addEventListener('load', () => {
+        window[flagName] = true;
+        resolve(true);
+      });
+      script.addEventListener('error', () => {
+        resolve(false);
+      });
+      document.body.appendChild(script);
+    });
   };
 
-  Promise.allSettled(includePromises).then(() => {
-    loadScriptOnce('/js/turnstile-loader.js', '__turnstileLoaderLoaded');
-    loadScriptOnce('/js/auth-shared.js', '__authSharedLoaded');
-    loadScriptOnce('/js/login-modal.js', '__loginModalLoaded');
-    loadScriptOnce('/js/signup-modal.js', '__signupModalLoaded');
-    loadScriptOnce('/js/password-reset-modal.js', '__passwordResetModalLoaded');
+  Promise.allSettled(includePromises).then(async () => {
+    await loadScriptOnce('/js/turnstile-loader.js', '__turnstileLoaderLoaded');
+    await loadScriptOnce('/js/auth/turnstile-client.js', '__turnstileClientLoaded');
+    await loadScriptOnce('/js/auth-shared.js', '__authSharedLoaded');
+    await loadScriptOnce('/js/login-modal.js', '__loginModalLoaded');
+    await loadScriptOnce('/js/signup-modal.js', '__signupModalLoaded');
+    await loadScriptOnce('/js/password-reset-modal.js', '__passwordResetModalLoaded');
   });
 })();

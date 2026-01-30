@@ -56,6 +56,7 @@
   const logoutButton = document.getElementById('login-modal-logout');
   const turnstileContainer = document.getElementById('login-modal-turnstile');
   const passkeyButton = document.getElementById('login-passkey-button');
+  const turnstileClient = window.TurnstileClient;
   const submitButton = document.getElementById('login-modal-submit');
   const turnstileStatusEl = document.getElementById('login-modal-turnstile-status');
   const turnstileLabelEl = document.getElementById('login-modal-turnstile-label');
@@ -67,6 +68,8 @@
   let lastTurnstileToken = '';
   let turnstileConfig = { siteKey: '', bypass: false };
   let turnstileState = 'idle';
+  let turnstileExecuted = false;
+  let turnstileSubmitted = false;
   let pendingOauthError = '';
 
   const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
@@ -131,21 +134,22 @@
   const setTurnstileState = (state, message) => {
     // Turnstile UI state machine: idle -> running -> ready, with needs-interaction/failed overrides.
     turnstileState = state;
-    const hasToken = !!(tokenInput && tokenInput.value) || !!lastTurnstileToken;
     const canBypass = !!turnstileConfig.bypass;
-    const canSubmit = canBypass || hasToken;
     if (submitButton) {
-      submitButton.disabled = !canSubmit || state === 'running';
+      submitButton.disabled = state === 'running';
     }
     if (turnstileStatusEl) {
       const messages = {
-        idle: 'Human check runs automatically.',
+        idle: '',
         running: 'Verifying you are human...',
-        'needs-interaction': 'Please complete the human check.',
+        'needs-interaction': 'Complete the human check to continue.',
         failed: 'Verification failed, try again.',
-        ready: '',
+        ready: 'Verified.',
       };
-      const next = message || messages[state] || '';
+      let next = message || messages[state] || '';
+      if (state === 'ready' && !turnstileSubmitted) {
+        next = '';
+      }
       turnstileStatusEl.textContent = next;
       turnstileStatusEl.classList.toggle('is-hidden', !next || canBypass);
     }
@@ -210,13 +214,15 @@
   };
 
   const resetTurnstile = () => {
-    if (window.turnstile && turnstileWidgetId !== null) {
-      window.turnstile.reset(turnstileWidgetId);
+    if (turnstileClient && turnstileWidgetId !== null) {
+      turnstileClient.resetWidget(turnstileWidgetId);
     }
     if (tokenInput) {
       tokenInput.value = '';
     }
     lastTurnstileToken = '';
+    turnstileExecuted = false;
+    turnstileSubmitted = false;
     setTurnstileState('idle');
   };
 
@@ -233,66 +239,49 @@
       setTurnstileState('failed', 'Verification unavailable.');
       return;
     }
+    if (!turnstileClient) {
+      showError('Turnstile failed to load.');
+      setTurnstileState('failed', 'Verification failed, try again.');
+      return;
+    }
+    const loaded = await turnstileClient.loadTurnstileOnce({ siteKey: turnstileConfig.siteKey });
+    if (!loaded) {
+      showError('Turnstile failed to load.');
+      setTurnstileState('failed', 'Verification failed, try again.');
+      return;
+    }
     if (turnstileLabelEl) {
       turnstileLabelEl.classList.toggle('is-hidden', !interactive);
     }
     turnstileContainer.classList.toggle('is-hidden', !interactive);
 
-    try {
-      if (!window.TurnstileLoader) {
-        showError('Turnstile failed to load.');
-        setTurnstileState('failed', 'Verification failed, try again.');
-        return;
-      }
-      await window.TurnstileLoader.load();
-    } catch (error) {
-      showError('Turnstile failed to load.');
-      setTurnstileState('failed', 'Verification failed, try again.');
-      return;
+    if (turnstileWidgetId === null) {
+      turnstileWidgetId = await turnstileClient.renderTurnstile({
+        container: turnstileContainer,
+        siteKey: turnstileConfig.siteKey,
+        appearance: 'interaction-only',
+        size: 'flexible',
+        onSuccess: (token) => {
+          tokenInput.value = token || '';
+          lastTurnstileToken = token || '';
+          setTurnstileState('ready');
+        },
+        onError: () => {
+          tokenInput.value = '';
+          lastTurnstileToken = '';
+          turnstileExecuted = false;
+          setTurnstileState('failed');
+        },
+        onExpire: () => {
+          tokenInput.value = '';
+          lastTurnstileToken = '';
+          turnstileExecuted = false;
+          setTurnstileState('needs-interaction');
+        },
+      });
     }
 
-    if (!window.turnstile) {
-      showError('Turnstile failed to load.');
-      setTurnstileState('failed', 'Verification failed, try again.');
-      return;
-    }
-
-    if (turnstileWidgetId !== null) {
-      try {
-        window.turnstile.remove(turnstileWidgetId);
-      } catch (error) {
-        // Ignore removal failures
-      }
-    }
-
-    turnstileWidgetId = window.turnstile.render(turnstileContainer, {
-      sitekey: turnstileConfig.siteKey,
-      size: interactive ? 'normal' : 'invisible',
-      callback: (token) => {
-        tokenInput.value = token || '';
-        lastTurnstileToken = token || '';
-        setTurnstileState('ready');
-      },
-      'error-callback': () => {
-        tokenInput.value = '';
-        lastTurnstileToken = '';
-        setTurnstileState('failed');
-      },
-      'expired-callback': () => {
-        tokenInput.value = '';
-        lastTurnstileToken = '';
-        setTurnstileState('needs-interaction');
-      },
-    });
-
-    if (!interactive && window.turnstile && typeof window.turnstile.execute === 'function') {
-      setTurnstileState('running');
-      try {
-        window.turnstile.execute(turnstileWidgetId);
-      } catch (error) {
-        setTurnstileState('needs-interaction');
-      }
-    } else if (interactive) {
+    if (interactive) {
       setTurnstileState('needs-interaction');
     }
   };
@@ -310,6 +299,8 @@
     if (passkeyNudgeEl) {
       passkeyNudgeEl.classList.add('is-hidden');
     }
+    turnstileExecuted = false;
+    turnstileSubmitted = false;
     const authenticated = await authUI.fetchAuthState();
     setLoggedInState(authenticated, authUI.state.email);
     turnstileConfig = await fetchTurnstileConfig();
@@ -322,6 +313,56 @@
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('no-scroll');
     showError('');
+    resetTurnstile();
+    if (turnstileLabelEl) {
+      turnstileLabelEl.classList.add('is-hidden');
+    }
+    if (turnstileContainer) {
+      turnstileContainer.classList.add('is-hidden');
+    }
+  };
+
+  const executeTurnstileOnce = async () => {
+    if (!turnstileClient || turnstileExecuted || turnstileWidgetId === null) {
+      return;
+    }
+    turnstileExecuted = true;
+    setTurnstileState('running');
+    const token = await turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
+    if (!token) {
+      turnstileExecuted = false;
+      setTurnstileState('needs-interaction');
+    }
+  };
+
+  const refreshAuthState = async () => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        setLoggedInState(false, '');
+        return false;
+      }
+      const data = await response.json();
+      if (data.authenticated) {
+        const email = data.user?.email || '';
+        if (authUI && authUI.state) {
+          authUI.state.email = email;
+        }
+        setLoggedInState(true, email);
+        window.dispatchEvent(
+          new CustomEvent('auth:changed', { detail: { authenticated: true } })
+        );
+        return true;
+      }
+      setLoggedInState(false, '');
+      return false;
+    } catch (error) {
+      setLoggedInState(false, '');
+      return false;
+    }
   };
 
   const fetchPasskeys = async () => {
@@ -430,6 +471,7 @@
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       showError('');
+      turnstileSubmitted = true;
       const email = emailInput ? emailInput.value.trim() : '';
       const password = passwordInput ? passwordInput.value : '';
       if (!email || !password) {
@@ -443,6 +485,7 @@
       if (!turnstileConfig.bypass && !tokenValue) {
         setTurnstileState('needs-interaction');
         await renderTurnstile(true);
+        await executeTurnstileOnce();
         return;
       }
       const response = await fetch('/api/auth/login', {
@@ -482,6 +525,9 @@
         window.dispatchEvent(
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
         );
+        if (window.PasskeyPrompt && typeof window.PasskeyPrompt.queueAfterPasswordLogin === 'function') {
+          window.PasskeyPrompt.queueAfterPasswordLogin();
+        }
         const nudged = await maybeShowPasskeyNudge();
         if (nudged) {
           return;
@@ -546,17 +592,13 @@
         }
         return;
       }
-      const authenticated = await waitForAuthState();
-      if (authenticated) {
-        window.dispatchEvent(
-          new CustomEvent('auth:changed', { detail: { authenticated: true } })
-        );
-        closeModal();
-        window.location.href = '/surveys/list/';
+      showError('');
+      const authenticated = await refreshAuthState();
+      if (!authenticated) {
+        showError('Passkey sign-in failed.');
         return;
       }
       closeModal();
-      window.location.href = '/surveys/list/';
     });
   }
 
