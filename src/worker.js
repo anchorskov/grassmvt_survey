@@ -412,6 +412,29 @@ const writeAuditEvent = async (env, request, { userId = null, eventType, metadat
     .run();
 };
 
+// Debug logging utilities for auth troubleshooting
+// Gated by X-Debug-Auth header matching DEBUG_AUTH_SECRET
+const shouldDebugAuth = (env, request) => {
+  if (!env.DEBUG_AUTH_SECRET) {
+    return false;
+  }
+  const debugHeader = request.headers.get('X-Debug-Auth') || '';
+  return debugHeader === env.DEBUG_AUTH_SECRET;
+};
+
+const logAuthDebug = (request, route, step, details) => {
+  const debugId = request.headers.get('X-Debug-Request-Id') || 'no-debug-id';
+  const timestamp = new Date().toISOString();
+  const safeDetails = JSON.stringify(details || {});
+  console.log(`[AuthDebug] timestamp=${timestamp} id=${debugId} route=${route} step=${step} details=${safeDetails}`);
+};
+
+const logAuthFailureDebug = (request, route, step, code, reason) => {
+  const debugId = request.headers.get('X-Debug-Request-Id') || 'no-debug-id';
+  const timestamp = new Date().toISOString();
+  console.log(`[AuthFailure] timestamp=${timestamp} id=${debugId} route=${route} step=${step} code=${code} reason=${reason}`);
+};
+
 const isLocalEnv = (env) => (env.ENVIRONMENT || '').toLowerCase() === 'local';
 
 let turnstileConfigLogged = false;
@@ -435,11 +458,28 @@ const enforceTurnstileBypassPolicy = (env) => {
 
 const requireSameOrigin = (request, env) => {
   const origin = request.headers.get('Origin');
-  const requestOrigin = new URL(request.url).origin;
+  const referer = request.headers.get('Referer');
+  const requestUrl = new URL(request.url);
+  const requestOrigin = requestUrl.origin;
+  
+  // Log for debugging origin mismatches
+  console.log('[Origin Check]', {
+    origin: origin || '(none)',
+    referer: referer || '(none)',
+    requestOrigin,
+    requestUrl: requestUrl.pathname,
+    method: request.method,
+  });
+  
   if (!origin) {
+    // Allow GET requests without Origin header (normal browser navigation)
+    if (request.method === 'GET') {
+      return null;
+    }
     return isLocalEnv(env) ? null : 'Missing Origin header.';
   }
   if (origin !== requestOrigin) {
+    console.log('[Origin Check] MISMATCH:', { origin, requestOrigin });
     return 'Invalid Origin header.';
   }
   return null;
@@ -752,6 +792,33 @@ const checkPasswordResetRateLimit = async (env, { emailHash, ipHash }) => {
 const initializeLucia = (env) => {
   const adapter = new D1Adapter(env.DB, { user: 'user', session: 'session' });
   const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
+  
+  // Parse domain from APP_BASE_URL for cookie domain setting
+  let cookieDomain = undefined;
+  try {
+    const baseUrl = env.APP_BASE_URL || '';
+    const url = new URL(baseUrl);
+    if (url.hostname && url.hostname !== 'localhost') {
+      // For grassrootsmvt.org, set domain to .grassrootsmvt.org so subdomains work too
+      // But for production, we want just the hostname to avoid scope issues
+      cookieDomain = url.hostname;
+    }
+  } catch (e) {
+    // If URL parsing fails, leave domain undefined (defaults to current host)
+  }
+
+  const sessionCookieAttributes = {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProduction,
+    path: '/',
+  };
+  
+  // Only set domain if in production and we have a valid hostname
+  if (isProduction && cookieDomain) {
+    sessionCookieAttributes.domain = cookieDomain;
+  }
+
   return new Lucia(adapter, {
     sessionExpiresIn: new TimeSpan(getAbsoluteTimeoutDays(env), 'd'),
     getUserAttributes: (attributes) => ({
@@ -759,12 +826,7 @@ const initializeLucia = (env) => {
     }),
     sessionCookie: {
       name: 'session',
-      attributes: {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: isProduction,
-        path: '/',
-      },
+      attributes: sessionCookieAttributes,
     },
   });
 };
@@ -949,6 +1011,14 @@ const handleAuthSignup = async (request, env) => {
   if (originError) {
     return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
   }
+  
+  const isDebug = shouldDebugAuth(env, request);
+  if (isDebug) {
+    logAuthDebug(request, 'POST /api/auth/signup', 'start', {
+      origin: request.headers.get('Origin'),
+    });
+  }
+  
   const body = await parseJsonBody(request);
   const email = normalizeEmail(body.email || '');
   const password = body.password || '';
@@ -959,6 +1029,9 @@ const handleAuthSignup = async (request, env) => {
       eventType: 'signup_failed',
       metadata: { reason: 'generic' },
     });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'validation', 'INVALID_EMAIL', 'Email missing or invalid');
+    }
     return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
   }
   if (!password || password.length < PASSWORD_MIN_LENGTH) {
@@ -966,6 +1039,9 @@ const handleAuthSignup = async (request, env) => {
       eventType: 'signup_failed',
       metadata: { reason: 'generic' },
     });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'validation', 'WEAK_PASSWORD', 'Password too short');
+    }
     return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
   }
 
@@ -975,6 +1051,9 @@ const handleAuthSignup = async (request, env) => {
       eventType: 'signup_failed',
       metadata: { reason: 'generic' },
     });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'turnstile', 'TURNSTILE_FAILED', turnstile.code);
+    }
     return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
   }
 
@@ -986,6 +1065,9 @@ const handleAuthSignup = async (request, env) => {
       eventType: 'signup_failed',
       metadata: { reason: 'generic' },
     });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'user_exists', 'EMAIL_EXISTS', 'Email already registered');
+    }
     return jsonResponse({ ok: false, code: 'EMAIL_EXISTS' }, { status: 409 });
   }
 
@@ -1005,6 +1087,12 @@ const handleAuthSignup = async (request, env) => {
     )
       .bind(userId, email)
       .run();
+    if (isDebug) {
+      logAuthDebug(request, 'POST /api/auth/signup', 'user_created', {
+        userId,
+        email: email.substring(0, 3) + '***',
+      });
+    }
   } catch (error) {
     await writeAuditEvent(env, request, {
       eventType: 'signup_failed',
@@ -1012,7 +1100,13 @@ const handleAuthSignup = async (request, env) => {
     });
     const message = error && typeof error.message === 'string' ? error.message : '';
     if (message.includes('UNIQUE constraint failed: user.email') || message.includes('idx_user_email_normalized')) {
+      if (isDebug) {
+        logAuthFailureDebug(request, 'POST /api/auth/signup', 'insert_user', 'EMAIL_EXISTS', 'Duplicate email detected');
+      }
       return jsonResponse({ ok: false, code: 'EMAIL_EXISTS' }, { status: 409 });
+    }
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'insert_user', 'DB_ERROR', message);
     }
     return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
   }
@@ -1024,10 +1118,19 @@ const handleAuthSignup = async (request, env) => {
     const session = await lucia.createSession(userId, {});
     await stampSessionTimestamps(env, session.id);
     const sessionCookie = lucia.createSessionCookie(session.id);
+    if (isDebug) {
+      logAuthDebug(request, 'POST /api/auth/signup', 'session_created', {
+        userId,
+        sessionId: session.id,
+      });
+    }
     const headers = new Headers();
     headers.append('Set-Cookie', sessionCookie.serialize());
     return jsonResponse({ ok: true }, { headers });
   } catch (error) {
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'session_create', 'SESSION_ERROR', error?.message);
+    }
     return jsonResponse({ ok: true }, { status: 200 });
   }
 };
@@ -1042,12 +1145,30 @@ const handleAuthLogin = async (request, env) => {
   }
   const route = 'POST /api/auth/login';
   const rayId = request.headers.get('cf-ray') || '';
+  const debugId = request.headers.get('X-Debug-Request-Id') || '';
   const startedAt = Date.now();
+  const isDebug = shouldDebugAuth(env, request);
+  
+  if (isDebug) {
+    logAuthDebug(request, route, 'start', {
+      rayId,
+      origin: request.headers.get('Origin'),
+    });
+  }
+  
   const body = await parseJsonBody(request);
   const email = normalizeEmail(body.email || '');
   const password = body.password || '';
   const turnstileToken = body.turnstileToken || '';
   logAuthTiming(route, rayId, 'parsed_body', startedAt);
+  
+  if (isDebug) {
+    logAuthDebug(request, route, 'parsed_body', {
+      hasEmail: !!email,
+      hasPassword: !!password,
+      hasTurnstile: !!turnstileToken,
+    });
+  }
 
   if (!email || !password) {
     await writeAuditEvent(env, request, {
@@ -1055,6 +1176,9 @@ const handleAuthLogin = async (request, env) => {
       metadata: { reason: 'generic' },
     });
     logAuthTiming(route, rayId, 'response_sent', startedAt);
+    if (isDebug) {
+      logAuthFailureDebug(request, route, 'validation', 'MISSING_CREDENTIALS', 'Email or password missing');
+    }
     return jsonResponse({ ok: false, code: 'MISSING_CREDENTIALS' }, { status: 400 });
   }
 
@@ -1065,6 +1189,9 @@ const handleAuthLogin = async (request, env) => {
       metadata: { reason: 'generic' },
     });
     logAuthTiming(route, rayId, 'response_sent', startedAt);
+    if (isDebug) {
+      logAuthFailureDebug(request, route, 'turnstile', 'FORBIDDEN', turnstile.code);
+    }
     return jsonResponse({ ok: false, code: 'FORBIDDEN' }, { status: 403 });
   }
 
@@ -1074,23 +1201,42 @@ const handleAuthLogin = async (request, env) => {
     .bind(email)
     .first();
   logAuthTiming(route, rayId, 'user_lookup_done', startedAt);
+  if (isDebug) {
+    logAuthDebug(request, route, 'user_lookup', {
+      found: !!user,
+      email: email.substring(0, 3) + '***',
+    });
+  }
+  
   if (!user) {
     await writeAuditEvent(env, request, {
       eventType: 'login_failed',
       metadata: { reason: 'generic' },
     });
     logAuthTiming(route, rayId, 'response_sent', startedAt);
+    if (isDebug) {
+      logAuthFailureDebug(request, route, 'user_lookup', 'ACCOUNT_NOT_FOUND', 'No user with this email');
+    }
     return jsonResponse({ ok: false, code: 'ACCOUNT_NOT_FOUND' }, { status: 404 });
   }
   logAuthTiming(route, rayId, 'password_verify_start', startedAt);
   const passwordOk = await verifyPassword(password, user.password_hash);
   logAuthTiming(route, rayId, 'password_verify_done', startedAt);
+  if (isDebug) {
+    logAuthDebug(request, route, 'password_verify', {
+      correct: passwordOk,
+    });
+  }
+  
   if (!passwordOk) {
     await writeAuditEvent(env, request, {
       eventType: 'login_failed',
       metadata: { reason: 'generic' },
     });
     logAuthTiming(route, rayId, 'response_sent', startedAt);
+    if (isDebug) {
+      logAuthFailureDebug(request, route, 'password_verify', 'PASSWORD_INCORRECT', 'Password does not match');
+    }
     return jsonResponse({ ok: false, code: 'PASSWORD_INCORRECT' }, { status: 401 });
   }
 
@@ -1099,6 +1245,9 @@ const handleAuthLogin = async (request, env) => {
     await env.DB.prepare('UPDATE user SET password_hash = ? WHERE id = ?')
       .bind(upgradedHash, user.id)
       .run();
+    if (isDebug) {
+      logAuthDebug(request, route, 'password_upgraded', { userId: user.id });
+    }
   }
 
   const lucia = initializeLucia(env);
@@ -1107,12 +1256,28 @@ const handleAuthLogin = async (request, env) => {
   await stampSessionTimestamps(env, session.id);
   const sessionCookie = lucia.createSessionCookie(session.id);
   logAuthTiming(route, rayId, 'session_created', startedAt);
+  
+  if (isDebug) {
+    logAuthDebug(request, route, 'session_created', {
+      sessionId: session.id,
+      userId: user.id,
+      cookieAttributes: sessionCookie.attributes,
+    });
+  }
 
   await writeAuditEvent(env, request, { userId: user.id, eventType: 'login_success' });
 
   const headers = new Headers();
   headers.append('Set-Cookie', sessionCookie.serialize());
   logAuthTiming(route, rayId, 'response_sent', startedAt);
+  
+  if (isDebug) {
+    logAuthDebug(request, route, 'response_ready', {
+      statusCode: 200,
+      setCookie: '(set)',
+    });
+  }
+  
   return jsonResponse({ ok: true }, { headers });
 };
 
@@ -1723,11 +1888,34 @@ const handlePasskeyLoginOptions = async (request, env) => {
     return passkeyGuard;
   }
   await cleanupExpiredWebauthnChallenges(env);
+  
+  // Parse request body for optional attachmentHint
+  const body = await parseJsonBody(request);
+  const attachmentHint = body.attachmentHint || '';
+  
   const rpID = getWebAuthnRpId(request, env);
+  const expectedOrigin = getWebAuthnExpectedOrigin(request);
+  
+  // Debug logging (controlled by PASSKEY_DEBUG env var)
+  const isDebug = shouldDebugPasskeys(env, request);
+  if (isDebug) {
+    console.log('[Passkey Login Options] Config:', {
+      rpID,
+      expectedOrigin,
+      attachmentHint: attachmentHint || '(none)',
+    });
+  }
+  
+  // Generate authentication options
+  // Note: For discoverable credentials (passkey login without username),
+  // allowCredentials should be empty to let the browser/authenticator
+  // discover available credentials for this RP ID.
   const options = await generateAuthenticationOptions({
     rpID,
     allowCredentials: [],
     userVerification: 'preferred',
+    // Set a reasonable timeout (60 seconds) to give users time
+    timeout: 60000,
   });
 
   const challengeId = crypto.randomUUID();
@@ -1751,6 +1939,7 @@ const handlePasskeyLoginOptions = async (request, env) => {
 
   await writeAuditEvent(env, request, {
     eventType: 'passkey_auth_options_issued',
+    meta: { attachmentHint: attachmentHint || 'none' },
   });
 
   return jsonResponse({ ok: true, options, challengeId });
@@ -2163,12 +2352,35 @@ const handleAuthLogout = async (request, env) => {
 
 const handleAuthMe = async (request, env) => {
   if (!env.DB) {
+    const isDebug = shouldDebugAuth(env, request);
+    if (isDebug) {
+      logAuthDebug(request, 'GET /api/auth/me', 'no_db_binding', { status: 'error' });
+    }
     return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
   }
+  
+  const isDebug = shouldDebugAuth(env, request);
+  if (isDebug) {
+    logAuthDebug(request, 'GET /api/auth/me', 'start', {
+      origin: request.headers.get('Origin'),
+      userAgent: request.headers.get('User-Agent') ? '(set)' : '(missing)',
+    });
+  }
+  
   let sessionResult;
   try {
     sessionResult = await getSessionUser(request, env);
+    if (isDebug) {
+      logAuthDebug(request, 'GET /api/auth/me', 'session_result', {
+        status: sessionResult.status,
+        hasUser: !!sessionResult.user,
+        hasSession: !!sessionResult.session,
+      });
+    }
   } catch (error) {
+    if (isDebug) {
+      logAuthFailureDebug(request, 'GET /api/auth/me', 'get_session_user', 'INTERNAL_ERROR', error?.message);
+    }
     console.error('[handleAuthMe] Unexpected error:', error?.message);
     return jsonResponse(
       { ok: false, code: 'INTERNAL_SERVER_ERROR' },
@@ -2179,6 +2391,9 @@ const handleAuthMe = async (request, env) => {
   // Handle DB schema/query errors
   if (sessionResult.status === 'error') {
     const errorMsg = sessionResult.dbError?.message || 'Database error';
+    if (isDebug) {
+      logAuthFailureDebug(request, 'GET /api/auth/me', 'db_error', 'DB_ERROR', errorMsg);
+    }
     if (errorMsg.includes('no such column')) {
       console.error('[handleAuthMe] D1 Schema mismatch - column does not exist');
       return jsonResponse(
@@ -2193,18 +2408,33 @@ const handleAuthMe = async (request, env) => {
   }
 
   if (sessionResult.status === 'expired') {
+    if (isDebug) {
+      logAuthFailureDebug(request, 'GET /api/auth/me', 'check_status', 'SESSION_EXPIRED', 'Session timeout');
+    }
     return jsonResponse(
       { ok: false, code: 'SESSION_EXPIRED' },
       { status: 401, headers: sessionResult.headers || undefined }
     );
   }
   if (sessionResult.status !== 'valid') {
+    if (isDebug) {
+      logAuthDebug(request, 'GET /api/auth/me', 'unauthenticated', {
+        status: sessionResult.status,
+      });
+    }
     return jsonResponse(
       { authenticated: false },
       sessionResult.headers ? { headers: sessionResult.headers } : {}
     );
   }
+  
   const { user } = sessionResult;
+  if (isDebug) {
+    logAuthDebug(request, 'GET /api/auth/me', 'user_loaded', {
+      userId: user.id,
+      email: user.email ? '(set)' : '(missing)',
+    });
+  }
 
   const profile = await env.DB.prepare(
     `SELECT state, wy_house_district
@@ -2220,6 +2450,14 @@ const handleAuthMe = async (request, env) => {
   )
     .bind(user.id)
     .first();
+
+  if (isDebug) {
+    logAuthDebug(request, 'GET /api/auth/me', 'response_ready', {
+      authenticated: true,
+      hasProfile: !!profile,
+      hasVerification: !!verification,
+    });
+  }
 
   return jsonResponse({
     authenticated: true,

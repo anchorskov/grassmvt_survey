@@ -2,6 +2,7 @@
 # ./checks_prod.sh
 # Production diagnostics script - runs wrangler and curl checks, writes to checks_findings.txt
 # Purpose: Capture worker, D1, auth endpoint, and migration state for debugging
+# Note: All D1 commands use --remote to target production database, not local
 
 set -euo pipefail
 
@@ -11,7 +12,7 @@ TEMP_BODY="/tmp/checks_auth_me_body_$$.txt"
 
 trap "rm -f '$TEMP_BODY'" EXIT
 
-# Initialize output file with header
+# Initialize output file with header (overwrite any existing file)
 {
   echo "==============================================================================="
   echo "PRODUCTION DIAGNOSTICS CHECK"
@@ -19,6 +20,9 @@ trap "rm -f '$TEMP_BODY'" EXIT
   echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
   echo "Hostname: $(hostname)"
   echo "Repo Root: $REPO_ROOT"
+  echo ""
+  echo "⚠️  IMPORTANT: All D1 checks use --remote flag"
+  echo "This means we are querying the PRODUCTION database in Cloudflare, not local."
   echo ""
   
   # Git info
@@ -42,23 +46,15 @@ trap "rm -f '$TEMP_BODY'" EXIT
   echo ""
   
   echo "==============================================================================="
-  echo "B) TAIL READINESS & DEPLOYMENTS"
+  echo "B) WORKER DEPLOYMENT STATUS"
   echo "==============================================================================="
   echo ""
   
-  # Try first variant
-  echo "Attempting: wrangler deployments list --config ./wrangler.jsonc grassmvtsurvey-production"
-  if wrangler deployments list --config "$REPO_ROOT/wrangler.jsonc" grassmvtsurvey-production 2>&1; then
-    echo "✓ Deployment list succeeded (variant 1: direct worker name)"
+  echo "Command: wrangler deployments list --config ./wrangler.jsonc --env production --name grassmvtsurvey"
+  if wrangler deployments list --config "$REPO_ROOT/wrangler.jsonc" --env production --name grassmvtsurvey 2>&1; then
+    echo "✓ Deployment list succeeded"
   else
-    echo "✗ Variant 1 failed, trying variant 2..."
-    echo ""
-    echo "Attempting: wrangler deployments list --config ./wrangler.jsonc --env production grassmvtsurvey"
-    if wrangler deployments list --config "$REPO_ROOT/wrangler.jsonc" --env production grassmvtsurvey 2>&1; then
-      echo "✓ Deployment list succeeded (variant 2: with --env production)"
-    else
-      echo "✗ Both variants failed"
-    fi
+    echo "✗ Deployment list command failed (check wrangler configuration)"
   fi
   echo ""
   
@@ -86,29 +82,29 @@ trap "rm -f '$TEMP_BODY'" EXIT
   echo ""
   
   echo "==============================================================================="
-  echo "D) D1 SCHEMA VERIFICATION"
+  echo "D) D1 SCHEMA VERIFICATION (Production Database - using --remote)"
   echo "==============================================================================="
   echo ""
   
-  echo "Command: wrangler d1 execute wy --config ./wrangler.jsonc --env production --command \"PRAGMA table_info(session);\""
-  wrangler d1 execute wy --config "$REPO_ROOT/wrangler.jsonc" --env production --command "PRAGMA table_info(session);" 2>&1 || echo "ERROR: session table info failed"
+  echo "Command: wrangler d1 execute wy --remote --env production --command \"PRAGMA table_info(session);\""
+  wrangler d1 execute wy --remote --env production --command "PRAGMA table_info(session);" 2>&1 || echo "ERROR: session table info failed"
   echo ""
   
-  echo "Command: wrangler d1 execute wy --config ./wrangler.jsonc --env production --command \"PRAGMA table_info(user);\""
-  wrangler d1 execute wy --config "$REPO_ROOT/wrangler.jsonc" --env production --command "PRAGMA table_info(user);" 2>&1 || echo "ERROR: user table info failed"
+  echo "Command: wrangler d1 execute wy --remote --env production --command \"PRAGMA table_info(user);\""
+  wrangler d1 execute wy --remote --env production --command "PRAGMA table_info(user);" 2>&1 || echo "ERROR: user table info failed"
   echo ""
   
   echo "Command: SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('session','user');"
-  wrangler d1 execute wy --config "$REPO_ROOT/wrangler.jsonc" --env production --command "SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('session','user');" 2>&1 || echo "ERROR: table schema query failed"
+  wrangler d1 execute wy --remote --env production --command "SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('session','user');" 2>&1 || echo "ERROR: table schema query failed"
   echo ""
   
   echo "==============================================================================="
-  echo "E) MIGRATION STATE"
+  echo "E) MIGRATION STATE (Production Database - using --remote)"
   echo "==============================================================================="
   echo ""
   
-  echo "Command: wrangler d1 migrations list wy --config ./wrangler.jsonc --env production"
-  wrangler d1 migrations list wy --config "$REPO_ROOT/wrangler.jsonc" --env production 2>&1 || echo "ERROR: migrations list failed"
+  echo "Command: wrangler d1 migrations list wy --remote --env production"
+  wrangler d1 migrations list wy --remote --env production 2>&1 || echo "ERROR: migrations list failed"
   echo ""
   
   echo "Local migrations directory:"

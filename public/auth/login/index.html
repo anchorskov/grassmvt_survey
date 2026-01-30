@@ -60,6 +60,13 @@
       <p class="helper-text">
         Need an account? <a href="/auth/signup/">Create one</a>
       </p>
+      
+      <!-- Debug diagnostics panel (hidden by default, enabled with ?debugAuth=1) -->
+      <section id="passkey-diagnostics" class="survey-form is-hidden" aria-live="polite">
+        <h3>Passkey Diagnostics</h3>
+        <pre id="passkey-diag-output" style="background:#f5f5f5;padding:1em;overflow:auto;max-height:300px;font-size:0.85em;"></pre>
+        <button class="button button--small" type="button" id="passkey-diag-run">Run Diagnostics</button>
+      </section>
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>

@@ -29,6 +29,43 @@
   const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
   const PASSKEY_NUDGE_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
 
+  // Debug mode: enable with ?debugAuth=1 query param
+  const debugAuth = new URLSearchParams(window.location.search).get('debugAuth') === '1';
+  const logDebug = (...args) => {
+    if (debugAuth) {
+      console.log('[Passkey Debug]', ...args);
+    }
+  };
+
+  // Map WebAuthn errors to user-friendly messages
+  const mapPasskeyError = (error) => {
+    const name = error && error.name ? error.name : '';
+    const message = error && error.message ? error.message : '';
+    
+    if (name === 'NotAllowedError') {
+      if (message.includes('timed out')) {
+        return 'Passkey sign-in timed out. Please try again.';
+      }
+      return 'Passkey sign-in was cancelled or not allowed. Try again or use password.';
+    }
+    if (name === 'InvalidStateError') {
+      return 'No matching passkey found for this account on this device.';
+    }
+    if (name === 'SecurityError') {
+      return 'Domain or security configuration mismatch. Please use password sign-in.';
+    }
+    if (name === 'AbortError') {
+      return 'Passkey sign-in was cancelled.';
+    }
+    if (name === 'NotSupportedError') {
+      return 'Passkey is not supported on this device or browser.';
+    }
+    return 'Passkey sign-in failed. Please try again or use password.';
+  };
+
+  // State tracking for passkey button
+  let passkeyInProgress = false;
+
   const showError = (message, allowHtml = false) => {
     if (!errorEl) {
       return;
@@ -310,10 +347,27 @@
     }
     turnstileExecuted = true;
     setTurnstileState('running');
-    const token = await turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
+    
+    // Add timeout to prevent infinite hang
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => resolve(''), 30000); // 30 second timeout
+    });
+    
+    const token = await Promise.race([
+      turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId }),
+      timeoutPromise,
+    ]);
+    
     if (!token) {
       turnstileExecuted = false;
       setTurnstileState('needs-interaction');
+      // Show the widget for manual interaction
+      if (turnstileLabelEl) {
+        turnstileLabelEl.classList.remove('is-hidden');
+      }
+      if (turnstileContainer) {
+        turnstileContainer.classList.remove('is-hidden');
+      }
     }
   };
 
@@ -564,43 +618,129 @@
     });
   }
 
-  if (passkeyButton && authMode === 'login') {
-    if (!window.PublicKeyCredential) {
-      passkeyButton.disabled = true;
-      passkeyButton.textContent = 'Passkey not supported on this device';
+  // Core passkey authentication function for login page
+  const doPasskeyLogin = async (attachmentHint) => {
+    // User activation guard: prevent double-calls
+    if (passkeyInProgress) {
+      logDebug('Passkey login already in progress, ignoring');
+      return;
     }
-    passkeyButton.addEventListener('click', async () => {
-      showError('');
-      let browser;
-      try {
-        browser = await loadWebAuthnBrowser();
-      } catch (error) {
-        showError('Passkey support is unavailable.');
-        return;
+    passkeyInProgress = true;
+    
+    // Disable button and show loading state
+    if (passkeyButton) {
+      passkeyButton.disabled = true;
+      passkeyButton.textContent = 'Signing in...';
+    }
+    
+    const resetButton = () => {
+      passkeyInProgress = false;
+      if (passkeyButton) {
+        passkeyButton.disabled = false;
+        passkeyButton.textContent = 'Sign in with passkey';
       }
-      const optionsResponse = await fetch('/api/auth/passkey/login/options', {
+    };
+    
+    showError('');
+    
+    // Debug: Log environment info (safe, no secrets)
+    logDebug('Starting passkey login', {
+      origin: window.location.origin,
+      hostname: window.location.hostname,
+      attachmentHint: attachmentHint || 'none',
+      userAgent: navigator.userAgent.substring(0, 100),
+    });
+    
+    let browser;
+    try {
+      browser = await loadWebAuthnBrowser();
+      logDebug('WebAuthn browser loaded successfully');
+    } catch (error) {
+      logDebug('WebAuthn browser load failed:', error.name, error.message);
+      showError('Passkey support is unavailable.');
+      resetButton();
+      return;
+    }
+    
+    // Fetch options from server
+    const optionsBody = {};
+    if (attachmentHint) {
+      optionsBody.attachmentHint = attachmentHint;
+    }
+    
+    let optionsResponse;
+    try {
+      optionsResponse = await fetch('/api/auth/passkey/login/options', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({}),
+        body: JSON.stringify(optionsBody),
       });
-      if (!optionsResponse.ok) {
-        showError('Unable to start passkey sign-in.');
-        return;
-      }
-      const optionsData = await optionsResponse.json();
-      if (!optionsData.options || !optionsData.challengeId) {
-        showError('Unable to start passkey sign-in.');
-        return;
-      }
-      let assertionResponse;
-      try {
-        assertionResponse = await browser.startAuthentication(optionsData.options);
-      } catch (error) {
-        showError('Passkey sign-in was cancelled.');
-        return;
-      }
-      const verifyResponse = await fetch('/api/auth/passkey/login/verify', {
+    } catch (error) {
+      logDebug('Options fetch failed:', error.name, error.message);
+      showError('Unable to start passkey sign-in. Check your connection.');
+      resetButton();
+      return;
+    }
+    
+    logDebug('Options response status:', optionsResponse.status);
+    
+    if (!optionsResponse.ok) {
+      showError('Unable to start passkey sign-in.');
+      resetButton();
+      return;
+    }
+    
+    const optionsData = await optionsResponse.json();
+    if (!optionsData.options || !optionsData.challengeId) {
+      logDebug('Invalid options data:', { hasOptions: !!optionsData.options, hasChallengeId: !!optionsData.challengeId });
+      showError('Unable to start passkey sign-in.');
+      resetButton();
+      return;
+    }
+    
+    // Debug: Log safe options info
+    logDebug('Options received', {
+      rpId: optionsData.options.rpId || '(not set)',
+      allowCredentialsCount: optionsData.options.allowCredentials ? optionsData.options.allowCredentials.length : 0,
+      userVerification: optionsData.options.userVerification || '(not set)',
+      timeout: optionsData.options.timeout || '(not set)',
+    });
+    
+    // Start WebAuthn authentication with timeout handling
+    let assertionResponse;
+    try {
+      logDebug('Calling startAuthentication');
+      assertionResponse = await browser.startAuthentication(optionsData.options);
+      logDebug('Authentication succeeded');
+    } catch (error) {
+      logDebug('Authentication error:', {
+        name: error.name,
+        message: error.message,
+      });
+      const friendlyMessage = mapPasskeyError(error);
+      showError(friendlyMessage);
+      resetButton();
+      return;
+    }
+    
+    if (!assertionResponse) {
+      logDebug('No assertion response returned');
+      showError('Passkey sign-in failed.');
+      resetButton();
+      return;
+    }
+    
+    logDebug('Assertion response received', {
+      id: '(present)',
+      type: assertionResponse.type,
+      hasResponse: !!assertionResponse.response,
+    });
+    
+    // Verify with server
+    let verifyResponse;
+    try {
+      verifyResponse = await fetch('/api/auth/passkey/login/verify', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         credentials: 'include',
@@ -609,25 +749,59 @@
           challengeId: optionsData.challengeId,
         }),
       });
-      if (!verifyResponse.ok) {
-        const data = await verifyResponse.json().catch(() => ({}));
-        if (data && data.code === 'UNKNOWN_CREDENTIAL') {
-          showError('No matching passkey found on this device. Sign in with password, then add a passkey.');
-        } else {
-          showError('Passkey sign-in failed.');
-        }
-        return;
-      }
-      const authenticated = await waitForAuthState();
-      if (window.AuthUI && typeof window.AuthUI.fetchAuthState === 'function') {
-        await window.AuthUI.fetchAuthState();
-      }
-      window.dispatchEvent(
-        new CustomEvent('auth:changed', { detail: { authenticated: !!authenticated } })
-      );
-      if (!authenticated) {
+    } catch (error) {
+      logDebug('Verify fetch failed:', error.name, error.message);
+      showError('Passkey verification failed. Check your connection.');
+      resetButton();
+      return;
+    }
+    
+    logDebug('Verify response status:', verifyResponse.status);
+    
+    if (!verifyResponse.ok) {
+      const data = await verifyResponse.json().catch(() => ({}));
+      logDebug('Verify failed', {
+        status: verifyResponse.status,
+        code: data.code || '(none)',
+      });
+      if (data && data.code === 'UNKNOWN_CREDENTIAL') {
+        showError('No matching passkey found on this device. Sign in with password, then add a passkey.');
+      } else if (data && data.code === 'RP_ID_MISMATCH') {
+        showError('Domain mismatch. Please use password sign-in.');
+      } else {
         showError('Passkey sign-in failed.');
       }
+      resetButton();
+      return;
+    }
+    
+    const authenticated = await waitForAuthState();
+    if (window.AuthUI && typeof window.AuthUI.fetchAuthState === 'function') {
+      await window.AuthUI.fetchAuthState();
+    }
+    window.dispatchEvent(
+      new CustomEvent('auth:changed', { detail: { authenticated: !!authenticated } })
+    );
+    if (!authenticated) {
+      logDebug('Auth state refresh failed');
+      showError('Passkey sign-in failed.');
+      resetButton();
+      return;
+    }
+    
+    logDebug('Login successful');
+    // Reset button state even on success for clean UI
+    resetButton();
+  };
+
+  if (passkeyButton && authMode === 'login') {
+    if (!window.PublicKeyCredential) {
+      passkeyButton.disabled = true;
+      passkeyButton.textContent = 'Passkey not supported on this device';
+    }
+    passkeyButton.addEventListener('click', () => {
+      // Direct click handler - maintains user activation
+      doPasskeyLogin();
     });
   }
 
@@ -640,6 +814,108 @@
   const oauthError = new URLSearchParams(window.location.search || '').get('oauth_error');
   if (oauthError) {
     showError(mapOauthError(oauthError));
+  }
+
+  // Diagnostics panel (enabled with ?debugAuth=1)
+  const diagPanel = document.getElementById('passkey-diagnostics');
+  const diagOutput = document.getElementById('passkey-diag-output');
+  const diagButton = document.getElementById('passkey-diag-run');
+  
+  if (debugAuth && diagPanel) {
+    diagPanel.classList.remove('is-hidden');
+    
+    const runDiagnostics = async () => {
+      const lines = [];
+      const log = (msg) => lines.push(msg);
+      
+      log('=== Passkey Diagnostics ===');
+      log('');
+      log(`Time: ${new Date().toISOString()}`);
+      log(`Origin: ${window.location.origin}`);
+      log(`Hostname: ${window.location.hostname}`);
+      log(`Protocol: ${window.location.protocol}`);
+      log(`User Agent: ${navigator.userAgent}`);
+      log('');
+      
+      // Check WebAuthn support
+      log('--- WebAuthn Support ---');
+      if (window.PublicKeyCredential) {
+        log('PublicKeyCredential: YES');
+        
+        // Check platform authenticator availability
+        try {
+          const platformAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+          log(`Platform Authenticator Available: ${platformAvailable ? 'YES' : 'NO'}`);
+        } catch (e) {
+          log(`Platform Authenticator Check Error: ${e.message}`);
+        }
+        
+        // Check conditional mediation (autofill) support
+        try {
+          if (PublicKeyCredential.isConditionalMediationAvailable) {
+            const conditionalAvailable = await PublicKeyCredential.isConditionalMediationAvailable();
+            log(`Conditional Mediation (Autofill): ${conditionalAvailable ? 'YES' : 'NO'}`);
+          } else {
+            log('Conditional Mediation: Not supported');
+          }
+        } catch (e) {
+          log(`Conditional Mediation Check Error: ${e.message}`);
+        }
+      } else {
+        log('PublicKeyCredential: NO - WebAuthn not supported');
+      }
+      log('');
+      
+      // Fetch server options to check RP ID
+      log('--- Server Configuration ---');
+      try {
+        const optionsResponse = await fetch('/api/auth/passkey/login/options', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        });
+        if (optionsResponse.ok) {
+          const data = await optionsResponse.json();
+          log(`Options fetch: OK`);
+          log(`RP ID: ${data.options?.rpId || '(not set)'}`);
+          log(`Timeout: ${data.options?.timeout || '(not set)'}`);
+          log(`User Verification: ${data.options?.userVerification || '(not set)'}`);
+          log(`Allow Credentials: ${data.options?.allowCredentials?.length || 0}`);
+          log(`Challenge ID: ${data.challengeId ? '(present)' : '(missing)'}`);
+          
+          // Check RP ID matches hostname
+          if (data.options?.rpId && data.options.rpId !== window.location.hostname) {
+            log('');
+            log(`⚠️  WARNING: RP ID (${data.options.rpId}) does not match hostname (${window.location.hostname})`);
+            log('    This may cause passkey lookups to fail!');
+          }
+        } else {
+          log(`Options fetch: FAILED (${optionsResponse.status})`);
+        }
+      } catch (e) {
+        log(`Options fetch error: ${e.message}`);
+      }
+      log('');
+      
+      log('--- Recommendations ---');
+      log('1. Ensure you have registered a passkey on this device first');
+      log('2. Check that Windows Hello is enabled in Windows Settings');
+      log('3. Try: Settings > Accounts > Sign-in options > Windows Hello');
+      log('');
+      log('=== End Diagnostics ===');
+      
+      if (diagOutput) {
+        diagOutput.textContent = lines.join('\n');
+      }
+    };
+    
+    if (diagButton) {
+      diagButton.addEventListener('click', runDiagnostics);
+    }
+    
+    // Auto-run on page load when debug is enabled
+    runDiagnostics();
   }
 
   fetchAuthState();

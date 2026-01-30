@@ -71,6 +71,7 @@
   let turnstileExecuted = false;
   let turnstileSubmitted = false;
   let pendingOauthError = '';
+  let pendingFormSubmit = null; // Store pending form submission to auto-continue after Turnstile
 
   const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
   const PASSKEY_NUDGE_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -238,6 +239,7 @@
     lastTurnstileToken = '';
     turnstileExecuted = false;
     turnstileSubmitted = false;
+    pendingFormSubmit = null;
     setTurnstileState('idle');
   };
 
@@ -280,17 +282,25 @@
           tokenInput.value = token || '';
           lastTurnstileToken = token || '';
           setTurnstileState('ready');
+          // Auto-continue pending form submission after Turnstile succeeds
+          if (pendingFormSubmit && typeof pendingFormSubmit === 'function') {
+            const submit = pendingFormSubmit;
+            pendingFormSubmit = null;
+            submit();
+          }
         },
         onError: () => {
           tokenInput.value = '';
           lastTurnstileToken = '';
           turnstileExecuted = false;
+          pendingFormSubmit = null;
           setTurnstileState('failed');
         },
         onExpire: () => {
           tokenInput.value = '';
           lastTurnstileToken = '';
           turnstileExecuted = false;
+          pendingFormSubmit = null;
           setTurnstileState('needs-interaction');
         },
       });
@@ -340,6 +350,7 @@
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('no-scroll');
     showError('');
+    pendingFormSubmit = null;
     resetTurnstile();
     if (turnstileLabelEl) {
       turnstileLabelEl.classList.add('is-hidden');
@@ -355,10 +366,27 @@
     }
     turnstileExecuted = true;
     setTurnstileState('running');
-    const token = await turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
+    
+    // Add timeout to prevent infinite hang
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => resolve(''), 30000); // 30 second timeout
+    });
+    
+    const token = await Promise.race([
+      turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId }),
+      timeoutPromise,
+    ]);
+    
     if (!token) {
       turnstileExecuted = false;
       setTurnstileState('needs-interaction');
+      // Show the widget for manual interaction
+      if (turnstileLabelEl) {
+        turnstileLabelEl.classList.remove('is-hidden');
+      }
+      if (turnstileContainer) {
+        turnstileContainer.classList.remove('is-hidden');
+      }
     }
   };
 
@@ -498,10 +526,62 @@
     });
   }
 
+  // Core login function - separated to allow auto-continue after Turnstile
+  const performLogin = async (email, password, tokenValue) => {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        email,
+        password,
+        turnstileToken: tokenValue || '',
+      }),
+    });
+    if (!response.ok) {
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = null;
+      }
+      if (data && data.code === 'PASSWORD_INCORRECT') {
+        showError('Password incorrect');
+      } else if (data && data.code === 'ACCOUNT_NOT_FOUND') {
+        showError('Account not found');
+      } else if (response.status === 404) {
+        showError('Account not found');
+      } else if (response.status === 401) {
+        showError('Password incorrect');
+      } else {
+        showError('Unable to sign in.');
+      }
+      resetTurnstile();
+      return;
+    }
+    resetTurnstile();
+    const authenticated = await waitForAuthState();
+    if (authenticated) {
+      window.dispatchEvent(
+        new CustomEvent('auth:changed', { detail: { authenticated: true } })
+      );
+      if (window.PasskeyPrompt && typeof window.PasskeyPrompt.queueAfterPasswordLogin === 'function') {
+        window.PasskeyPrompt.queueAfterPasswordLogin();
+      }
+      const nudged = await maybeShowPasskeyNudge();
+      if (nudged) {
+        return;
+      }
+    }
+    closeModal();
+    window.location.href = '/surveys/list/';
+  };
+
   if (form) {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       showError('');
+      pendingFormSubmit = null; // Clear any pending submit
       turnstileSubmitted = true;
       const email = emailInput ? emailInput.value.trim() : '';
       const password = passwordInput ? passwordInput.value : '';
@@ -520,118 +600,188 @@
       }
       const tokenValue = tokenInput && tokenInput.value ? tokenInput.value : lastTurnstileToken;
       if (!turnstileConfig.bypass && !tokenValue) {
+        // Store pending submit to auto-continue after Turnstile completes
+        pendingFormSubmit = () => {
+          const newToken = tokenInput && tokenInput.value ? tokenInput.value : lastTurnstileToken;
+          if (newToken) {
+            performLogin(email, password, newToken);
+          } else {
+            showError('Verification failed. Please try again.');
+            resetTurnstile();
+          }
+        };
         setTurnstileState('running', 'Verifying you are human...');
         await renderTurnstile(true);
         await executeTurnstileOnce();
         return;
       }
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          email,
-          password,
-          turnstileToken: tokenValue || '',
-        }),
-      });
-      if (!response.ok) {
-        let data = null;
-        try {
-          data = await response.json();
-        } catch (error) {
-          data = null;
-        }
-        if (data && data.code === 'PASSWORD_INCORRECT') {
-          showError('Password incorrect');
-        } else if (data && data.code === 'ACCOUNT_NOT_FOUND') {
-          showError('Account not found');
-        } else if (response.status === 404) {
-          showError('Account not found');
-        } else if (response.status === 401) {
-          showError('Password incorrect');
-        } else {
-          showError('Unable to sign in.');
-        }
-        resetTurnstile();
-        return;
-      }
-      resetTurnstile();
-      const authenticated = await waitForAuthState();
-      if (authenticated) {
-        window.dispatchEvent(
-          new CustomEvent('auth:changed', { detail: { authenticated: true } })
-        );
-        if (window.PasskeyPrompt && typeof window.PasskeyPrompt.queueAfterPasswordLogin === 'function') {
-          window.PasskeyPrompt.queueAfterPasswordLogin();
-        }
-        const nudged = await maybeShowPasskeyNudge();
-        if (nudged) {
-          return;
-        }
-      }
-      closeModal();
-      window.location.href = '/surveys/list/';
+      await performLogin(email, password, tokenValue);
     });
   }
 
-  if (passkeyButton) {
-    if (!window.PublicKeyCredential) {
-      passkeyButton.disabled = true;
-      passkeyButton.textContent = 'Passkey not supported on this device';
+  // Debug mode: enable with ?debugAuth=1 query param
+  const debugAuth = new URLSearchParams(window.location.search).get('debugAuth') === '1';
+  const logDebug = (...args) => {
+    if (debugAuth) {
+      console.log('[Passkey Debug]', ...args);
     }
-    passkeyButton.addEventListener('click', async () => {
-      showError('');
-      let browser;
-      try {
-        browser = await loadWebAuthnBrowser();
-      } catch (error) {
-        showError('Passkey support is unavailable.');
-        return;
+  };
+
+  // Map WebAuthn errors to user-friendly messages
+  const mapPasskeyError = (error) => {
+    const name = error && error.name ? error.name : '';
+    const message = error && error.message ? error.message : '';
+    
+    if (name === 'NotAllowedError') {
+      if (message.includes('timed out')) {
+        return 'Passkey sign-in timed out. Please try again.';
       }
-      const optionsResponse = await fetch('/api/auth/passkey/login/options', {
+      return 'Passkey sign-in was cancelled or not allowed. Try again or use password.';
+    }
+    if (name === 'InvalidStateError') {
+      return 'No matching passkey found for this account on this device.';
+    }
+    if (name === 'SecurityError') {
+      return 'Domain or security configuration mismatch. Please use password sign-in.';
+    }
+    if (name === 'AbortError') {
+      return 'Passkey sign-in was cancelled.';
+    }
+    if (name === 'NotSupportedError') {
+      return 'Passkey is not supported on this device or browser.';
+    }
+    return 'Passkey sign-in failed. Please try again or use password.';
+  };
+
+  // State tracking for passkey button
+  let passkeyInProgress = false;
+  
+  // Core passkey authentication function
+  const doPasskeyLogin = async (attachmentHint) => {
+    // User activation guard: prevent double-calls
+    if (passkeyInProgress) {
+      logDebug('Passkey login already in progress, ignoring');
+      return;
+    }
+    passkeyInProgress = true;
+    
+    // Disable button and show loading state
+    if (passkeyButton) {
+      passkeyButton.disabled = true;
+      passkeyButton.textContent = 'Signing in...';
+    }
+    
+    const resetButton = () => {
+      passkeyInProgress = false;
+      if (passkeyButton) {
+        passkeyButton.disabled = false;
+        passkeyButton.textContent = 'Sign in with passkey';
+      }
+    };
+    
+    showError('');
+    
+    // Debug: Log environment info (safe, no secrets)
+    logDebug('Starting passkey login', {
+      origin: window.location.origin,
+      hostname: window.location.hostname,
+      attachmentHint: attachmentHint || 'none',
+      userAgent: navigator.userAgent.substring(0, 100),
+    });
+    
+    let browser;
+    try {
+      browser = await loadWebAuthnBrowser();
+      logDebug('WebAuthn browser loaded successfully');
+    } catch (error) {
+      logDebug('WebAuthn browser load failed:', error.name, error.message);
+      showError('Passkey support is unavailable.');
+      resetButton();
+      return;
+    }
+    
+    // Fetch options from server
+    const optionsBody = {};
+    if (attachmentHint) {
+      optionsBody.attachmentHint = attachmentHint;
+    }
+    
+    let optionsResponse;
+    try {
+      optionsResponse = await fetch('/api/auth/passkey/login/options', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({}),
+        body: JSON.stringify(optionsBody),
       });
-      if (!optionsResponse.ok) {
-        showError('Unable to start passkey sign-in.');
-        return;
-      }
-      const optionsData = await optionsResponse.json();
-      if (!optionsData.options || !optionsData.challengeId) {
-        showError('Unable to start passkey sign-in.');
-        return;
-      }
-      let assertionResponse;
-      try {
-        assertionResponse = await browser.startAuthentication(optionsData.options);
-      } catch (error) {
-        console.error('[Passkey Login] Authentication cancelled:', error);
-        showError('Passkey sign-in was cancelled.');
-        return;
-      }
+    } catch (error) {
+      logDebug('Options fetch failed:', error.name, error.message);
+      showError('Unable to start passkey sign-in. Check your connection.');
+      resetButton();
+      return;
+    }
+    
+    logDebug('Options response status:', optionsResponse.status);
+    
+    if (!optionsResponse.ok) {
+      showError('Unable to start passkey sign-in.');
+      resetButton();
+      return;
+    }
+    
+    const optionsData = await optionsResponse.json();
+    if (!optionsData.options || !optionsData.challengeId) {
+      logDebug('Invalid options data:', { hasOptions: !!optionsData.options, hasChallengeId: !!optionsData.challengeId });
+      showError('Unable to start passkey sign-in.');
+      resetButton();
+      return;
+    }
+    
+    // Debug: Log safe options info
+    logDebug('Options received', {
+      rpId: optionsData.options.rpId || '(not set)',
+      allowCredentialsCount: optionsData.options.allowCredentials ? optionsData.options.allowCredentials.length : 0,
+      userVerification: optionsData.options.userVerification || '(not set)',
+      timeout: optionsData.options.timeout || '(not set)',
+    });
+    
+    // Start WebAuthn authentication with timeout handling
+    let assertionResponse;
+    try {
+      // Set a reasonable timeout (default 60 seconds)
+      const authTimeout = optionsData.options.timeout || 60000;
+      logDebug('Calling startAuthentication with timeout:', authTimeout);
       
-      if (!assertionResponse) {
-        console.error('[Passkey Login] No assertion response returned');
-        showError('Passkey sign-in failed.');
-        return;
-      }
-      
-      console.log('[Passkey Login] Assertion response:', {
-        id: assertionResponse.id,
-        rawId: assertionResponse.rawId,
-        type: assertionResponse.type,
-        response: assertionResponse.response ? {
-          clientDataJSON: typeof assertionResponse.response.clientDataJSON,
-          authenticatorData: typeof assertionResponse.response.authenticatorData,
-          signature: typeof assertionResponse.response.signature,
-          userHandle: assertionResponse.response.userHandle,
-        } : null,
+      assertionResponse = await browser.startAuthentication(optionsData.options);
+      logDebug('Authentication succeeded');
+    } catch (error) {
+      logDebug('Authentication error:', {
+        name: error.name,
+        message: error.message,
       });
-      
-      const verifyResponse = await fetch('/api/auth/passkey/login/verify', {
+      const friendlyMessage = mapPasskeyError(error);
+      showError(friendlyMessage);
+      resetButton();
+      return;
+    }
+    
+    if (!assertionResponse) {
+      logDebug('No assertion response returned');
+      showError('Passkey sign-in failed.');
+      resetButton();
+      return;
+    }
+    
+    logDebug('Assertion response received', {
+      id: '(present)',
+      type: assertionResponse.type,
+      hasResponse: !!assertionResponse.response,
+    });
+    
+    // Verify with server
+    let verifyResponse;
+    try {
+      verifyResponse = await fetch('/api/auth/passkey/login/verify', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         credentials: 'include',
@@ -640,29 +790,54 @@
           challengeId: optionsData.challengeId,
         }),
       });
-      
-      if (!verifyResponse.ok) {
-        const data = await verifyResponse.json().catch(() => ({}));
-        console.error('[Passkey Login] Verify failed:', {
-          status: verifyResponse.status,
-          code: data.code,
-          error: data.error,
-        });
-        if (data && data.code === 'UNKNOWN_CREDENTIAL') {
-          showError('No matching passkey found on this device. Sign in with password, then add a passkey.');
-        } else {
-          showError('Passkey sign-in failed.');
-        }
-        return;
-      }
-      showError('');
-      const authenticated = await refreshAuthState();
-      if (!authenticated) {
+    } catch (error) {
+      logDebug('Verify fetch failed:', error.name, error.message);
+      showError('Passkey verification failed. Check your connection.');
+      resetButton();
+      return;
+    }
+    
+    logDebug('Verify response status:', verifyResponse.status);
+    
+    if (!verifyResponse.ok) {
+      const data = await verifyResponse.json().catch(() => ({}));
+      logDebug('Verify failed', {
+        status: verifyResponse.status,
+        code: data.code || '(none)',
+      });
+      if (data && data.code === 'UNKNOWN_CREDENTIAL') {
+        showError('No matching passkey found on this device. Sign in with password, then add a passkey.');
+      } else if (data && data.code === 'RP_ID_MISMATCH') {
+        showError('Domain mismatch. Please use password sign-in.');
+      } else {
         showError('Passkey sign-in failed.');
-        return;
       }
-      closeModal();
-      window.location.href = '/surveys/list/';
+      resetButton();
+      return;
+    }
+    
+    showError('');
+    const authenticated = await refreshAuthState();
+    if (!authenticated) {
+      logDebug('Auth state refresh failed');
+      showError('Passkey sign-in failed.');
+      resetButton();
+      return;
+    }
+    
+    logDebug('Login successful, redirecting');
+    closeModal();
+    window.location.href = '/surveys/list/';
+  };
+  
+  if (passkeyButton) {
+    if (!window.PublicKeyCredential) {
+      passkeyButton.disabled = true;
+      passkeyButton.textContent = 'Passkey not supported on this device';
+    }
+    passkeyButton.addEventListener('click', () => {
+      // Direct click handler - maintains user activation
+      doPasskeyLogin();
     });
   }
 
