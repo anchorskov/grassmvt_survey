@@ -160,6 +160,21 @@
     }
   };
 
+  const checkAccountExists = async (email) => {
+    try {
+      const response = await fetch(`/api/auth/exists?email=${encodeURIComponent(email)}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const data = await response.json();
+      return !!data.exists;
+    } catch (error) {
+      return null;
+    }
+  };
+
   const shouldShowPasskeyNudge = () => {
     if (!passkeyNudgeEl) {
       return false;
@@ -478,12 +493,18 @@
         showError('Email and password are required.');
         return;
       }
+      const exists = await checkAccountExists(email);
+      if (exists === false && authModals && typeof authModals.open === 'function') {
+        authModals.open('signup');
+        showError('No account found. Create one to continue.');
+        return;
+      }
       if (!turnstileConfig.siteKey && !turnstileConfig.bypass) {
         turnstileConfig = await fetchTurnstileConfig();
       }
       const tokenValue = tokenInput && tokenInput.value ? tokenInput.value : lastTurnstileToken;
       if (!turnstileConfig.bypass && !tokenValue) {
-        setTurnstileState('needs-interaction');
+        setTurnstileState('running', 'Verifying you are human...');
         await renderTurnstile(true);
         await executeTurnstileOnce();
         return;
@@ -599,6 +620,7 @@
         return;
       }
       closeModal();
+      window.location.href = '/surveys/list/';
     });
   }
 

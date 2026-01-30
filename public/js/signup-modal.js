@@ -262,8 +262,17 @@
       }
       resetTurnstile();
       showError('Account created. Signing you in. Add a passkey from your account page.');
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const authenticated = await authUI.fetchAuthState();
+      
+      // Wait for session cookie to be fully set
+      let authenticated = false;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        authenticated = await authUI.fetchAuthState();
+        if (authenticated) {
+          break;
+        }
+      }
+      
       if (authenticated) {
         window.dispatchEvent(
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
