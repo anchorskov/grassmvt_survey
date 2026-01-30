@@ -271,18 +271,10 @@ const getWebAuthnRpId = (request, env) => {
     console.log(`[Passkey] Using configured RP ID: ${configured}`);
     return configured;
   }
-  let { hostname } = new URL(request.url);
+  const { hostname } = new URL(request.url);
   
-  // Normalize localhost and 127.0.0.1 to 127.0.0.1 for consistency
-  // (WebAuthn RP ID must be consistent across registration and verification)
-  if (hostname === 'localhost') {
-    hostname = '127.0.0.1';
-  }
-  
-  if (hostname === '127.0.0.1' || hostname === 'localhost') {
-    console.log(`[Passkey] Using local RP ID: 127.0.0.1 (normalized from ${hostname})`);
-    return '127.0.0.1';
-  }
+  // WebAuthn RP ID must match the origin's domain
+  // Always use the actual hostname from the request
   console.log(`[Passkey] Using request RP ID: ${hostname}`);
   return hostname;
 };
