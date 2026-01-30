@@ -56,9 +56,23 @@
   const logoutButton = document.getElementById('login-modal-logout');
   const turnstileContainer = document.getElementById('login-modal-turnstile');
   const passkeyButton = document.getElementById('login-passkey-button');
+  const oauthGoogleButton = document.getElementById('login-modal-oauth-google');
+  const oauthAppleButton = document.getElementById('login-modal-oauth-apple');
+  const submitButton = document.getElementById('login-modal-submit');
+  const turnstileStatusEl = document.getElementById('login-modal-turnstile-status');
+  const turnstileLabelEl = document.getElementById('login-modal-turnstile-label');
+  const passkeyNudgeEl = document.getElementById('login-modal-passkey-nudge');
+  const passkeyNudgeAdd = document.getElementById('login-modal-passkey-add');
+  const passkeyNudgeSkip = document.getElementById('login-modal-passkey-skip');
 
   let turnstileWidgetId = null;
   let lastTurnstileToken = '';
+  let turnstileConfig = { siteKey: '', bypass: false };
+  let turnstileState = 'idle';
+  let pendingOauthError = '';
+
+  const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
+  const PASSKEY_NUDGE_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
 
   const showError = (message) => {
     if (!errorEl) {
@@ -71,6 +85,20 @@
     }
     errorEl.textContent = message;
     errorEl.classList.remove('is-hidden');
+  };
+
+  const mapOauthError = (value) => {
+    const errors = {
+      access_denied: 'Sign-in cancelled. Please try again.',
+      oauth_unavailable: 'OAuth is not configured. Please sign in with email and password.',
+      state_invalid: 'Sign-in expired. Please try again.',
+      token_exchange_failed: 'Sign-in failed. Please try again.',
+      id_token_invalid: 'Sign-in failed. Please try again.',
+      email_missing: 'We could not read your email. Please sign in with password and try again.',
+      account_link_failed: 'Unable to link this account. Please sign in with password.',
+      provider_error: 'Sign-in failed. Please try again.',
+    };
+    return errors[value] || 'Sign-in failed. Please try again.';
   };
 
   const setLoggedInState = (isLoggedIn, email) => {
@@ -100,6 +128,54 @@
       authenticated = await authUI.fetchAuthState();
     }
     return authenticated;
+  };
+
+  const setTurnstileState = (state, message) => {
+    // Turnstile UI state machine: idle -> running -> ready, with needs-interaction/failed overrides.
+    turnstileState = state;
+    const hasToken = !!(tokenInput && tokenInput.value) || !!lastTurnstileToken;
+    const canBypass = !!turnstileConfig.bypass;
+    const canSubmit = canBypass || hasToken;
+    if (submitButton) {
+      submitButton.disabled = !canSubmit || state === 'running';
+    }
+    if (turnstileStatusEl) {
+      const messages = {
+        idle: 'Human check runs automatically.',
+        running: 'Verifying you are human...',
+        'needs-interaction': 'Please complete the human check.',
+        failed: 'Verification failed, try again.',
+        ready: '',
+      };
+      const next = message || messages[state] || '';
+      turnstileStatusEl.textContent = next;
+      turnstileStatusEl.classList.toggle('is-hidden', !next || canBypass);
+    }
+    if (turnstileLabelEl && turnstileContainer) {
+      const showChallenge = state === 'needs-interaction' || state === 'failed';
+      turnstileLabelEl.classList.toggle('is-hidden', !showChallenge);
+      turnstileContainer.classList.toggle('is-hidden', !showChallenge);
+    }
+  };
+
+  const shouldShowPasskeyNudge = () => {
+    if (!passkeyNudgeEl) {
+      return false;
+    }
+    try {
+      const last = Number(localStorage.getItem(PASSKEY_NUDGE_KEY) || 0);
+      return !last || Date.now() - last > PASSKEY_NUDGE_SUPPRESS_MS;
+    } catch (error) {
+      return true;
+    }
+  };
+
+  const dismissPasskeyNudge = () => {
+    try {
+      localStorage.setItem(PASSKEY_NUDGE_KEY, String(Date.now()));
+    } catch (error) {
+      // Ignore storage failures
+    }
   };
 
   const fetchTurnstileConfig = async () => {
@@ -143,36 +219,43 @@
       tokenInput.value = '';
     }
     lastTurnstileToken = '';
+    setTurnstileState('idle');
   };
 
-  const renderTurnstile = async () => {
+  const renderTurnstile = async (interactive = false) => {
     if (!turnstileContainer || !tokenInput) {
       return;
     }
-    const config = await fetchTurnstileConfig();
-    if (config.bypass) {
-      turnstileContainer.classList.add('is-hidden');
+    if (turnstileConfig.bypass) {
+      setTurnstileState('ready');
       return;
     }
-    if (!config.siteKey) {
+    if (!turnstileConfig.siteKey) {
       showError('Turnstile is not configured.');
+      setTurnstileState('failed', 'Verification unavailable.');
       return;
     }
-    turnstileContainer.classList.remove('is-hidden');
+    if (turnstileLabelEl) {
+      turnstileLabelEl.classList.toggle('is-hidden', !interactive);
+    }
+    turnstileContainer.classList.toggle('is-hidden', !interactive);
 
     try {
       if (!window.TurnstileLoader) {
         showError('Turnstile failed to load.');
+        setTurnstileState('failed', 'Verification failed, try again.');
         return;
       }
       await window.TurnstileLoader.load();
     } catch (error) {
       showError('Turnstile failed to load.');
+      setTurnstileState('failed', 'Verification failed, try again.');
       return;
     }
 
     if (!window.turnstile) {
       showError('Turnstile failed to load.');
+      setTurnstileState('failed', 'Verification failed, try again.');
       return;
     }
 
@@ -185,31 +268,55 @@
     }
 
     turnstileWidgetId = window.turnstile.render(turnstileContainer, {
-      sitekey: config.siteKey,
+      sitekey: turnstileConfig.siteKey,
+      size: interactive ? 'normal' : 'invisible',
       callback: (token) => {
         tokenInput.value = token || '';
         lastTurnstileToken = token || '';
+        setTurnstileState('ready');
       },
       'error-callback': () => {
         tokenInput.value = '';
         lastTurnstileToken = '';
-        showError('Turnstile validation failed.');
+        setTurnstileState('failed');
       },
       'expired-callback': () => {
         tokenInput.value = '';
         lastTurnstileToken = '';
+        setTurnstileState('needs-interaction');
       },
     });
+
+    if (!interactive && window.turnstile && typeof window.turnstile.execute === 'function') {
+      setTurnstileState('running');
+      try {
+        window.turnstile.execute(turnstileWidgetId);
+      } catch (error) {
+        setTurnstileState('needs-interaction');
+      }
+    } else if (interactive) {
+      setTurnstileState('needs-interaction');
+    }
   };
 
   const openModal = async () => {
     modal.classList.remove('is-hidden');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('no-scroll');
-    showError('');
+    if (pendingOauthError) {
+      showError(mapOauthError(pendingOauthError));
+      pendingOauthError = '';
+    } else {
+      showError('');
+    }
+    if (passkeyNudgeEl) {
+      passkeyNudgeEl.classList.add('is-hidden');
+    }
     const authenticated = await authUI.fetchAuthState();
     setLoggedInState(authenticated, authUI.state.email);
-    await renderTurnstile();
+    turnstileConfig = await fetchTurnstileConfig();
+    setTurnstileState(turnstileConfig.bypass ? 'ready' : 'idle');
+    await renderTurnstile(false);
   };
 
   const closeModal = () => {
@@ -219,10 +326,120 @@
     showError('');
   };
 
+  const fetchPasskeys = async () => {
+    const response = await fetch('/api/auth/passkey/list', { credentials: 'include', cache: 'no-store' });
+    if (!response.ok) {
+      return null;
+    }
+    const data = await response.json();
+    return data.credentials || [];
+  };
+
+  const startPasskeyEnrollment = async () => {
+    if (!window.PublicKeyCredential) {
+      showError('Passkeys are not supported on this device.');
+      return false;
+    }
+    let browser;
+    try {
+      browser = await loadWebAuthnBrowser();
+    } catch (error) {
+      showError('Passkey support is unavailable.');
+      return false;
+    }
+    const optionsResponse = await fetch('/api/auth/passkey/register/options', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ nickname: '' }),
+    });
+    if (!optionsResponse.ok) {
+      showError('Unable to start passkey registration.');
+      return false;
+    }
+    const optionsData = await optionsResponse.json();
+    if (!optionsData.options) {
+      showError('Unable to start passkey registration.');
+      return false;
+    }
+    let attestationResponse;
+    try {
+      attestationResponse = await browser.startRegistration(optionsData.options);
+    } catch (error) {
+      showError('Passkey registration was cancelled.');
+      return false;
+    }
+    const verifyResponse = await fetch('/api/auth/passkey/register/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ attestationResponse, nickname: '' }),
+    });
+    if (!verifyResponse.ok) {
+      showError('Passkey registration failed.');
+      return false;
+    }
+    return true;
+  };
+
+  const maybeShowPasskeyNudge = async () => {
+    // One-time passkey nudge after password login if the account has no passkeys.
+    if (!passkeyNudgeEl || !shouldShowPasskeyNudge()) {
+      return false;
+    }
+    const credentials = await fetchPasskeys();
+    if (!credentials || credentials.length > 0) {
+      return false;
+    }
+    passkeyNudgeEl.classList.remove('is-hidden');
+    if (form) {
+      form.classList.add('is-hidden');
+    }
+    if (loggedInEl) {
+      loggedInEl.classList.add('is-hidden');
+    }
+    return true;
+  };
+
   if (logoutButton) {
     logoutButton.addEventListener('click', async () => {
       await authUI.logout();
       setLoggedInState(false, '');
+    });
+  }
+
+  const startOauth = (provider) => {
+    if (!provider) {
+      return;
+    }
+    window.location.href = `/api/auth/oauth/${provider}/start`;
+  };
+
+  if (oauthGoogleButton) {
+    oauthGoogleButton.addEventListener('click', () => startOauth('google'));
+  }
+
+  if (oauthAppleButton) {
+    oauthAppleButton.addEventListener('click', () => startOauth('apple'));
+  }
+
+  if (passkeyNudgeAdd) {
+    passkeyNudgeAdd.addEventListener('click', async () => {
+      showError('');
+      const ok = await startPasskeyEnrollment();
+      if (!ok) {
+        return;
+      }
+      closeModal();
+      window.location.href = '/surveys/list/';
+    });
+  }
+
+  if (passkeyNudgeSkip) {
+    passkeyNudgeSkip.addEventListener('click', () => {
+      dismissPasskeyNudge();
+      closeModal();
+      window.location.href = '/surveys/list/';
     });
   }
 
@@ -236,10 +453,13 @@
         showError('Email and password are required.');
         return;
       }
-      const config = await fetchTurnstileConfig();
+      if (!turnstileConfig.siteKey && !turnstileConfig.bypass) {
+        turnstileConfig = await fetchTurnstileConfig();
+      }
       const tokenValue = tokenInput && tokenInput.value ? tokenInput.value : lastTurnstileToken;
-      if (!config.bypass && !tokenValue) {
-        showError('Please complete the Turnstile check.');
+      if (!turnstileConfig.bypass && !tokenValue) {
+        setTurnstileState('needs-interaction');
+        await renderTurnstile(true);
         return;
       }
       const response = await fetch('/api/auth/login', {
@@ -259,8 +479,14 @@
         } catch (error) {
           data = null;
         }
-        if (response.status === 401 && data && data.code === 'INVALID_CREDENTIALS') {
-          showError('Email or password is incorrect.');
+        if (data && data.code === 'PASSWORD_INCORRECT') {
+          showError('Password incorrect');
+        } else if (data && data.code === 'ACCOUNT_NOT_FOUND') {
+          showError('Account not found');
+        } else if (response.status === 404) {
+          showError('Account not found');
+        } else if (response.status === 401) {
+          showError('Password incorrect');
         } else {
           showError('Unable to sign in.');
         }
@@ -273,9 +499,10 @@
         window.dispatchEvent(
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
         );
-        closeModal();
-        window.location.href = '/surveys/list/';
-        return;
+        const nudged = await maybeShowPasskeyNudge();
+        if (nudged) {
+          return;
+        }
       }
       closeModal();
       window.location.href = '/surveys/list/';
@@ -328,7 +555,12 @@
         }),
       });
       if (!verifyResponse.ok) {
-        showError('Passkey sign-in failed.');
+        const data = await verifyResponse.json().catch(() => ({}));
+        if (data && data.code === 'UNKNOWN_CREDENTIAL') {
+          showError('No matching passkey found on this device. Sign in with password, then add a passkey.');
+        } else {
+          showError('Passkey sign-in failed.');
+        }
         return;
       }
       const authenticated = await waitForAuthState();
@@ -349,4 +581,11 @@
     open: openModal,
     close: closeModal,
   });
+
+  const urlParams = new URLSearchParams(window.location.search || '');
+  const oauthError = urlParams.get('oauth_error');
+  if (oauthError) {
+    pendingOauthError = oauthError;
+    authModals.open('login');
+  }
 })();

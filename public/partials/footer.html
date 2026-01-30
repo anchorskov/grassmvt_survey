@@ -24,6 +24,14 @@
       </section>
       <form class="survey-form" id="login-modal-form">
         <div class="passkey-actions">
+          <button class="button button--secondary" type="button" id="login-modal-oauth-google">
+            Continue with Google
+          </button>
+          <button class="button button--secondary" type="button" id="login-modal-oauth-apple">
+            Continue with Apple
+          </button>
+        </div>
+        <div class="passkey-actions">
           <button class="button button--primary" type="button" id="login-passkey-button">
             Sign in with passkey
           </button>
@@ -37,10 +45,14 @@
           <label for="login-modal-password">Password</label>
           <input id="login-modal-password" name="password" type="password" autocomplete="current-password" required />
         </div>
-        <div class="form-row" id="login-modal-turnstile"></div>
+        <p class="helper-text is-hidden" id="login-modal-turnstile-label">Verify you are human</p>
+        <div class="form-row is-hidden" id="login-modal-turnstile"></div>
         <input type="hidden" id="login-modal-token" name="turnstileToken" />
         <p class="form-error is-hidden" id="login-modal-error" role="alert"></p>
-        <button class="button button--primary" type="submit">Sign in</button>
+        <p class="helper-text is-hidden" id="login-modal-turnstile-status" role="status"></p>
+        <button class="button button--primary" type="submit" id="login-modal-submit" disabled>
+          Sign in
+        </button>
         <p class="helper-text auth-modal__links">
           <button class="link-button" type="button" data-auth-open="password-reset">
             Forgot password?
@@ -51,6 +63,18 @@
           <button class="link-button" type="button" data-auth-open="signup">Create account</button>
         </p>
       </form>
+      <section class="survey-form is-hidden" id="login-modal-passkey-nudge" aria-live="polite">
+        <h3>Add a passkey for faster sign-in</h3>
+        <p class="helper-text">Use this device or your phone. No password needed next time.</p>
+        <div class="form-row">
+          <button class="button button--primary" type="button" id="login-modal-passkey-add">
+            Add passkey
+          </button>
+          <button class="button button--small" type="button" id="login-modal-passkey-skip">
+            Not now
+          </button>
+        </div>
+      </section>
     </div>
   </div>
 </div>

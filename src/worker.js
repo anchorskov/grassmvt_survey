@@ -72,12 +72,54 @@ const sha256Hex = async (text) => {
     .join('');
 };
 
+const base64UrlEncode = (input) => {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+
+const base64UrlDecode = (value) => {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+};
+
+const encodeJsonBase64Url = (value) => base64UrlEncode(new TextEncoder().encode(JSON.stringify(value)));
+
+const sha256Base64Url = async (value) => {
+  const data = new TextEncoder().encode(value);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return base64UrlEncode(new Uint8Array(hashBuffer));
+};
+
+const parseFormBody = async (request) => {
+  try {
+    const form = await request.formData();
+    const data = {};
+    form.forEach((value, key) => {
+      data[key] = value.toString();
+    });
+    return data;
+  } catch (error) {
+    return {};
+  }
+};
+
 const PASSWORD_MIN_LENGTH = 12;
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, dkLen: 64 };
 const DEFAULT_IDLE_TIMEOUT_MINUTES = 30;
 const DEFAULT_ABSOLUTE_TIMEOUT_DAYS = 7;
 const PBKDF2_ITERATIONS = 100000;
 const PBKDF2_SALT_BYTES = 16;
+const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 const PASSWORD_RESET_TTL_MINUTES = 30;
 const PASSWORD_RESET_EMAIL_LIMIT = 3;
 const PASSWORD_RESET_IP_LIMIT = 5;
@@ -433,6 +475,252 @@ const verifyTurnstile = async (token, request, env) => {
     console.error('[Turnstile] Verification error:', err.message);
     return { ok: false, code: 'TURNSTILE_API_ERROR', error: 'Turnstile service error. Please try again.' };
   }
+};
+
+const oauthJwksCache = new Map();
+
+const getOAuthRedirectBase = (request, env) => {
+  const override = (env.OAUTH_REDIRECT_BASE || '').trim();
+  if (override) {
+    return override.replace(/\/+$/, '');
+  }
+  const requestOrigin = new URL(request.url).origin;
+  return requestOrigin;
+};
+
+const normalizePem = (value) => {
+  if (!value) {
+    return '';
+  }
+  const trimmed = value.toString().trim();
+  return trimmed.includes('-----BEGIN') ? trimmed : trimmed.replace(/\\n/g, '\n');
+};
+
+const pemToArrayBuffer = (pem) => {
+  const cleaned = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\s+/g, '');
+  const binary = atob(cleaned);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
+
+const derToJoseSignature = (derSig, size = 32) => {
+  if (!derSig || derSig[0] !== 0x30) {
+    return derSig;
+  }
+  let offset = 2;
+  if (derSig[1] > 0x80) {
+    offset += derSig[1] - 0x80;
+  }
+  if (derSig[offset] !== 0x02) {
+    return derSig;
+  }
+  const rLen = derSig[offset + 1];
+  const rStart = offset + 2;
+  const r = derSig.slice(rStart, rStart + rLen);
+  offset = rStart + rLen;
+  if (derSig[offset] !== 0x02) {
+    return derSig;
+  }
+  const sLen = derSig[offset + 1];
+  const sStart = offset + 2;
+  const s = derSig.slice(sStart, sStart + sLen);
+  const rPad = r.length > size ? r.slice(r.length - size) : r;
+  const sPad = s.length > size ? s.slice(s.length - size) : s;
+  const out = new Uint8Array(size * 2);
+  out.set(rPad, size - rPad.length);
+  out.set(sPad, size * 2 - sPad.length);
+  return out;
+};
+
+const createAppleClientSecret = async (env) => {
+  const privateKey = normalizePem(env.APPLE_PRIVATE_KEY || '');
+  if (!privateKey || !env.APPLE_TEAM_ID || !env.APPLE_CLIENT_ID || !env.APPLE_KEY_ID) {
+    throw new Error('APPLE_CONFIG_MISSING');
+  }
+  const keyData = pemToArrayBuffer(privateKey);
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    keyData,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign']
+  );
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'ES256', kid: env.APPLE_KEY_ID, typ: 'JWT' };
+  const payload = {
+    iss: env.APPLE_TEAM_ID,
+    iat: now,
+    exp: now + 300,
+    aud: 'https://appleid.apple.com',
+    sub: env.APPLE_CLIENT_ID,
+  };
+  const tokenBase = `${encodeJsonBase64Url(header)}.${encodeJsonBase64Url(payload)}`;
+  const signature = new Uint8Array(await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    key,
+    new TextEncoder().encode(tokenBase)
+  ));
+  const joseSig = signature.length === 64 ? signature : derToJoseSignature(signature);
+  return `${tokenBase}.${base64UrlEncode(joseSig)}`;
+};
+
+const fetchJwks = async (url) => {
+  const cached = oauthJwksCache.get(url);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) {
+    return cached.keys;
+  }
+  const response = await fetch(url, { cf: { cacheTtl: 3600 } });
+  if (!response.ok) {
+    throw new Error('JWKS_FETCH_FAILED');
+  }
+  const data = await response.json();
+  const keys = data.keys || [];
+  oauthJwksCache.set(url, { keys, expiresAt: now + 60 * 60 * 1000 });
+  return keys;
+};
+
+const verifyJwt = async (token, options) => {
+  const [headerB64, payloadB64, signatureB64] = token.split('.');
+  if (!headerB64 || !payloadB64 || !signatureB64) {
+    return null;
+  }
+  const header = JSON.parse(new TextDecoder().decode(base64UrlDecode(headerB64)));
+  const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(payloadB64)));
+  if (header.alg !== 'RS256') {
+    return null;
+  }
+  const keys = await fetchJwks(options.jwksUrl);
+  const jwk = keys.find((key) => key.kid === header.kid);
+  if (!jwk) {
+    return null;
+  }
+  const key = await crypto.subtle.importKey(
+    'jwk',
+    jwk,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['verify']
+  );
+  const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+  const signature = base64UrlDecode(signatureB64);
+  const ok = await crypto.subtle.verify({ name: 'RSASSA-PKCS1-v1_5' }, key, signature, data);
+  if (!ok) {
+    return null;
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.iss !== options.issuer) {
+    return null;
+  }
+  if (Array.isArray(payload.aud)) {
+    if (!payload.aud.includes(options.audience)) {
+      return null;
+    }
+  } else if (payload.aud !== options.audience) {
+    return null;
+  }
+  if (payload.exp && payload.exp < now - 30) {
+    return null;
+  }
+  return payload;
+};
+
+const cleanupExpiredOAuthStates = async (env) => {
+  if (!env.DB) {
+    return;
+  }
+  const cutoff = Math.floor(Date.now() / 1000) - OAUTH_STATE_TTL_SECONDS;
+  await env.DB.prepare('DELETE FROM oauth_states WHERE created_at <= ?')
+    .bind(cutoff)
+    .run();
+};
+
+const createOAuthState = async (env, provider, codeVerifier) => {
+  const stateBytes = new Uint8Array(32);
+  crypto.getRandomValues(stateBytes);
+  const state = base64UrlEncode(stateBytes);
+  await env.DB.prepare(
+    'INSERT INTO oauth_states (state, provider, code_verifier, created_at) VALUES (?, ?, ?, ?)'
+  )
+    .bind(state, provider, codeVerifier, Math.floor(Date.now() / 1000))
+    .run();
+  return state;
+};
+
+const consumeOAuthState = async (env, state, provider) => {
+  const record = await env.DB.prepare(
+    'SELECT state, provider, code_verifier, created_at FROM oauth_states WHERE state = ?'
+  )
+    .bind(state)
+    .first();
+  if (!record || record.provider !== provider) {
+    return null;
+  }
+  const ageSeconds = Math.floor(Date.now() / 1000) - Number(record.created_at || 0);
+  if (ageSeconds > OAUTH_STATE_TTL_SECONDS) {
+    await env.DB.prepare('DELETE FROM oauth_states WHERE state = ?').bind(state).run();
+    return null;
+  }
+  await env.DB.prepare('DELETE FROM oauth_states WHERE state = ?').bind(state).run();
+  return record;
+};
+
+const buildOAuthReturnTo = (request) => {
+  const referer = request.headers.get('Referer') || '';
+  if (!referer) {
+    return '';
+  }
+  try {
+    const refUrl = new URL(referer);
+    const reqOrigin = new URL(request.url).origin;
+    if (refUrl.origin !== reqOrigin) {
+      return '';
+    }
+    return `${refUrl.pathname}${refUrl.search}`;
+  } catch (error) {
+    return '';
+  }
+};
+
+const oauthCookieAttributes = (env) => {
+  const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
+  const secure = isProduction ? '; Secure' : '';
+  return `Path=/; Max-Age=600; SameSite=Lax${secure}`;
+};
+
+const setOauthReturnCookie = (headers, value, env) => {
+  if (!value) {
+    return;
+  }
+  headers.append('Set-Cookie', `oauth_return_to=${encodeURIComponent(value)}; ${oauthCookieAttributes(env)}`);
+};
+
+const clearOauthReturnCookie = (headers, env) => {
+  headers.append('Set-Cookie', `oauth_return_to=; ${oauthCookieAttributes(env)}; Max-Age=0`);
+};
+
+const buildOauthErrorRedirect = (request, env, code) => {
+  const base = getOAuthRedirectBase(request, env);
+  const fallback = '/auth/login/';
+  const rawReturn = decodeURIComponent(getCookieValue(request, 'oauth_return_to') || '') || fallback;
+  const returnTo = rawReturn.startsWith('/') ? rawReturn : fallback;
+  const url = new URL(returnTo, base);
+  url.searchParams.set('oauth_error', code);
+  return url.toString();
+};
+
+const buildOauthSuccessRedirect = (request, env) => {
+  const base = getOAuthRedirectBase(request, env);
+  const rawReturn = decodeURIComponent(getCookieValue(request, 'oauth_return_to') || '');
+  const fallback = '/account/';
+  const returnTo = rawReturn && rawReturn.startsWith('/') ? rawReturn : fallback;
+  return new URL(returnTo, base).toString();
 };
 
 const cleanupExpiredSessions = async (env) => {
@@ -870,6 +1158,247 @@ const handleAuthLogin = async (request, env) => {
   headers.append('Set-Cookie', sessionCookie.serialize());
   logAuthTiming(route, rayId, 'response_sent', startedAt);
   return jsonResponse({ ok: true }, { headers });
+};
+
+const exchangeGoogleCode = async (code, codeVerifier, redirectUri, env) => {
+  const body = new URLSearchParams();
+  body.set('code', code);
+  body.set('client_id', env.GOOGLE_CLIENT_ID || '');
+  body.set('client_secret', env.GOOGLE_CLIENT_SECRET || '');
+  body.set('redirect_uri', redirectUri);
+  body.set('grant_type', 'authorization_code');
+  body.set('code_verifier', codeVerifier);
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
+};
+
+const exchangeAppleCode = async (code, codeVerifier, redirectUri, env) => {
+  const clientSecret = await createAppleClientSecret(env);
+  const body = new URLSearchParams();
+  body.set('code', code);
+  body.set('client_id', env.APPLE_CLIENT_ID || '');
+  body.set('client_secret', clientSecret);
+  body.set('redirect_uri', redirectUri);
+  body.set('grant_type', 'authorization_code');
+  body.set('code_verifier', codeVerifier);
+  const response = await fetch('https://appleid.apple.com/auth/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
+};
+
+const handleOAuthStart = async (request, env, provider) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const base = getOAuthRedirectBase(request, env);
+  const returnTo = buildOAuthReturnTo(request);
+  const codeVerifierBytes = new Uint8Array(32);
+  crypto.getRandomValues(codeVerifierBytes);
+  const codeVerifier = base64UrlEncode(codeVerifierBytes);
+  const codeChallenge = await sha256Base64Url(codeVerifier);
+  await cleanupExpiredOAuthStates(env);
+  const state = await createOAuthState(env, provider, codeVerifier);
+
+  let authUrl = '';
+  if (provider === 'google') {
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+      const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'oauth_unavailable') });
+      clearOauthReturnCookie(headers, env);
+      return new Response(null, { status: 302, headers });
+    }
+    const redirectUri = env.GOOGLE_REDIRECT_URI || `${base}/api/auth/oauth/google/callback`;
+    const params = new URLSearchParams({
+      client_id: env.GOOGLE_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+      prompt: 'select_account',
+    });
+    authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  } else if (provider === 'apple') {
+    if (!env.APPLE_CLIENT_ID || !env.APPLE_TEAM_ID || !env.APPLE_KEY_ID || !env.APPLE_PRIVATE_KEY) {
+      const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'oauth_unavailable') });
+      clearOauthReturnCookie(headers, env);
+      return new Response(null, { status: 302, headers });
+    }
+    const redirectUri = env.APPLE_REDIRECT_URI || `${base}/api/auth/oauth/apple/callback`;
+    const params = new URLSearchParams({
+      client_id: env.APPLE_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      response_mode: 'form_post',
+      scope: 'openid email name',
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+    });
+    authUrl = `https://appleid.apple.com/auth/authorize?${params.toString()}`;
+  } else {
+    return jsonResponse({ error: 'Unsupported provider.' }, { status: 400 });
+  }
+
+  const headers = new Headers({ Location: authUrl });
+  setOauthReturnCookie(headers, returnTo, env);
+  return new Response(null, { status: 302, headers });
+};
+
+const handleOAuthCallback = async (request, env, provider) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const params = request.method === 'POST' ? await parseFormBody(request) : Object.fromEntries(new URL(request.url).searchParams.entries());
+  if (params.error) {
+    const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, params.error) });
+    clearOauthReturnCookie(headers, env);
+    return new Response(null, { status: 302, headers });
+  }
+  const code = params.code || '';
+  const state = params.state || '';
+  if (!code || !state) {
+    const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'provider_error') });
+    clearOauthReturnCookie(headers, env);
+    return new Response(null, { status: 302, headers });
+  }
+  await cleanupExpiredOAuthStates(env);
+  const stateRecord = await consumeOAuthState(env, state, provider);
+  if (!stateRecord) {
+    const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'state_invalid') });
+    clearOauthReturnCookie(headers, env);
+    return new Response(null, { status: 302, headers });
+  }
+  const base = getOAuthRedirectBase(request, env);
+  let tokens = null;
+  try {
+    if (provider === 'google') {
+      const redirectUri = env.GOOGLE_REDIRECT_URI || `${base}/api/auth/oauth/google/callback`;
+      tokens = await exchangeGoogleCode(code, stateRecord.code_verifier, redirectUri, env);
+    } else if (provider === 'apple') {
+      const redirectUri = env.APPLE_REDIRECT_URI || `${base}/api/auth/oauth/apple/callback`;
+      tokens = await exchangeAppleCode(code, stateRecord.code_verifier, redirectUri, env);
+    }
+  } catch (error) {
+    tokens = null;
+  }
+  if (!tokens || !tokens.id_token) {
+    const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'token_exchange_failed') });
+    clearOauthReturnCookie(headers, env);
+    return new Response(null, { status: 302, headers });
+  }
+  let claims = null;
+  try {
+    if (provider === 'google') {
+      claims = await verifyJwt(tokens.id_token, {
+        jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs',
+        issuer: 'https://accounts.google.com',
+        audience: env.GOOGLE_CLIENT_ID,
+      });
+      if (!claims) {
+        claims = await verifyJwt(tokens.id_token, {
+          jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs',
+          issuer: 'accounts.google.com',
+          audience: env.GOOGLE_CLIENT_ID,
+        });
+      }
+    } else if (provider === 'apple') {
+      claims = await verifyJwt(tokens.id_token, {
+        jwksUrl: 'https://appleid.apple.com/auth/keys',
+        issuer: 'https://appleid.apple.com',
+        audience: env.APPLE_CLIENT_ID,
+      });
+    }
+  } catch (error) {
+    claims = null;
+  }
+  if (!claims || !claims.sub) {
+    const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'id_token_invalid') });
+    clearOauthReturnCookie(headers, env);
+    return new Response(null, { status: 302, headers });
+  }
+
+  const providerSub = claims.sub;
+  const email = normalizeEmail(claims.email || '');
+  let userId = '';
+  const existingOauth = await env.DB.prepare(
+    'SELECT user_id FROM oauth_accounts WHERE provider = ? AND provider_sub = ?'
+  )
+    .bind(provider, providerSub)
+    .first();
+  if (existingOauth && existingOauth.user_id) {
+    userId = existingOauth.user_id;
+  } else if (email) {
+    const existingUser = await env.DB.prepare('SELECT id FROM user WHERE email = ?').bind(email).first();
+    if (existingUser && existingUser.id) {
+      userId = existingUser.id;
+      await env.DB.prepare(
+        `INSERT INTO oauth_accounts (provider, provider_sub, user_id, email, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+        .bind(provider, providerSub, userId, email, Math.floor(Date.now() / 1000))
+        .run();
+    } else {
+      try {
+        userId = crypto.randomUUID();
+        const randomPassword = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+        const passwordHash = await hashPassword(randomPassword);
+        await env.DB.prepare(
+          `INSERT INTO user (id, email, password_hash)
+           VALUES (?, ?, ?)`
+        )
+          .bind(userId, email, passwordHash)
+          .run();
+        await env.DB.prepare(
+          `INSERT INTO user_profile (user_id, email)
+           VALUES (?, ?)`
+        )
+          .bind(userId, email)
+          .run();
+        await env.DB.prepare(
+          `INSERT INTO oauth_accounts (provider, provider_sub, user_id, email, created_at)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+          .bind(provider, providerSub, userId, email, Math.floor(Date.now() / 1000))
+          .run();
+      } catch (error) {
+        userId = '';
+      }
+    }
+  } else {
+    const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'email_missing') });
+    clearOauthReturnCookie(headers, env);
+    return new Response(null, { status: 302, headers });
+  }
+
+  if (!userId) {
+    const headers = new Headers({ Location: buildOauthErrorRedirect(request, env, 'account_link_failed') });
+    clearOauthReturnCookie(headers, env);
+    return new Response(null, { status: 302, headers });
+  }
+
+  const lucia = initializeLucia(env);
+  await lucia.invalidateUserSessions(userId);
+  const session = await lucia.createSession(userId, {});
+  await stampSessionTimestamps(env, session.id);
+  const sessionCookie = lucia.createSessionCookie(session.id);
+  const headers = new Headers({ Location: buildOauthSuccessRedirect(request, env) });
+  headers.append('Set-Cookie', sessionCookie.serialize());
+  clearOauthReturnCookie(headers, env);
+  return new Response(null, { status: 302, headers });
 };
 
 const handlePasswordResetRequest = async (request, env) => {
@@ -2228,6 +2757,25 @@ export default {
 
       if (request.method === 'POST' && pathParts[2] === 'login') {
         return handleAuthLogin(request, env);
+      }
+
+      if (request.method === 'GET' && pathParts[2] === 'oauth' && pathParts[3] === 'google' && pathParts[4] === 'start') {
+        return handleOAuthStart(request, env, 'google');
+      }
+
+      if (request.method === 'GET' && pathParts[2] === 'oauth' && pathParts[3] === 'google' && pathParts[4] === 'callback') {
+        return handleOAuthCallback(request, env, 'google');
+      }
+
+      if (request.method === 'GET' && pathParts[2] === 'oauth' && pathParts[3] === 'apple' && pathParts[4] === 'start') {
+        return handleOAuthStart(request, env, 'apple');
+      }
+
+      if ((request.method === 'GET' || request.method === 'POST')
+        && pathParts[2] === 'oauth'
+        && pathParts[3] === 'apple'
+        && pathParts[4] === 'callback') {
+        return handleOAuthCallback(request, env, 'apple');
       }
 
       if (request.method === 'POST' && pathParts[2] === 'password-reset' && pathParts[3] === 'request') {

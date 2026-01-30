@@ -7,6 +7,9 @@
   const errorEl = document.getElementById('passkey-error');
   const successEl = document.getElementById('passkey-success');
   const listEl = document.getElementById('passkey-list');
+  const countEl = document.getElementById('passkey-count');
+
+  const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
 
   if (!authRequiredSection || !passkeySection || !listEl) {
     return;
@@ -38,6 +41,14 @@
     successEl.classList.remove('is-hidden');
   };
 
+  const setPasskeyCount = (count) => {
+    if (!countEl) {
+      return;
+    }
+    const label = count === 1 ? 'passkey' : 'passkeys';
+    countEl.textContent = `You have ${count} ${label} registered.`;
+  };
+
   const loadWebAuthnBrowser = async () => {
     if (window.__webauthnBrowser) {
       return window.__webauthnBrowser;
@@ -60,6 +71,7 @@
 
   const renderList = (credentials) => {
     listEl.innerHTML = '';
+    setPasskeyCount(credentials.length);
     if (!credentials.length) {
       const empty = document.createElement('li');
       empty.textContent = 'No passkeys registered yet.';
@@ -108,8 +120,18 @@
   };
 
   const fetchPasskeys = async () => {
-    const response = await fetch('/api/auth/passkey/list', { credentials: 'include' });
+    const response = await fetch('/api/auth/passkey/list', { credentials: 'include', cache: 'no-store' });
     if (!response.ok) {
+      if (response.status === 403) {
+        showError('Please sign in again.');
+        authRequiredSection.classList.remove('is-hidden');
+        passkeySection.classList.add('is-hidden');
+        if (window.AuthUI && typeof window.AuthUI.openLogin === 'function') {
+          window.AuthUI.openLogin();
+        }
+        return;
+      }
+      showError('Unable to load passkeys.');
       renderList([]);
       return;
     }
@@ -118,7 +140,7 @@
   };
 
   const fetchAuthState = async () => {
-    const response = await fetch('/api/auth/me', { credentials: 'include' });
+    const response = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
     if (!response.ok) {
       return false;
     }
@@ -127,6 +149,11 @@
   };
 
   const init = async () => {
+    try {
+      localStorage.removeItem(PASSKEY_NUDGE_KEY);
+    } catch (error) {
+      // Ignore storage failures
+    }
     const authenticated = await fetchAuthState();
     if (!authenticated) {
       authRequiredSection.classList.remove('is-hidden');

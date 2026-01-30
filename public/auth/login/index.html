@@ -22,6 +22,14 @@
 
       <form id="auth-form" class="survey-form" data-auth-mode="login">
         <div class="passkey-actions">
+          <button class="button button--secondary" type="button" id="auth-oauth-google">
+            Continue with Google
+          </button>
+          <button class="button button--secondary" type="button" id="auth-oauth-apple">
+            Continue with Apple
+          </button>
+        </div>
+        <div class="passkey-actions">
           <button class="button button--primary" type="button" id="passkey-login-button">
             Sign in with passkey
           </button>
@@ -35,11 +43,27 @@
           <label for="auth-password">Password</label>
           <input id="auth-password" name="password" type="password" autocomplete="current-password" required />
         </div>
-        <div class="form-row" id="turnstile-login"></div>
+        <p class="helper-text is-hidden" id="turnstile-login-label">Verify you are human</p>
+        <div class="form-row is-hidden" id="turnstile-login"></div>
         <input type="hidden" id="turnstile-token" name="turnstileToken" />
         <p class="form-error is-hidden" id="auth-error" role="alert"></p>
-        <button class="button button--primary" type="submit">Sign in</button>
+        <p class="helper-text is-hidden" id="turnstile-login-status" role="status"></p>
+        <button class="button button--primary" type="submit" id="auth-submit" disabled>
+          Sign in
+        </button>
       </form>
+      <section class="survey-form is-hidden" id="login-passkey-nudge" aria-live="polite">
+        <h2>Add a passkey for faster sign-in</h2>
+        <p class="helper-text">Use this device or your phone. No password needed next time.</p>
+        <div class="form-row">
+          <button class="button button--primary" type="button" id="login-passkey-add">
+            Add passkey
+          </button>
+          <button class="button button--small" type="button" id="login-passkey-skip">
+            Not now
+          </button>
+        </div>
+      </section>
 
       <p class="helper-text">
         Need an account? <a href="/auth/signup/">Create one</a>
