@@ -1923,26 +1923,11 @@ const handlePasskeyLoginVerify = async (request, env) => {
     return jsonResponse({ ok: false, code: 'BUFFER_CONVERSION_ERROR' }, { status: 400 });
   }
 
-  const authenticator = {
-    credentialID: credentialIDBuffer,
-    credentialPublicKey: credentialPublicKeyBuffer,
-    counter: Number(credential.counter || 0),
-  };
-
   if (isDebug) {
-    console.log('[Passkey Login Verify] Authenticator object:', {
-      credentialIDType: authenticator.credentialID?.constructor?.name || typeof authenticator.credentialID,
-      credentialIDLength: authenticator.credentialID?.length || 'N/A',
-      credentialIDIsUint8Array: authenticator.credentialID instanceof Uint8Array,
-      credentialPublicKeyType: authenticator.credentialPublicKey?.constructor?.name || typeof authenticator.credentialPublicKey,
-      credentialPublicKeyLength: authenticator.credentialPublicKey?.length || 'N/A',
-      credentialPublicKeyIsUint8Array: authenticator.credentialPublicKey instanceof Uint8Array,
-      counterValue: authenticator.counter,
-      counterType: typeof authenticator.counter,
-      fullAuthenticator: JSON.stringify(authenticator, (k, v) => {
-        if (v instanceof Uint8Array) return `Uint8Array(${v.length})`;
-        return v;
-      }),
+    console.log('[Passkey Login Verify] Authenticator prepared:', {
+      idLength: credentialIDBuffer?.length,
+      publicKeyLength: credentialPublicKeyBuffer?.length,
+      counter: Number(credential.counter || 0),
     });
   }
 
@@ -1953,20 +1938,13 @@ const handlePasskeyLoginVerify = async (request, env) => {
       expectedChallenge: challengeRecord.challenge,
       expectedOrigin,
       expectedRPID: rpID,
-      credential: authenticator,
+      credential: {
+        id: credentialIDBuffer,
+        publicKey: credentialPublicKeyBuffer,
+        counter: Number(credential.counter || 0),
+      },
       requireUserVerification: false,
     };
-    
-    if (isDebug) {
-      console.log('[Passkey Login Verify] verifyAuthenticationResponse options:', {
-        responseType: assertionResponse?.type,
-        expectedChallengeType: typeof challengeRecord.challenge,
-        expectedOriginType: typeof expectedOrigin,
-        expectedRPIDType: typeof rpID,
-        credentialType: typeof authenticator,
-        credentialKeys: authenticator ? Object.keys(authenticator) : [],
-      });
-    }
     
     verification = await verifyAuthenticationResponse(verifyOptions);
   } catch (error) {

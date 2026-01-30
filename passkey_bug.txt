@@ -1,0 +1,102 @@
+PASSKEY LOGIN VERIFICATION ERROR - BUG REPORT
+============================================
+
+ERROR MESSAGE:
+"Must declare either "leafCert" or "credentialPublicKey""
+
+OCCURRENCE:
+- Triggered during passkey login verification (POST /api/auth/passkey/login/verify)
+- SimpleWebAuthn server library v9.0.1
+- verifySignature function (node_modules/@simplewebauthn/server/esm/helpers/verifySignature.js:10)
+
+DETAILED CONTEXT:
+================
+
+1. ISSUE DESCRIPTION:
+   When a user completes passkey authentication and submits the assertion response,
+   the backend's verifyAuthenticationResponse() call fails with the error above.
+   The error occurs inside the verifySignature() function which is called by
+   verifyAuthenticationResponse().
+
+2. STACK TRACE:
+   Error: Must declare either "leafCert" or "credentialPublicKey"
+       at verifySignature (node_modules/@simplewebauthn/server/esm/helpers/verifySignature.js:10:15)
+       at verifyAuthenticationResponse (node_modules/@simplewebauthn/server/esm/authentication/verifyAuthenticationResponse.js:154:25)
+       at async handlePasskeyLoginVerify (src/worker.js:1971:20)
+
+3. WHAT WE'RE PASSING TO verifyAuthenticationResponse():
+   {
+     response: assertionResponse,
+     expectedChallenge: challengeRecord.challenge (string),
+     expectedOrigin: "http://localhost:8787" (string),
+     expectedRPID: "localhost" (string),
+     credential: authenticator (object),
+     requireUserVerification: false
+   }
+
+4. CREDENTIAL OBJECT STRUCTURE (what we pass):
+   {
+     credentialID: Uint8Array(16),        [decoded from base64URL string]
+     credentialPublicKey: Uint8Array(77), [decoded from base64URL string in DB]
+     counter: 0 (number)
+   }
+   
+   All three properties exist and have correct types.
+
+5. PUBLIC KEY STORAGE IN DATABASE:
+   - Stored as: base64URL-encoded string (77 bytes when decoded to UINT8ARRAY)
+   - Retrieved as: SELECT public_key FROM passkey_credentials WHERE credential_id = ?
+   - Converted: isoBase64URL.toBuffer(credential.public_key) → Uint8Array(77)
+   - The public key was saved during passkey registration via SimpleWebAuthn
+
+6. THE PARADOX:
+   - We ARE passing credentialPublicKey property
+   - It IS a valid Uint8Array
+   - It has correct length (77 bytes)
+   - Yet verifySignature() reports it doesn't exist or is undefined
+
+7. HYPOTHESIS:
+   The error originates from verifySignature's check:
+   ```
+   if (!x509Certificate && !credentialPublicKey) {
+       throw new Error('Must declare either "leafCert" or "credentialPublicKey"');
+   }
+   ```
+   
+   This suggests that:
+   a) The credentialPublicKey property is not being found/passed correctly
+   b) The property is being stripped or transformed before reaching verifySignature
+   c) There's a naming mismatch (we use credentialPublicKey, but verifySignature expects different name)
+   d) The Uint8Array is somehow invalid or unrecognizable
+
+8. PREVIOUS FIXES ATTEMPTED:
+   - Changed parameter from "authenticator" to "credential" ✓ (got us past different error)
+   - Converted credential ID to Uint8Array ✓ (correct type)
+   - Converted public key to Uint8Array ✓ (correct type)
+   - Verified all properties exist in credential object ✓
+   
+9. WHAT'S DIFFERENT FROM REGISTRATION:
+   - Registration verification WORKS with similar structure
+   - Uses same isoBase64URL.toBuffer() for public key conversion
+   - Same database schema and retrieval process
+   - Main difference: registration uses verifyRegistrationResponse, login uses verifyAuthenticationResponse
+
+10. TEST ACCOUNT:
+    testflow@example6.com
+    - Passkey registered successfully
+    - Passkey stored in DB with credential_id='v8FAz7Gwf8UvX2VjhBZuxQ'
+    - Public key stored and retrievable
+    - Registration verification worked fine
+
+11. ENVIRONMENT:
+    - Node.js environment in Cloudflare Workers (wrangler dev)
+    - SimpleWebAuthn @simplewebauthn/server v9.0.1
+    - Local D1 SQLite database
+
+NEXT INVESTIGATION:
+===================
+- Check if verifySignature is being called with a different parameter structure
+- Review SimpleWebAuthn v9.0.1 authentication verification documentation
+- Compare how credentialPublicKey format differs between registration and authentication
+- Investigate if the Uint8Array needs to be converted differently
+- Check if there's a CBOR encoding/decoding issue with public key storage
