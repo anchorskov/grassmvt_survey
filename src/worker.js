@@ -1896,6 +1896,17 @@ const handlePasskeyLoginVerify = async (request, env) => {
   debugStep = 'webauthn_verify';
   const rpID = getWebAuthnRpId(request, env);
   const expectedOrigin = getWebAuthnExpectedOrigin(request);
+  
+  if (isDebug) {
+    console.log('[Passkey Login Verify] Credential loaded from DB:', {
+      credential_id: credential.credential_id,
+      public_key: credential.public_key ? '(set)' : '(missing)',
+      counter: credential.counter,
+      counterType: typeof credential.counter,
+      allKeys: Object.keys(credential),
+    });
+  }
+  
   const authenticator = {
     credentialID: isoBase64URL.toBuffer(credential.credential_id),
     credentialPublicKey: isoBase64URL.toBuffer(credential.public_key),
@@ -1917,15 +1928,30 @@ const handlePasskeyLoginVerify = async (request, env) => {
       .bind(nowIso(), challengeRecord.id)
       .run();
     
+    // Categorize the error for diagnostics
+    const errorMessage = error?.message || '';
+    let errorCategory = 'UNKNOWN_ERROR';
+    if (errorMessage.includes('origin')) {
+      errorCategory = 'ORIGIN_MISMATCH';
+    } else if (errorMessage.includes('RP ID') || errorMessage.includes('rpId')) {
+      errorCategory = 'RPID_MISMATCH';
+    } else if (errorMessage.includes('challenge')) {
+      errorCategory = 'CHALLENGE_MISMATCH';
+    } else if (errorMessage.includes('signature')) {
+      errorCategory = 'SIGNATURE_INVALID';
+    } else if (errorMessage.includes('counter')) {
+      errorCategory = 'COUNTER_ISSUE';
+    } else if (errorMessage.includes('verified')) {
+      errorCategory = 'VERIFICATION_FAILED';
+    }
+    
+    // Get request origin for diagnostics
+    const requestOriginHeader = request.headers.get('origin');
+    const requestOrigin = requestOriginHeader || new URL(request.url).origin;
+    const hostname = new URL(request.url).hostname;
+    
     if (isDebug) {
-      console.error('[Passkey Login Verify] Verification failed:', {
-        errorMessage: error?.message,
-        errorName: error?.name,
-        rpID,
-        expectedOrigin,
-        challengeExists: !!challengeRecord.challenge,
-        credentialExists: !!credential,
-      });
+      console.log(`[Passkey Login Verify] VERIFY_FAILED diagnostic: code=VERIFY_FAILED rayId=${debugRayId} hostname=${hostname} requestOrigin=${requestOrigin} expectedOrigin=${expectedOrigin} expectedRPID=${rpID} errorName=${error?.name} errorCategory=${errorCategory}`);
     }
     
     await logFailure('VERIFY_FAILED', {
@@ -1938,10 +1964,12 @@ const handlePasskeyLoginVerify = async (request, env) => {
       challengeAgeMs: Number.isFinite(challengeAgeMs) ? challengeAgeMs : null,
       origin: expectedOrigin,
       errorMessage: error?.message,
+      errorCategory,
+      requestOrigin,
     }, error && error.name ? error.name : 'Error');
     await writeAuditEvent(env, request, {
       eventType: 'passkey_login_failed',
-      metadata: { reason: 'verify_failed' },
+      metadata: { reason: 'verify_failed', errorCategory },
     });
     return jsonResponse({ ok: false, code: 'VERIFY_FAILED' }, { status: 400 });
   }
