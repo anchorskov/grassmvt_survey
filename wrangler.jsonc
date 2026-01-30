@@ -47,12 +47,12 @@
         "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ",
         "EMAIL_FROM": "noreply@grassrootsmvt.org",
         "SUPPORT_EMAIL_TO": "anchorskov@gmail.com",
-        "APP_BASE_URL": "https://grassrootsmvt.org",
+        "APP_BASE_URL": "https://grassmvtsurvey-production.anchorskov.workers.dev",
         "OAUTH_REDIRECT_BASE": "",
         "GOOGLE_CLIENT_ID": "",
         "GOOGLE_CLIENT_SECRET": "",
         "GOOGLE_REDIRECT_URI": "",
-        "WEBAUTHN_RP_ID": "grassrootsmvt.org"
+        "WEBAUTHN_RP_ID": "grassmvtsurvey-production.anchorskov.workers.dev"
       },
       "observability": {
         "enabled": true,

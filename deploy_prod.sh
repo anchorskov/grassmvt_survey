@@ -33,8 +33,8 @@ echo ""
 
 # Deploy to production
 # shellcheck disable=SC2086
-npx wrangler deploy --name grassmvtsurvey-production
+npx wrangler deploy --name grassmvtsurvey-production --env production
 
 echo ""
 echo "[deploy] Production deploy complete."
-echo "[deploy] Deployed to: https://grassmvtsurvey.anchorskov.workers.dev"
+echo "[deploy] Deployed to: https://grassmvtsurvey-production.anchorskov.workers.dev"

@@ -293,13 +293,22 @@ const getSessionUser = async (request, env) => {
   if (!env.DB) {
     return { user: null, session: null, lucia, status: 'invalid', headers: null };
   }
-  const sessionRow = await env.DB.prepare(
-    `SELECT id, user_id, created_at, last_seen_at
-     FROM session
-     WHERE id = ?`
-  )
-    .bind(sessionId)
-    .first();
+  let sessionRow;
+  try {
+    sessionRow = await env.DB.prepare(
+      `SELECT id, user_id, created_at, last_seen_at
+       FROM session
+       WHERE id = ?`
+    )
+      .bind(sessionId)
+      .first();
+  } catch (dbError) {
+    console.error('[getSessionUser] D1 query error:', {
+      error: dbError?.message,
+      code: dbError?.code,
+    });
+    return { user: null, session: null, lucia, status: 'error', headers: null, dbError };
+  }
   const { session, user } = await lucia.validateSession(sessionId);
   if (!sessionRow || !session || !user) {
     await lucia.invalidateSession(sessionId);
@@ -2156,7 +2165,33 @@ const handleAuthMe = async (request, env) => {
   if (!env.DB) {
     return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
   }
-  const sessionResult = await getSessionUser(request, env);
+  let sessionResult;
+  try {
+    sessionResult = await getSessionUser(request, env);
+  } catch (error) {
+    console.error('[handleAuthMe] Unexpected error:', error?.message);
+    return jsonResponse(
+      { ok: false, code: 'INTERNAL_SERVER_ERROR' },
+      { status: 500 }
+    );
+  }
+
+  // Handle DB schema/query errors
+  if (sessionResult.status === 'error') {
+    const errorMsg = sessionResult.dbError?.message || 'Database error';
+    if (errorMsg.includes('no such column')) {
+      console.error('[handleAuthMe] D1 Schema mismatch - column does not exist');
+      return jsonResponse(
+        { ok: false, code: 'DB_SCHEMA_MISMATCH', error: 'Database schema error' },
+        { status: 500 }
+      );
+    }
+    return jsonResponse(
+      { ok: false, code: 'DB_ERROR' },
+      { status: 500 }
+    );
+  }
+
   if (sessionResult.status === 'expired') {
     return jsonResponse(
       { ok: false, code: 'SESSION_EXPIRED' },
