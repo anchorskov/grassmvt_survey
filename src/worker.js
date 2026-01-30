@@ -1907,26 +1907,82 @@ const handlePasskeyLoginVerify = async (request, env) => {
     });
   }
   
+  let credentialIDBuffer;
+  let credentialPublicKeyBuffer;
+  try {
+    credentialIDBuffer = isoBase64URL.toBuffer(credential.credential_id);
+    credentialPublicKeyBuffer = isoBase64URL.toBuffer(credential.public_key);
+  } catch (bufferError) {
+    if (isDebug) {
+      console.log('[Passkey Login Verify] Buffer conversion error:', {
+        credentialId: credential.credential_id,
+        publicKey: credential.public_key ? '(set)' : '(missing)',
+        error: bufferError?.message,
+      });
+    }
+    return jsonResponse({ ok: false, code: 'BUFFER_CONVERSION_ERROR' }, { status: 400 });
+  }
+
   const authenticator = {
-    credentialID: isoBase64URL.toBuffer(credential.credential_id),
-    credentialPublicKey: isoBase64URL.toBuffer(credential.public_key),
+    credentialID: credentialIDBuffer,
+    credentialPublicKey: credentialPublicKeyBuffer,
     counter: Number(credential.counter || 0),
   };
 
+  if (isDebug) {
+    console.log('[Passkey Login Verify] Authenticator object:', {
+      credentialIDType: authenticator.credentialID?.constructor?.name || typeof authenticator.credentialID,
+      credentialIDLength: authenticator.credentialID?.length || 'N/A',
+      credentialIDIsUint8Array: authenticator.credentialID instanceof Uint8Array,
+      credentialPublicKeyType: authenticator.credentialPublicKey?.constructor?.name || typeof authenticator.credentialPublicKey,
+      credentialPublicKeyLength: authenticator.credentialPublicKey?.length || 'N/A',
+      credentialPublicKeyIsUint8Array: authenticator.credentialPublicKey instanceof Uint8Array,
+      counterValue: authenticator.counter,
+      counterType: typeof authenticator.counter,
+      fullAuthenticator: JSON.stringify(authenticator, (k, v) => {
+        if (v instanceof Uint8Array) return `Uint8Array(${v.length})`;
+        return v;
+      }),
+    });
+  }
+
   let verification;
   try {
-    verification = await verifyAuthenticationResponse({
+    const verifyOptions = {
       response: assertionResponse,
       expectedChallenge: challengeRecord.challenge,
       expectedOrigin,
       expectedRPID: rpID,
-      authenticator,
+      credential: authenticator,
       requireUserVerification: false,
-    });
+    };
+    
+    if (isDebug) {
+      console.log('[Passkey Login Verify] verifyAuthenticationResponse options:', {
+        responseType: assertionResponse?.type,
+        expectedChallengeType: typeof challengeRecord.challenge,
+        expectedOriginType: typeof expectedOrigin,
+        expectedRPIDType: typeof rpID,
+        credentialType: typeof authenticator,
+        credentialKeys: authenticator ? Object.keys(authenticator) : [],
+      });
+    }
+    
+    verification = await verifyAuthenticationResponse(verifyOptions);
   } catch (error) {
     await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
       .bind(nowIso(), challengeRecord.id)
       .run();
+    
+    // Log full error stack for debugging
+    const errorStack = error?.stack || '';
+    if (isDebug) {
+      console.log('[Passkey Login Verify] Error details:', {
+        message: error?.message,
+        name: error?.name,
+        stack: errorStack.split('\n').slice(0, 5).join('\n'),
+      });
+    }
     
     // Categorize the error for diagnostics
     const errorMessage = error?.message || '';
