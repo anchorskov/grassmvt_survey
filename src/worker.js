@@ -271,10 +271,17 @@ const getWebAuthnRpId = (request, env) => {
     console.log(`[Passkey] Using configured RP ID: ${configured}`);
     return configured;
   }
-  const { hostname } = new URL(request.url);
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    console.log(`[Passkey] Using local RP ID: ${hostname}`);
-    return hostname;
+  let { hostname } = new URL(request.url);
+  
+  // Normalize localhost and 127.0.0.1 to 127.0.0.1 for consistency
+  // (WebAuthn RP ID must be consistent across registration and verification)
+  if (hostname === 'localhost') {
+    hostname = '127.0.0.1';
+  }
+  
+  if (hostname === '127.0.0.1' || hostname === 'localhost') {
+    console.log(`[Passkey] Using local RP ID: 127.0.0.1 (normalized from ${hostname})`);
+    return '127.0.0.1';
   }
   console.log(`[Passkey] Using request RP ID: ${hostname}`);
   return hostname;
@@ -1917,6 +1924,18 @@ const handlePasskeyLoginVerify = async (request, env) => {
     await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
       .bind(nowIso(), challengeRecord.id)
       .run();
+    
+    if (isDebug) {
+      console.error('[Passkey Login Verify] Verification failed:', {
+        errorMessage: error?.message,
+        errorName: error?.name,
+        rpID,
+        expectedOrigin,
+        challengeExists: !!challengeRecord.challenge,
+        credentialExists: !!credential,
+      });
+    }
+    
     await logFailure('VERIFY_FAILED', {
       hasChallengeId: true,
       hasAssertionId: true,
@@ -1926,6 +1945,7 @@ const handlePasskeyLoginVerify = async (request, env) => {
       dbCredentialFound: true,
       challengeAgeMs: Number.isFinite(challengeAgeMs) ? challengeAgeMs : null,
       origin: expectedOrigin,
+      errorMessage: error?.message,
     }, error && error.name ? error.name : 'Error');
     await writeAuditEvent(env, request, {
       eventType: 'passkey_login_failed',
