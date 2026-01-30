@@ -318,6 +318,18 @@
     turnstileSubmitted = false;
     const authenticated = await authUI.fetchAuthState();
     setLoggedInState(authenticated, authUI.state.email);
+    
+    // If user is authenticated (e.g., just signed up), check for passkey nudge
+    // Force show for new signups, respect dismissal for regular logins
+    if (authenticated) {
+      const forceShow = document.body.classList.contains('auth-just-signed-up');
+      await maybeShowPasskeyNudge(forceShow);
+      document.body.classList.remove('auth-just-signed-up');
+      turnstileConfig = await fetchTurnstileConfig();
+      setTurnstileState(turnstileConfig.bypass ? 'ready' : 'idle');
+      return;
+    }
+    
     turnstileConfig = await fetchTurnstileConfig();
     setTurnstileState(turnstileConfig.bypass ? 'ready' : 'idle');
     await renderTurnstile(false);
@@ -436,9 +448,13 @@
     return true;
   };
 
-  const maybeShowPasskeyNudge = async () => {
+  const maybeShowPasskeyNudge = async (forceShow = false) => {
     // One-time passkey nudge after password login if the account has no passkeys.
-    if (!passkeyNudgeEl || !shouldShowPasskeyNudge()) {
+    // forceShow=true will ignore dismissal (used after signup).
+    if (!passkeyNudgeEl) {
+      return false;
+    }
+    if (!forceShow && !shouldShowPasskeyNudge()) {
       return false;
     }
     const credentials = await fetchPasskeys();
@@ -592,9 +608,29 @@
       try {
         assertionResponse = await browser.startAuthentication(optionsData.options);
       } catch (error) {
+        console.error('[Passkey Login] Authentication cancelled:', error);
         showError('Passkey sign-in was cancelled.');
         return;
       }
+      
+      if (!assertionResponse) {
+        console.error('[Passkey Login] No assertion response returned');
+        showError('Passkey sign-in failed.');
+        return;
+      }
+      
+      console.log('[Passkey Login] Assertion response:', {
+        id: assertionResponse.id,
+        rawId: assertionResponse.rawId,
+        type: assertionResponse.type,
+        response: assertionResponse.response ? {
+          clientDataJSON: typeof assertionResponse.response.clientDataJSON,
+          authenticatorData: typeof assertionResponse.response.authenticatorData,
+          signature: typeof assertionResponse.response.signature,
+          userHandle: assertionResponse.response.userHandle,
+        } : null,
+      });
+      
       const verifyResponse = await fetch('/api/auth/passkey/login/verify', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -604,8 +640,14 @@
           challengeId: optionsData.challengeId,
         }),
       });
+      
       if (!verifyResponse.ok) {
         const data = await verifyResponse.json().catch(() => ({}));
+        console.error('[Passkey Login] Verify failed:', {
+          status: verifyResponse.status,
+          code: data.code,
+          error: data.error,
+        });
         if (data && data.code === 'UNKNOWN_CREDENTIAL') {
           showError('No matching passkey found on this device. Sign in with password, then add a passkey.');
         } else {

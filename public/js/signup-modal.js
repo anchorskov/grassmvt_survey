@@ -261,7 +261,7 @@
         return;
       }
       resetTurnstile();
-      showError('Account created. Signing you in. Add a passkey from your account page.');
+      showError('Account created. Signing you in.');
       
       // Wait for session cookie to be fully set
       let authenticated = false;
@@ -278,41 +278,10 @@
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
         );
         
-        // After signup, show passkey nudge to encourage immediate registration
-        // (unlike password login which respects dismissal preference)
-        if (window.PasskeyPrompt && typeof window.PasskeyPrompt.queueAfterPasswordLogin === 'function') {
-          window.PasskeyPrompt.queueAfterPasswordLogin();
-        }
-        
-        // For signup, always show passkey nudge if supported
-        const passkeyNudgeEl = document.getElementById('login-modal-passkey-nudge');
-        if (passkeyNudgeEl && window.PublicKeyCredential) {
-          // Fetch passkeys to check if user has any
-          try {
-            const response = await fetch('/api/auth/passkey/list', { 
-              credentials: 'include', 
-              cache: 'no-store' 
-            });
-            const data = response.ok ? await response.json() : { credentials: [] };
-            const credentials = data.credentials || [];
-            
-            // If no passkeys, show nudge (don't respect dismissal for new accounts)
-            if (credentials.length === 0) {
-              const loginForm = document.getElementById('login-modal-form');
-              const loggedInEl = document.getElementById('login-modal-logged-in');
-              
-              passkeyNudgeEl.classList.remove('is-hidden');
-              if (loginForm) loginForm.classList.add('is-hidden');
-              if (loggedInEl) loggedInEl.classList.add('is-hidden');
-              return;  // Show nudge, don't close modal
-            }
-          } catch (error) {
-            // Ignore errors, just proceed to close modal
-          }
-        }
-        
+        // Close signup modal and open login modal with passkey nudge flag
         closeModal();
-        window.location.href = '/surveys/list/';
+        document.body.classList.add('auth-just-signed-up');
+        authModals.open('login');
         return;
       }
       showError('Account created. Please sign in.');

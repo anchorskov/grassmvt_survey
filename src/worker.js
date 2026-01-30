@@ -11,6 +11,7 @@ import {
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { Lucia, TimeSpan } from 'lucia';
 import snarkdown from 'snarkdown';
+import { logPasskeyVerifyFailure, shouldDebugPasskeys } from './lib/debug-auth.js';
 import { sendEmail } from './server/email/resend.js';
 
 const escapeHtml = (value = '') =>
@@ -1751,6 +1752,23 @@ const handlePasskeyLoginVerify = async (request, env) => {
   if (!env.DB) {
     return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
   }
+  const isDebug = shouldDebugPasskeys(env, request);
+  const debugHostname = new URL(request.url).hostname;
+  const debugRayId = request.headers.get('cf-ray') || '';
+  let debugStep = 'parsed_body';
+  const logFailure = async (code, details, exceptionName) => {
+    if (!isDebug) {
+      return;
+    }
+    await logPasskeyVerifyFailure({
+      code,
+      rayId: debugRayId,
+      hostname: debugHostname,
+      step: debugStep,
+      details,
+      exceptionName,
+    });
+  };
   const originError = requireSameOrigin(request, env);
   if (originError) {
     return jsonResponse({ error: originError }, { status: 403 });
@@ -1762,19 +1780,44 @@ const handlePasskeyLoginVerify = async (request, env) => {
   const body = await parseJsonBody(request);
   const assertionResponse = body.assertionResponse;
   const challengeId = body.challengeId ? body.challengeId.toString().trim() : '';
+  
+  if (isDebug) {
+    console.log('[Passkey Login Verify] Request body:', {
+      hasAssertionResponse: !!assertionResponse,
+      assertionResponseKeys: assertionResponse ? Object.keys(assertionResponse) : [],
+      challengeId: challengeId ? '(set)' : '(missing)',
+      origin: new URL(request.url).origin,
+    });
+  }
+  
   if (!assertionResponse || !challengeId) {
-    return jsonResponse({ error: 'Missing passkey assertion.', code: 'MISSING_ASSERTION' }, { status: 400 });
+    await logFailure('MISSING_ASSERTION', {
+      hasChallengeId: !!challengeId,
+      hasAssertionId: !!(assertionResponse && (assertionResponse.id || assertionResponse.rawId)),
+      origin: new URL(request.url).origin,
+    });
+    return jsonResponse({ ok: false, error: 'Missing passkey assertion.', code: 'MISSING_ASSERTION' }, { status: 400 });
   }
 
+  debugStep = 'challenge_lookup';
   await cleanupExpiredWebauthnChallenges(env);
   const challengeRecord = await env.DB.prepare(
-    `SELECT id, challenge, expires_at, used_at
+    `SELECT id, challenge, expires_at, used_at, created_at
      FROM webauthn_challenges
      WHERE id = ? AND kind = 'authentication'`
   )
     .bind(challengeId)
     .first();
+  const challengeAgeMs = challengeRecord && challengeRecord.created_at
+    ? Date.now() - new Date(challengeRecord.created_at).getTime()
+    : null;
   if (!challengeRecord || challengeRecord.used_at) {
+    await logFailure('CHALLENGE_INVALID', {
+      hasChallengeId: true,
+      hasAssertionId: !!(assertionResponse.id || assertionResponse.rawId),
+      challengeAgeMs: Number.isFinite(challengeAgeMs) ? challengeAgeMs : null,
+      origin: new URL(request.url).origin,
+    });
     await writeAuditEvent(env, request, {
       eventType: 'passkey_login_failed',
       metadata: { reason: 'challenge_invalid' },
@@ -1782,6 +1825,12 @@ const handlePasskeyLoginVerify = async (request, env) => {
     return jsonResponse({ ok: false, code: 'CHALLENGE_INVALID' }, { status: 400 });
   }
   if (new Date(challengeRecord.expires_at).getTime() <= Date.now()) {
+    await logFailure('CHALLENGE_EXPIRED', {
+      hasChallengeId: true,
+      hasAssertionId: !!(assertionResponse.id || assertionResponse.rawId),
+      challengeAgeMs: Number.isFinite(challengeAgeMs) ? challengeAgeMs : null,
+      origin: new URL(request.url).origin,
+    });
     await writeAuditEvent(env, request, {
       eventType: 'passkey_login_failed',
       metadata: { reason: 'challenge_expired' },
@@ -1789,14 +1838,35 @@ const handlePasskeyLoginVerify = async (request, env) => {
     return jsonResponse({ ok: false, code: 'CHALLENGE_EXPIRED' }, { status: 400 });
   }
 
+  debugStep = 'challenge_validated';
+  debugStep = 'credential_extract';
   const credentialId = assertionResponse?.id || assertionResponse?.rawId || '';
   if (!credentialId) {
     await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
       .bind(nowIso(), challengeRecord.id)
       .run();
+    await logFailure('UNKNOWN_CREDENTIAL', {
+      hasChallengeId: true,
+      hasAssertionId: false,
+      credentialIdType: 'unknown',
+      origin: new URL(request.url).origin,
+    });
     return jsonResponse({ ok: false, code: 'UNKNOWN_CREDENTIAL' }, { status: 400 });
   }
 
+  debugStep = 'credential_lookup';
+  let credentialIdType = 'unknown';
+  let credentialIdLen = null;
+  if (typeof credentialId === 'string') {
+    credentialIdType = 'string';
+    credentialIdLen = credentialId.length;
+  } else if (credentialId instanceof ArrayBuffer) {
+    credentialIdType = 'arraybuffer';
+    credentialIdLen = credentialId.byteLength;
+  } else if (ArrayBuffer.isView(credentialId)) {
+    credentialIdType = 'uint8array';
+    credentialIdLen = credentialId.byteLength;
+  }
   const credential = await env.DB.prepare(
     `SELECT id, user_id, credential_id, public_key, counter
      FROM passkey_credentials
@@ -1808,6 +1878,15 @@ const handlePasskeyLoginVerify = async (request, env) => {
     await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
       .bind(nowIso(), challengeRecord.id)
       .run();
+    await logFailure('UNKNOWN_CREDENTIAL', {
+      hasChallengeId: true,
+      hasAssertionId: true,
+      credentialIdType,
+      credentialIdLen,
+      credentialIdValue: credentialId,
+      dbCredentialFound: false,
+      origin: new URL(request.url).origin,
+    });
     await writeAuditEvent(env, request, {
       eventType: 'passkey_login_failed',
       metadata: { reason: 'unknown_credential' },
@@ -1815,6 +1894,7 @@ const handlePasskeyLoginVerify = async (request, env) => {
     return jsonResponse({ ok: false, code: 'UNKNOWN_CREDENTIAL' }, { status: 400 });
   }
 
+  debugStep = 'webauthn_verify';
   const rpID = getWebAuthnRpId(request, env);
   const expectedOrigin = getWebAuthnExpectedOrigin(request);
   const authenticator = {
@@ -1837,6 +1917,16 @@ const handlePasskeyLoginVerify = async (request, env) => {
     await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
       .bind(nowIso(), challengeRecord.id)
       .run();
+    await logFailure('VERIFY_FAILED', {
+      hasChallengeId: true,
+      hasAssertionId: true,
+      credentialIdType,
+      credentialIdLen,
+      credentialIdValue: credentialId,
+      dbCredentialFound: true,
+      challengeAgeMs: Number.isFinite(challengeAgeMs) ? challengeAgeMs : null,
+      origin: expectedOrigin,
+    }, error && error.name ? error.name : 'Error');
     await writeAuditEvent(env, request, {
       eventType: 'passkey_login_failed',
       metadata: { reason: 'verify_failed' },
@@ -1848,6 +1938,16 @@ const handlePasskeyLoginVerify = async (request, env) => {
     await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
       .bind(nowIso(), challengeRecord.id)
       .run();
+    await logFailure('VERIFY_FAILED', {
+      hasChallengeId: true,
+      hasAssertionId: true,
+      credentialIdType,
+      credentialIdLen,
+      credentialIdValue: credentialId,
+      dbCredentialFound: true,
+      challengeAgeMs: Number.isFinite(challengeAgeMs) ? challengeAgeMs : null,
+      origin: expectedOrigin,
+    });
     await writeAuditEvent(env, request, {
       eventType: 'passkey_login_failed',
       metadata: { reason: 'not_verified' },
@@ -1855,6 +1955,7 @@ const handlePasskeyLoginVerify = async (request, env) => {
     return jsonResponse({ ok: false, code: 'VERIFY_FAILED' }, { status: 400 });
   }
 
+  debugStep = 'session_create';
   const { newCounter } = verification.authenticationInfo;
   await env.DB.prepare(
     `UPDATE passkey_credentials

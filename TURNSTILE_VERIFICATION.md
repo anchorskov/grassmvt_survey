@@ -312,5 +312,17 @@ When all tests pass, you should see:
 
 ---
 
+## Passkey Debug Logging
+
+To enable local passkey verify logs:
+
+```bash
+PASSKEY_DEBUG=1 npx wrangler dev --local --config wrangler.jsonc --port 8787
+```
+
+This logs a single safe line per 400 response from `/api/auth/passkey/login/verify` on localhost only.
+
+---
+
 **Test Date:** January 30, 2026  
 **Status:** Ready for manual browser verification
