@@ -264,11 +264,18 @@ const sendPasswordResetEmail = async (env, { to, resetUrl, replyTo }) => {
   return sendEmail(env, { to, subject, text, html, replyTo });
 };
 
-const getWebAuthnRpId = (request) => {
+const getWebAuthnRpId = (request, env) => {
+  const configured = (env.WEBAUTHN_RP_ID || '').toString().trim();
+  if (configured) {
+    console.log(`[Passkey] Using configured RP ID: ${configured}`);
+    return configured;
+  }
   const { hostname } = new URL(request.url);
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    console.log(`[Passkey] Using local RP ID: ${hostname}`);
     return hostname;
   }
+  console.log(`[Passkey] Using request RP ID: ${hostname}`);
   return hostname;
 };
 
@@ -1504,7 +1511,7 @@ const handlePasskeyRegisterOptions = async (request, env) => {
     transports: row.transports_json ? JSON.parse(row.transports_json) : undefined,
   }));
 
-  const rpID = getWebAuthnRpId(request);
+  const rpID = getWebAuthnRpId(request, env);
   const rpName = getWebAuthnRpName(env);
   const userID = new TextEncoder().encode(user.id);
 
@@ -1595,7 +1602,7 @@ const handlePasskeyRegisterVerify = async (request, env) => {
     return jsonResponse({ error: 'Registration challenge expired.', code: 'CHALLENGE_EXPIRED' }, { status: 400 });
   }
 
-  const rpID = getWebAuthnRpId(request);
+  const rpID = getWebAuthnRpId(request, env);
   const expectedOrigin = getWebAuthnExpectedOrigin(request);
 
   let verification;
@@ -1707,7 +1714,7 @@ const handlePasskeyLoginOptions = async (request, env) => {
     return passkeyGuard;
   }
   await cleanupExpiredWebauthnChallenges(env);
-  const rpID = getWebAuthnRpId(request);
+  const rpID = getWebAuthnRpId(request, env);
   const options = await generateAuthenticationOptions({
     rpID,
     allowCredentials: [],
@@ -1808,7 +1815,7 @@ const handlePasskeyLoginVerify = async (request, env) => {
     return jsonResponse({ ok: false, code: 'UNKNOWN_CREDENTIAL' }, { status: 400 });
   }
 
-  const rpID = getWebAuthnRpId(request);
+  const rpID = getWebAuthnRpId(request, env);
   const expectedOrigin = getWebAuthnExpectedOrigin(request);
   const authenticator = {
     credentialID: isoBase64URL.toBuffer(credential.credential_id),

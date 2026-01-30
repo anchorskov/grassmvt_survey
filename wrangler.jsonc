@@ -19,7 +19,8 @@
     "OAUTH_REDIRECT_BASE": "",
     "GOOGLE_CLIENT_ID": "",
     "GOOGLE_CLIENT_SECRET": "",
-    "GOOGLE_REDIRECT_URI": ""
+    "GOOGLE_REDIRECT_URI": "",
+    "WEBAUTHN_RP_ID": ""
   },
   "d1_databases": [
     {
@@ -50,7 +51,8 @@
         "OAUTH_REDIRECT_BASE": "",
         "GOOGLE_CLIENT_ID": "",
         "GOOGLE_CLIENT_SECRET": "",
-        "GOOGLE_REDIRECT_URI": ""
+        "GOOGLE_REDIRECT_URI": "",
+        "WEBAUTHN_RP_ID": "grassrootsmvt.org"
       },
       "observability": {
         "enabled": true,
