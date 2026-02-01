@@ -59,6 +59,20 @@
   let lastTurnstileToken = '';
   let turnstileExecuted = false;
   let turnstileSubmitted = false;
+  const AUTH_RETURN_KEY = 'auth_return_to';
+
+  const storeAuthReturnTo = () => {
+    try {
+      const { pathname, search, hash } = window.location;
+      if (pathname.startsWith('/auth/')) {
+        return;
+      }
+      const returnTo = `${pathname}${search || ''}${hash || ''}`;
+      localStorage.setItem(AUTH_RETURN_KEY, returnTo);
+    } catch (error) {
+      // Ignore storage failures
+    }
+  };
 
   const showError = (message, allowHtml = false) => {
     if (!errorEl) {
@@ -304,6 +318,7 @@
       }
       resetTurnstile();
       if (data && data.status === 'VERIFICATION_REQUIRED') {
+        storeAuthReturnTo();
         showError(
           'Check your email to verify your account. <button class="link-button" type="button" data-email-verify-resend>Resend verification email</button>.',
           true

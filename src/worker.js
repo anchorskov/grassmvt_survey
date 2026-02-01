@@ -1,4 +1,4 @@
-/* src/worker.js */
+// src/worker.js
 import { D1Adapter } from '@lucia-auth/adapter-sqlite';
 import { scrypt } from '@noble/hashes/scrypt';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
@@ -23,6 +23,144 @@ const escapeHtml = (value = '') =>
     .replace(/'/g, '&#39;');
 
 const parsePathParts = (pathname) => pathname.split('/').filter(Boolean);
+const AUTH_LOG_PATHS = new Set([
+  '/api/auth/login',
+  '/api/auth/resend-verification',
+  '/api/auth/verify-email',
+  '/api/auth/email/verify/request',
+  '/api/auth/email/verify/confirm',
+]);
+
+const truncateValue = (value, maxLength) => {
+  if (!value) {
+    return '';
+  }
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return value.slice(0, maxLength);
+};
+
+const generateRequestId = () => {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+};
+
+const getRequestId = (request) => {
+  const headerValue = request.headers.get('x-request-id');
+  if (headerValue && headerValue.trim()) {
+    return truncateValue(headerValue.trim(), 64);
+  }
+  return generateRequestId();
+};
+
+const appendExposeHeader = (headers, headerName) => {
+  const existing = headers.get('Access-Control-Expose-Headers');
+  if (!existing) {
+    headers.set('Access-Control-Expose-Headers', headerName);
+    return;
+  }
+  const normalized = existing
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  if (!normalized.includes(headerName.toLowerCase())) {
+    headers.set('Access-Control-Expose-Headers', `${existing}, ${headerName}`);
+  }
+};
+
+const withRequestIdHeaders = (response, requestId) => {
+  const headers = new Headers(response.headers);
+  headers.set('x-request-id', requestId);
+  appendExposeHeader(headers, 'x-request-id');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+};
+
+const extractForbiddenReason = async (response) => {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return 'FORBIDDEN';
+  }
+  try {
+    const payload = await response.clone().json();
+    return String(payload.code || payload.status || payload.error || 'FORBIDDEN');
+  } catch (error) {
+    return 'FORBIDDEN';
+  }
+};
+
+const shouldLogAuthRoute = (pathname) => AUTH_LOG_PATHS.has(pathname);
+
+const logAuthRequest = (entry) => {
+  console.log(JSON.stringify(entry));
+};
+
+const withAuthLogging = async (request, url, handler) => {
+  const pathname = url.pathname;
+  if (!shouldLogAuthRoute(pathname)) {
+    return handler();
+  }
+
+  const requestId = getRequestId(request);
+  const start = Date.now();
+  const baseEntry = {
+    type: 'auth_request',
+    method: request.method,
+    path: pathname,
+    cf_ray: request.headers.get('cf-ray') || '',
+    client_ip: request.headers.get('cf-connecting-ip') || '',
+    user_agent: truncateValue(request.headers.get('user-agent') || '', 80),
+    origin: request.headers.get('origin') || '',
+    host: url.host || '',
+    request_id: requestId,
+  };
+
+  logAuthRequest({
+    ...baseEntry,
+    phase: 'start',
+    status: 'pending',
+    duration_ms: 0,
+  });
+
+  let response;
+  try {
+    response = await handler();
+  } catch (error) {
+    logAuthRequest({
+      ...baseEntry,
+      phase: 'end',
+      status: 500,
+      duration_ms: Date.now() - start,
+      reason: 'UNCAUGHT_EXCEPTION',
+    });
+    throw error;
+  }
+
+  let reason;
+  if (response.status === 403) {
+    reason = await extractForbiddenReason(response);
+  }
+
+  const endEntry = {
+    ...baseEntry,
+    phase: 'end',
+    status: response.status,
+    duration_ms: Date.now() - start,
+  };
+  if (reason) {
+    endEntry.reason = reason;
+  }
+
+  logAuthRequest(endEntry);
+  return withRequestIdHeaders(response, requestId);
+};
 
 const jsonResponse = (payload, init = {}) => {
   const headers = new Headers(init.headers || {});
@@ -3570,7 +3708,7 @@ export default {
       }
 
       if (request.method === 'POST' && pathParts[2] === 'login') {
-        return handleAuthLogin(request, env);
+        return withAuthLogging(request, url, () => handleAuthLogin(request, env));
       }
 
       if (request.method === 'GET' && pathParts[2] === 'oauth' && pathParts[3] === 'google' && pathParts[4] === 'start') {
@@ -3590,11 +3728,11 @@ export default {
       }
 
       if (request.method === 'POST' && pathParts[2] === 'email' && pathParts[3] === 'verify' && pathParts[4] === 'request') {
-        return handleEmailVerifyRequest(request, env);
+        return withAuthLogging(request, url, () => handleEmailVerifyRequest(request, env));
       }
 
       if (request.method === 'POST' && pathParts[2] === 'email' && pathParts[3] === 'verify' && pathParts[4] === 'confirm') {
-        return handleEmailVerifyConfirm(request, env);
+        return withAuthLogging(request, url, () => handleEmailVerifyConfirm(request, env));
       }
 
       if (request.method === 'POST' && pathParts[2] === 'passkey' && pathParts[3] === 'register' && pathParts[4] === 'options') {

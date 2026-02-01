@@ -11,7 +11,11 @@
     "dev": "http-server ./public -p 8788 -c-1",
     "dev:worker": "wrangler dev --config wrangler.jsonc",
     "deploy": "wrangler pages deploy public --project-name grassrootsmvt --config wrangler.jsonc",
-    "cf:login": "wrangler login --config wrangler.jsonc"
+    "cf:login": "wrangler login --config wrangler.jsonc",
+    "tail:prod": "wrangler tail --format pretty",
+    "tail:json": "wrangler tail --format json",
+    "tail:prod:env": "wrangler tail --env production --format pretty",
+    "tail:json:env": "wrangler tail --env production --format json"
   },
   "keywords": [],
   "author": "",

@@ -118,8 +118,49 @@
   </div>
 
   <script>
+    const AUTH_RETURN_KEY = 'auth_return_to';
+    const AUTH_POST_VERIFY_KEY = 'auth_post_verify';
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token') || '';
+    const returnFromUrl = urlParams.get('returnTo') || '';
+
+    const normalizeReturnTo = (value) => {
+      if (!value) {
+        return '';
+      }
+      if (!value.startsWith('/')) {
+        return '';
+      }
+      if (value.startsWith('//')) {
+        return '';
+      }
+      return value;
+    };
+
+    const getReturnTo = () => {
+      const fromUrl = normalizeReturnTo(returnFromUrl);
+      if (fromUrl) {
+        return fromUrl;
+      }
+      try {
+        const stored = normalizeReturnTo(localStorage.getItem(AUTH_RETURN_KEY) || '');
+        if (stored) {
+          localStorage.removeItem(AUTH_RETURN_KEY);
+          return stored;
+        }
+      } catch (error) {
+        return '';
+      }
+      return '';
+    };
+
+    const setPostVerifyFlag = () => {
+      try {
+        localStorage.setItem(AUTH_POST_VERIFY_KEY, '1');
+      } catch (error) {
+        // Ignore storage failures
+      }
+    };
     
     // If token is in URL, auto-verify
     if (tokenFromUrl) {
@@ -156,11 +197,17 @@
         document.getElementById('loading').style.display = 'none';
         
         if (response.ok && data.ok) {
+          const returnTo = getReturnTo() || '/';
+          const successLink = document.querySelector('#success a.button');
+          if (successLink) {
+            successLink.setAttribute('href', returnTo);
+          }
+          setPostVerifyFlag();
           document.getElementById('success').style.display = 'block';
-          // Redirect to login after 2 seconds
+          // Redirect back after 1.5 seconds
           setTimeout(() => {
-            window.location.href = '/auth/login/';
-          }, 2000);
+            window.location.href = returnTo;
+          }, 1500);
         } else {
           const message = data.message || 'The verification link is invalid or has expired.';
           document.getElementById('error-message').textContent = message;

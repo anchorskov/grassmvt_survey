@@ -51,6 +51,19 @@
   const PASSKEY_PROMPT_SUPPRESS_KEY = 'passkey_prompt_dismissed_at';
   const PASSKEY_PROMPT_PENDING_KEY = 'passkey_prompt_pending';
   const PASSKEY_PROMPT_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
+  const AUTH_POST_VERIFY_KEY = 'auth_post_verify';
+
+  const consumePostVerifyFlag = () => {
+    try {
+      if (localStorage.getItem(AUTH_POST_VERIFY_KEY) !== '1') {
+        return false;
+      }
+      localStorage.removeItem(AUTH_POST_VERIFY_KEY);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
 
   const isPromptSuppressed = () => {
     try {
@@ -188,6 +201,9 @@
       const data = await response.json();
       if (data.authenticated) {
         setLoggedInState(true, data.user?.email || '');
+        if (consumePostVerifyFlag()) {
+          AuthModals.closeAll();
+        }
         await maybeShowPasskeyPrompt();
         return true;
       }

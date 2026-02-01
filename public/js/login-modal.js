@@ -75,6 +75,20 @@
 
   const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
   const PASSKEY_NUDGE_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
+  const AUTH_RETURN_KEY = 'auth_return_to';
+
+  const storeAuthReturnTo = () => {
+    try {
+      const { pathname, search, hash } = window.location;
+      if (pathname.startsWith('/auth/')) {
+        return;
+      }
+      const returnTo = `${pathname}${search || ''}${hash || ''}`;
+      localStorage.setItem(AUTH_RETURN_KEY, returnTo);
+    } catch (error) {
+      // Ignore storage failures
+    }
+  };
 
   const showError = (message, allowHtml = false) => {
     if (!errorEl) {
@@ -605,6 +619,7 @@
         } else if (data && data.code === 'ACCOUNT_NOT_FOUND') {
           showError('Account not found');
         } else if (data && data.code === 'EMAIL_NOT_VERIFIED') {
+          storeAuthReturnTo();
           showError(
             'Email not verified. Check your inbox or <button class="link-button" type="button" data-email-verify-resend>resend verification email</button>.',
             true

@@ -19,6 +19,7 @@
   const passkeyNudgeEl = document.getElementById('login-passkey-nudge');
   const passkeyNudgeAdd = document.getElementById('login-passkey-add');
   const passkeyNudgeSkip = document.getElementById('login-passkey-skip');
+  const AUTH_RETURN_KEY = 'auth_return_to';
   let turnstileWidgetId = null;
   let lastTurnstileToken = '';
   let turnstileConfig = { siteKey: '', bypass: false };
@@ -82,6 +83,19 @@
       errorEl.textContent = message;
     }
     errorEl.classList.remove('is-hidden');
+  };
+
+  const storeAuthReturnTo = () => {
+    try {
+      const { pathname, search, hash } = window.location;
+      if (pathname.startsWith('/auth/')) {
+        return;
+      }
+      const returnTo = `${pathname}${search || ''}${hash || ''}`;
+      localStorage.setItem(AUTH_RETURN_KEY, returnTo);
+    } catch (error) {
+      // Ignore storage failures
+    }
   };
 
   const mapOauthError = (value) => {
@@ -599,6 +613,7 @@
         if (authMode === 'signup' && response.status === 409 && errorBody.code === 'EMAIL_EXISTS') {
           showDuplicateEmailMessage();
         } else if (authMode === 'login' && errorBody.code === 'EMAIL_NOT_VERIFIED') {
+          storeAuthReturnTo();
           showError(
             'Email not verified. Check your inbox or <button class="link-button" type="button" data-email-verify-resend>resend verification email</button>.',
             true
@@ -629,6 +644,7 @@
       logDebug(authMode + ' successful');
       const successData = await response.json().catch(() => ({}));
       if (authMode === 'signup' && successData && successData.status === 'VERIFICATION_REQUIRED') {
+        storeAuthReturnTo();
         showError(
           'Check your email to verify your account. <button class="link-button" type="button" data-email-verify-resend>Resend verification email</button>.',
           true
