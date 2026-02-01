@@ -1,0 +1,540 @@
+================================================================================
+RESEND EMAIL VERIFICATION INTEGRATION CHECK
+Date: 2026-01-30
+Objective: Verify email verification flow is wired to Resend and lifecycle works end-to-end
+================================================================================
+
+STEP 1: RESEND MODULE AND WIRING VERIFICATION
+==============================================
+
+[PASS] Resend module exists and exports sendEmail function
+       File: src/server/email/resend.js
+       
+[PASS] sendEmail is imported in worker.js
+       File: src/worker.js:15
+       Evidence: import { sendEmail } from './server/email/resend.js';
+
+[PASS] sendEmailVerificationEmail function uses sendEmail
+       File: src/worker.js:965-969
+       Evidence:
+         ```
+         const sendEmailVerificationEmail = async (env, { to, verifyUrl, replyTo }) => {
+           const subject = 'Verify your email address';
+           const text = `Click this link to verify your email: ${verifyUrl}`;
+           const html = `Click <a href="${escapeHtml(verifyUrl)}">here</a> to verify your email.`;
+           return sendEmail(env, { to, subject, text, html, replyTo });
+         };
+         ```
+
+[PASS] handleAuthSignup calls sendEmailVerificationEmail
+       File: src/worker.js:1319-1325
+       Evidence:
+         ```
+         const emailSent = await sendEmailVerificationEmail(env, {
+           to: email,
+           verifyUrl: verifyUrl.toString(),
+           replyTo: env.EMAIL_FROM,
+         });
+         ```
+
+[PASS] handleEmailVerifyRequest calls sendEmailVerificationEmail
+       File: src/worker.js:2687-2691
+       Evidence:
+         ```
+         const sent = await sendEmailVerificationEmail(env, {
+           to: email,
+           verifyUrl: verifyUrl.toString(),
+           replyTo: env.EMAIL_FROM,
+         });
+         ```
+
+EMAIL PROVIDER BEHAVIOR:
+Local environment (ENVIRONMENT='local'):
+- sendEmail() stubs the send and logs: '[Email] Stub send: {to} {subject}'
+- Returns { ok: true, stubbed: true } without calling Resend API
+- Allows local testing without consuming Resend quota
+
+Production environment:
+- sendEmail() calls Resend API at https://api.resend.com/emails
+- Requires env.RESEND_API_KEY (Bearer token)
+- Sends actual emails
+
+
+STEP 2: ENVIRONMENT VARIABLES VERIFICATION
+===========================================
+
+[PASS] RESEND_API_KEY configured for local development
+       Location: .dev.vars:9
+       Value: dummy_local_key_for_testing
+       Note: Local environment stubs emails, so dummy key is fine
+       
+[PASS] EMAIL_FROM configured
+       Location: wrangler.jsonc:14 (base config)
+       Value: noreply@grassrootsmvt.org
+       Also in: wrangler.jsonc:49 (production override)
+       
+[PASS] APP_BASE_URL configured for local
+       Location: wrangler.jsonc:18
+       Value: http://localhost:8787
+       Also in: wrangler.jsonc:50 (production: https://grassrootsmvt.org)
+       Used for: Building verification links
+
+[PASS] ENVIRONMENT=local in .dev.vars
+       Location: .dev.vars:10
+       Evidence: Triggers email stubbing in sendEmail()
+
+[PASS] TURNSTILE_BYPASS=true in .dev.vars
+       Location: .dev.vars:11
+       Evidence: Allows local testing without Turnstile tokens
+
+Required env vars for email verification:
+✓ RESEND_API_KEY (for production, local uses dummy)
+✓ EMAIL_FROM
+✓ APP_BASE_URL
+✓ ENVIRONMENT (controls stubbing)
+
+All required env vars present. ✓
+
+
+STEP 3: DATABASE SCHEMA VALIDATION
+==================================
+
+Tables and columns required:
+1) user table columns:
+   - id (TEXT PRIMARY KEY)
+   - email (TEXT UNIQUE)
+   - email_verified_at (TEXT, nullable) ← NEW
+   - account_status (TEXT DEFAULT 'pending') ← NEW
+   
+2) email_verification_tokens table:
+   - id (TEXT PRIMARY KEY)
+   - user_id (TEXT NOT NULL, FK -> user.id)
+   - token_hash (TEXT NOT NULL UNIQUE)
+   - expires_at (TEXT NOT NULL)
+   - used_at (TEXT, nullable)
+   - created_at (TEXT NOT NULL)
+   - request_ip_hash (TEXT, nullable)
+
+3) session table (Lucia):
+   - id (TEXT PRIMARY KEY)
+   - user_id (TEXT)
+   - expires_at (INTEGER)
+
+4) audit_events table:
+   - id (INTEGER PRIMARY KEY)
+   - user_id (TEXT, nullable)
+   - event_type (TEXT)
+   - ip_hash (TEXT)
+   - user_agent_hash (TEXT)
+   - metadata_json (TEXT)
+   - created_at (DATETIME DEFAULT CURRENT_TIMESTAMP)
+
+Verification commands (run in WSL):
+
+# Check user table columns
+wrangler d1 execute wy_local --local --command "PRAGMA table_info(user);" | grep -E "email_verified_at|account_status"
+
+# Check email_verification_tokens table exists and has all columns
+wrangler d1 execute wy_local --local --command "PRAGMA table_info(email_verification_tokens);"
+
+# Check session table exists
+wrangler d1 execute wy_local --local --command "PRAGMA table_info(session);"
+
+# Check audit_events table exists
+wrangler d1 execute wy_local --local --command "PRAGMA table_info(audit_events);"
+
+# View schema migration
+cat db/migrations/0013_email_verification.sql
+
+
+STEP 4: SMOKE TEST ENDPOINTS (LOCAL)
+====================================
+
+Prerequisites:
+- Start local dev server: bash startDev.sh
+- Wait for wrangler to start on http://localhost:8787
+- All commands use curl from WSL
+
+TEST 4A: Email verification request endpoint
+─────────────────────────────────────────────
+
+Purpose: Verify POST /api/auth/email/verify/request accepts email and returns ok:true
+
+Command:
+```
+curl -i -X POST http://localhost:8787/api/auth/email/verify/request \
+  -H "content-type: application/json" \
+  -H "Origin: http://localhost:8787" \
+  -d '{
+    "email": "test-user-1@example.com",
+    "turnstileToken": ""
+  }'
+```
+
+Expected response:
+- HTTP Status: 200
+- Body: { "ok": true }
+- No error, no session cookie (verify/request does NOT create session)
+
+Local behavior notes:
+- Turnstile: bypass enabled (TURNSTILE_BYPASS=true)
+- Email: stubbed (will log "[Email] Stub send: test-user-1@example.com Verify your email address")
+- No actual email sent to inbox
+
+
+TEST 4B: Email verification confirm with invalid token
+──────────────────────────────────────────────────────
+
+Purpose: Verify POST /api/auth/email/verify/confirm rejects invalid token
+
+Command:
+```
+curl -i -X POST http://localhost:8787/api/auth/email/verify/confirm \
+  -H "content-type: application/json" \
+  -H "Origin: http://localhost:8787" \
+  -d '{
+    "token": "INVALID_TOKEN_WILL_FAIL"
+  }'
+```
+
+Expected response:
+- HTTP Status: 400
+- Body: { "ok": false, "code": "INVALID_TOKEN" }
+- No session cookie set
+
+
+TEST 4C: Signup endpoint returns VERIFICATION_REQUIRED
+──────────────────────────────────────────────────────
+
+Purpose: Verify signup creates token, sends email, returns VERIFICATION_REQUIRED, and NO session cookie
+
+Command:
+```
+curl -i -X POST http://localhost:8787/api/auth/signup \
+  -H "content-type: application/json" \
+  -H "Origin: http://localhost:8787" \
+  -d '{
+    "email": "newuser@example.com",
+    "password": "SecurePassword123!",
+    "turnstileToken": ""
+  }'
+```
+
+Expected response:
+- HTTP Status: 200
+- Body: { "ok": true, "status": "VERIFICATION_REQUIRED", "message": "Check your email to verify your account" }
+- NO Set-Cookie header (no session created yet)
+- Console log: "[Email] Stub send: newuser@example.com Verify your email address"
+
+Key difference from old behavior:
+- OLD: Created session cookie immediately after signup
+- NEW: Requires email verification first
+
+
+TEST 4D: Login blocks unverified accounts
+─────────────────────────────────────────
+
+Purpose: Verify login returns EMAIL_NOT_VERIFIED for pending accounts
+
+Command:
+```
+curl -i -X POST http://localhost:8787/api/auth/login \
+  -H "content-type: application/json" \
+  -H "Origin: http://localhost:8787" \
+  -d '{
+    "email": "newuser@example.com",
+    "password": "SecurePassword123!",
+    "turnstileToken": ""
+  }'
+```
+
+Expected response:
+- HTTP Status: 403
+- Body: { "ok": false, "code": "EMAIL_NOT_VERIFIED", "message": "Please verify your email first" }
+- NO session cookie
+
+
+STEP 5: AUDIT EVENTS VERIFICATION
+=================================
+
+Audit events are written for all email verification attempts and outcomes.
+Query database to verify audit trail.
+
+Commands to run locally:
+
+# View all email verification audit events
+wrangler d1 execute wy_local --local --command \
+  "SELECT id, user_id, event_type, metadata_json FROM audit_events WHERE event_type LIKE 'email_verify%' ORDER BY created_at DESC LIMIT 10;"
+
+# View signup success events
+wrangler d1 execute wy_local --local --command \
+  "SELECT id, user_id, event_type, metadata_json FROM audit_events WHERE event_type = 'signup_success' ORDER BY created_at DESC LIMIT 5;"
+
+# View audit events with specific outcome reasons
+wrangler d1 execute wy_local --local --command \
+  "SELECT event_type, json_extract(metadata_json, '$.reason') as reason, COUNT(*) as count FROM audit_events WHERE event_type LIKE 'email_verify%' GROUP BY event_type, reason;"
+
+# View user verification status
+wrangler d1 execute wy_local --local --command \
+  "SELECT id, email, email_verified_at, account_status FROM user WHERE email LIKE '%example.com' LIMIT 5;"
+
+# View pending email verification tokens (should be 30-minute TTL)
+wrangler d1 execute wy_local --local --command \
+  "SELECT id, user_id, expires_at, used_at FROM email_verification_tokens ORDER BY created_at DESC LIMIT 5;"
+
+Expected audit event types:
+- email_verify_requested (written on /api/auth/email/verify/request)
+  - reason: 'turnstile_failed', 'invalid_email', 'rate_limited', 'no_user', 'already_verified', 'token_creation_failed', 'sent'
+- email_verify_confirmed (written on /api/auth/email/verify/confirm)
+  - reason: 'missing_token', 'invalid_token', 'success', 'db_error'
+- signup_success (written when signup completes)
+  - metadata: { email_sent: true/false }
+
+
+STEP 6: END-TO-END VERIFICATION LIFECYCLE (MANUAL)
+================================================
+
+This section is for manual testing with a REAL email address.
+Follow these steps to verify the complete flow: pending -> verified -> session.
+
+Prerequisites:
+- Local dev server running (bash startDev.sh)
+- A real email inbox you can access
+- Resend API key configured (for real sends, or keep stubbed for logging)
+
+TEST SEQUENCE:
+─────────────
+
+Phase 1: Signup and receive verification email
+───────────────────────────────────────────────
+
+1) Navigate to http://localhost:8787/auth/signup/ in a browser
+
+2) Fill in:
+   - Email: your-real-email@example.com
+   - Password: SecurePassword123!
+
+3) Click "Sign up"
+
+4) Expected UI response:
+   - Page shows: "Check your email to verify your account. Resend verification email."
+   - NO session cookie set
+   - Verify by opening browser dev tools → Application → Cookies
+   - Should see NO "session" cookie
+
+5) Console check (for local stubbed sends):
+   - If stubbed locally, check server logs:
+     bash startDev.sh output should show: "[Email] Stub send: your-real-email@example.com Verify your email address"
+
+6) Real email check (if Resend key is configured):
+   - Wait 30 seconds
+   - Open your inbox
+   - Look for email from noreply@grassrootsmvt.org with subject "Verify your email address"
+   - Email should contain verification link with format: http://localhost:8787/auth/email-verify/?token=<random_token>
+
+
+Phase 2: Click verification link and confirm email
+──────────────────────────────────────────────────
+
+7) Click the verification link in the email
+   - You will be taken to: http://localhost:8787/auth/email-verify/?token=<token>
+
+8) The page should:
+   - Extract token from URL
+   - Auto-submit verification to POST /api/auth/email/verify/confirm
+   - Show success message
+
+9) After successful verification:
+   - Page shows: "Email verified successfully! Redirecting..."
+   - Automatically redirect to dashboard or login
+
+10) Verify session cookie is now set:
+    - Dev tools → Application → Cookies
+    - Should see "session" cookie with value
+    - Cookie should have Secure=true (production) or empty (local)
+
+
+Phase 3: Attempt login with verified account
+─────────────────────────────────────────────
+
+11) Log out or open new browser
+
+12) Navigate to http://localhost:8787/auth/login/
+
+13) Enter:
+    - Email: your-real-email@example.com
+    - Password: SecurePassword123!
+
+14) Expected behavior:
+    - Login succeeds (no EMAIL_NOT_VERIFIED error)
+    - Session cookie is set
+    - User is logged in and can access protected pages
+
+
+VERIFICATION CHECKLIST:
+─────────────────────
+
+Complete the manual test above and verify these checkpoints:
+
+□ Phase 1: Signup page accepts form submission
+□ Phase 1: Response contains "VERIFICATION_REQUIRED"
+□ Phase 1: NO session cookie after signup
+□ Phase 1: Verification email received (check inbox or server logs)
+□ Phase 2: Verification link in email opens email-verify page
+□ Phase 2: Email-verify page shows success message
+□ Phase 2: Session cookie is set after verification
+□ Phase 3: Login page accepts email and password for verified user
+□ Phase 3: User successfully logs in with session
+
+
+DATABASE VERIFICATION AFTER MANUAL TEST:
+───────────────────────────────────────
+
+After completing manual test, run these queries to verify state:
+
+# Check user is marked as verified and active
+wrangler d1 execute wy_local --local --command \
+  "SELECT email, email_verified_at, account_status FROM user WHERE email = 'your-real-email@example.com';"
+
+Expected result:
+- email_verified_at: timestamp (e.g., "2026-01-30T12:34:56.789Z")
+- account_status: "active"
+
+# Check verification token was marked as used
+wrangler d1 execute wy_local --local --command \
+  "SELECT id, user_id, used_at FROM email_verification_tokens ORDER BY created_at DESC LIMIT 1;"
+
+Expected result:
+- used_at: timestamp (not NULL)
+
+# Check session exists for user
+wrangler d1 execute wy_local --local --command \
+  "SELECT user_id, expires_at FROM session WHERE user_id = (SELECT id FROM user WHERE email = 'your-real-email@example.com');"
+
+Expected result:
+- One or more session rows for that user
+
+
+TROUBLESHOOTING:
+───────────────
+
+Issue: Email not received
+- Check: Is RESEND_API_KEY configured with a real key? (not dummy_local_key_for_testing)
+- Check: Is ENVIRONMENT=production? (needed for real sends, not local)
+- Check: Server logs for "[Email] Stub send:" message (indicates stubbed send, not real)
+- Solution: Configure real RESEND_API_KEY in .dev.vars or use wrangler secret put
+
+Issue: Verification link doesn't work
+- Check: Is token parameter present in URL?
+- Check: Token hasn't expired (30-minute TTL)
+- Check: Browser dev tools Network tab for POST /api/auth/email/verify/confirm response
+- Solution: Try resending verification email
+
+Issue: Login still fails after verification
+- Check: Database shows email_verified_at IS NOT NULL and account_status='active'
+- Check: Server logs for "email_not_verified" audit event
+- Solution: Run database query above to verify state
+
+
+================================================================================
+PART B: MINIMAL CHECKLIST FOR QUICK VERIFICATION
+=================================================================================
+
+QUICK PASS/FAIL CHECKLIST (run each to confirm):
+─────────────────────────────────────────────────
+
+[  ] 1. sendEmail function exists and is exported from resend.js
+     Evidence: grep "export const sendEmail" src/server/email/resend.js
+     Command: grep -n "export const sendEmail" src/server/email/resend.js
+
+[  ] 2. sendEmail is imported in worker.js
+     Evidence: grep "import.*sendEmail.*resend" src/worker.js
+     Command: grep -n "import.*sendEmail" src/worker.js
+
+[  ] 3. sendEmailVerificationEmail calls sendEmail
+     Evidence: Line 969 in worker.js
+     Command: sed -n '965,969p' src/worker.js
+
+[  ] 4. handleAuthSignup calls sendEmailVerificationEmail (line 1319)
+     Evidence: "await sendEmailVerificationEmail(env, {"
+     Command: sed -n '1319,1325p' src/worker.js
+
+[  ] 5. handleAuthSignup does NOT create session (no lucia.createSession call)
+     Evidence: Returns status: VERIFICATION_REQUIRED at line 1341
+     Command: sed -n '1341,1343p' src/worker.js
+
+[  ] 6. handleAuthSignup returns VERIFICATION_REQUIRED
+     Evidence: "status": "VERIFICATION_REQUIRED"
+     Command: grep -n "VERIFICATION_REQUIRED" src/worker.js
+
+[  ] 7. RESEND_API_KEY configured in .dev.vars
+     Evidence: Line 9 of .dev.vars
+     Command: grep RESEND_API_KEY .dev.vars
+
+[  ] 8. EMAIL_FROM configured in wrangler.jsonc
+     Evidence: EMAIL_FROM: "noreply@grassrootsmvt.org"
+     Command: grep EMAIL_FROM wrangler.jsonc
+
+[  ] 9. APP_BASE_URL configured in wrangler.jsonc
+     Evidence: http://localhost:8787 for local
+     Command: grep APP_BASE_URL wrangler.jsonc
+
+[  ] 10. email_verification_tokens table created in migration 0013
+      Evidence: CREATE TABLE IF NOT EXISTS email_verification_tokens
+      Command: grep "CREATE TABLE IF NOT EXISTS email_verification_tokens" db/migrations/0013_email_verification.sql
+
+[  ] 11. Local user can be created and queried
+      Evidence: user table exists with email_verified_at and account_status columns
+      Command: wrangler d1 execute wy_local --local --command "SELECT sql FROM sqlite_master WHERE type='table' AND name='user';"
+
+[  ] 12. POST /api/auth/email/verify/request returns { ok: true }
+      Evidence: Endpoint callable, returns 200 OK
+      Command: curl -X POST http://localhost:8787/api/auth/email/verify/request \
+                 -H "content-type: application/json" \
+                 -H "Origin: http://localhost:8787" \
+                 -d '{"email":"test@example.com","turnstileToken":""}'
+
+[  ] 13. POST /api/auth/email/verify/confirm rejects invalid token
+      Evidence: Returns code: INVALID_TOKEN
+      Command: curl -X POST http://localhost:8787/api/auth/email/verify/confirm \
+                 -H "content-type: application/json" \
+                 -H "Origin: http://localhost:8787" \
+                 -d '{"token":"INVALID"}'
+
+[  ] 14. handleEmailVerifyRequest sends email via sendEmailVerificationEmail (line 2687)
+      Evidence: "await sendEmailVerificationEmail(env, {"
+      Command: sed -n '2687,2691p' src/worker.js
+
+[  ] 15. handleAuthLogin checks email_verified_at and account_status (lines 1461-1468)
+      Evidence: "SELECT id, email_verified_at, account_status FROM user"
+      Command: sed -n '1461,1468p' src/worker.js
+
+
+RUNNING QUICK CHECKLIST:
+─────────────────────
+
+cd /home/anchor/projects/grassmvt_survey
+
+# Check all grep commands at once
+echo "=== Checking sendEmail export ===" && grep -n "export const sendEmail" src/server/email/resend.js
+echo "=== Checking sendEmail import ===" && grep -n "import.*sendEmail" src/worker.js
+echo "=== Checking sendEmailVerificationEmail call in signup ===" && sed -n '1319,1325p' src/worker.js
+echo "=== Checking VERIFICATION_REQUIRED response ===" && sed -n '1341,1343p' src/worker.js
+echo "=== Checking RESEND_API_KEY ===" && grep RESEND_API_KEY .dev.vars
+echo "=== Checking EMAIL_FROM ===" && grep EMAIL_FROM wrangler.jsonc | head -1
+echo "=== Checking email_verification_tokens table ===" && grep "CREATE TABLE IF NOT EXISTS email_verification_tokens" db/migrations/0013_email_verification.sql
+
+
+================================================================================
+END OF CHECKLIST
+================================================================================
+
+Summary: Resend email integration is fully wired into email verification flow.
+All required endpoints, database schema, environment variables, and session
+handling are in place. Ready for end-to-end testing with manual signup/verify.
+
+Next steps:
+1. Run quick checklist commands above to verify wiring
+2. Follow Step 4 (smoke tests) for endpoint validation
+3. Follow Step 6 (manual test) for complete lifecycle verification
+4. Check database state using queries from Step 5

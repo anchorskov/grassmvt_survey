@@ -371,6 +371,35 @@
     }
   };
 
+  const requestEmailVerification = async (email) => {
+    const trimmed = (email || '').trim();
+    if (!trimmed) {
+      showError('Enter your email to resend the verification link.');
+      return false;
+    }
+    if (!turnstileConfig.siteKey && !turnstileConfig.bypass) {
+      turnstileConfig = await fetchTurnstileConfig();
+    }
+    let token = '';
+    if (!turnstileConfig.bypass) {
+      await renderTurnstile(true);
+      await executeTurnstileOnce();
+      token = (tokenInput && tokenInput.value) || lastTurnstileToken || '';
+      if (!token) {
+        showError('Complete the human check to resend the verification email.');
+        return false;
+      }
+    }
+    await fetch('/api/auth/email/verify/request', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email: trimmed, turnstileToken: token || '' }),
+    });
+    showError('Verification email sent. Check your inbox.');
+    return true;
+  };
+
   const fetchPasskeys = async () => {
     const response = await fetch('/api/auth/passkey/list', { credentials: 'include', cache: 'no-store' });
     if (!response.ok) {
@@ -569,6 +598,11 @@
         logDebug('Server error: ' + (errorBody.code || 'unknown'));
         if (authMode === 'signup' && response.status === 409 && errorBody.code === 'EMAIL_EXISTS') {
           showDuplicateEmailMessage();
+        } else if (authMode === 'login' && errorBody.code === 'EMAIL_NOT_VERIFIED') {
+          showError(
+            'Email not verified. Check your inbox or <button class="link-button" type="button" data-email-verify-resend>resend verification email</button>.',
+            true
+          );
         } else if (authMode === 'login' && (errorBody.code === 'PASSWORD_INCORRECT' || response.status === 401)) {
           showError('Password incorrect');
         } else if (authMode === 'login' && (errorBody.code === 'ACCOUNT_NOT_FOUND' || response.status === 404)) {
@@ -593,6 +627,14 @@
       turnstileSubmitted = false;
       setTurnstileState('idle');
       logDebug(authMode + ' successful');
+      const successData = await response.json().catch(() => ({}));
+      if (authMode === 'signup' && successData && successData.status === 'VERIFICATION_REQUIRED') {
+        showError(
+          'Check your email to verify your account. <button class="link-button" type="button" data-email-verify-resend>Resend verification email</button>.',
+          true
+        );
+        return;
+      }
       const authenticated = await waitForAuthState();
       if (window.AuthUI && typeof window.AuthUI.fetchAuthState === 'function') {
         await window.AuthUI.fetchAuthState();
@@ -615,6 +657,18 @@
       if (authMode === 'signup' && !authenticated) {
         showError('Account created. Please sign in.');
       }
+    });
+  }
+
+  if (form) {
+    form.addEventListener('click', async (event) => {
+      const target = event.target.closest('[data-email-verify-resend]');
+      if (!target) {
+        return;
+      }
+      event.preventDefault();
+      const email = emailInput ? emailInput.value.trim() : '';
+      await requestEmailVerification(email);
     });
   }
 

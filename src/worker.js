@@ -126,6 +126,9 @@ const PASSWORD_RESET_EMAIL_LIMIT = 3;
 const PASSWORD_RESET_IP_LIMIT = 5;
 const PASSWORD_RESET_EMAIL_WINDOW_MINUTES = 30;
 const PASSWORD_RESET_IP_WINDOW_MINUTES = 15;
+const EMAIL_VERIFY_EMAIL_LIMIT = 3;
+const EMAIL_VERIFY_IP_LIMIT = 5;
+const EMAIL_VERIFY_WINDOW_MINUTES = 30;
 const WEBAUTHN_CHALLENGE_TTL_MINUTES = 10;
 
 const normalizeEmail = (value = '') => value.toString().trim().toLowerCase();
@@ -317,6 +320,14 @@ const getSessionUser = async (request, env) => {
     headers.append('Set-Cookie', blank.serialize());
     return { user: null, session: null, lucia, status: 'invalid', headers };
   }
+  // Check if account is suspended
+  if (user && user.account_status === 'suspended') {
+    await lucia.invalidateSession(sessionId);
+    const blank = lucia.createBlankSessionCookie();
+    const headers = new Headers();
+    headers.append('Set-Cookie', blank.serialize());
+    return { user: null, session: null, lucia, status: 'suspended', headers };
+  }
   const nowMs = Date.now();
   const createdAtMs = parseIsoMs(sessionRow.created_at) ?? nowMs;
   const lastSeenMs = parseIsoMs(sessionRow.last_seen_at) ?? createdAtMs;
@@ -438,6 +449,17 @@ const logAuthFailureDebug = (request, route, step, code, reason) => {
 const isLocalEnv = (env) => (env.ENVIRONMENT || '').toLowerCase() === 'local';
 
 let turnstileConfigLogged = false;
+
+const shouldBypassEmailVerification = (env) => {
+  if (!isLocalEnv(env)) {
+    return false;
+  }
+  const bypassSetting = (env.EMAIL_VERIFICATION_BYPASS || '').toLowerCase();
+  if (bypassSetting === 'false') {
+    return false;
+  }
+  return true;
+};
 
 const enforceTurnstileBypassPolicy = (env) => {
   const envName = (env.ENVIRONMENT || '').toLowerCase();
@@ -789,6 +811,175 @@ const checkPasswordResetRateLimit = async (env, { emailHash, ipHash }) => {
   };
 };
 
+const checkEmailVerificationRateLimit = async (env, { emailHash, ipHash }) => {
+  if (!env.DB) {
+    return { limited: false };
+  }
+  let emailCount = 0;
+  let ipCount = 0;
+  if (emailHash) {
+    const result = await env.DB.prepare(
+      `SELECT COUNT(*) as count
+       FROM audit_events
+       WHERE event_type = 'email_verify_requested'
+         AND json_extract(metadata_json, '$.email_hash') = ?
+         AND datetime(created_at) >= datetime('now', ?)`
+    )
+      .bind(emailHash, `-${EMAIL_VERIFY_WINDOW_MINUTES} minutes`)
+      .first();
+    emailCount = Number(result?.count || 0);
+  }
+  if (ipHash) {
+    const result = await env.DB.prepare(
+      `SELECT COUNT(*) as count
+       FROM audit_events
+       WHERE event_type = 'email_verify_requested'
+         AND ip_hash = ?
+         AND datetime(created_at) >= datetime('now', ?)`
+    )
+      .bind(ipHash, `-${EMAIL_VERIFY_WINDOW_MINUTES} minutes`)
+      .first();
+    ipCount = Number(result?.count || 0);
+  }
+  const emailLimited = emailHash && emailCount >= EMAIL_VERIFY_EMAIL_LIMIT;
+  const ipLimited = ipHash && ipCount >= EMAIL_VERIFY_IP_LIMIT;
+  return {
+    limited: emailLimited || ipLimited,
+    emailCount,
+    ipCount,
+    emailLimited,
+    ipLimited,
+  };
+};
+
+// ============================================================================
+// EMAIL VERIFICATION TOKEN HELPERS
+// ============================================================================
+
+const EMAIL_VERIFICATION_TTL_MINUTES = 30;
+const VERIFICATION_TOKEN_LENGTH = 32;
+
+// Hash a verification token using SHA-256 (same pattern as password reset)
+const hashEmailVerificationToken = async (salt, token) => sha256Hex(`${salt}:${token}`);
+
+// Generate a random email verification token
+const generateEmailVerificationToken = () => {
+  const bytes = new Uint8Array(VERIFICATION_TOKEN_LENGTH);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
+};
+
+// Create an email verification token and store it
+// Returns the raw token (only returned once, never stored)
+const createEmailVerificationToken = async (env, userId, email, ipHash) => {
+  if (!env.DB) {
+    console.error('[EmailVerification] DB not available');
+    return null;
+  }
+  
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[EmailVerification] HASH_SALT not configured');
+    return null;
+  }
+  
+  const rawToken = generateEmailVerificationToken();
+  const tokenHash = await hashEmailVerificationToken(salt, rawToken);
+  const tokenId = crypto.randomUUID();
+  const expiresAt = addMinutesIso(EMAIL_VERIFICATION_TTL_MINUTES);
+  const createdAt = nowIso();
+  
+  try {
+    await env.DB.prepare(
+      `INSERT INTO email_verification_tokens
+       (id, user_id, token_hash, expires_at, used_at, created_at, request_ip_hash)
+       VALUES (?, ?, ?, ?, NULL, ?, ?)`
+    )
+      .bind(tokenId, userId, tokenHash, expiresAt, createdAt, ipHash || null)
+      .run();
+    
+    return rawToken;
+  } catch (error) {
+    console.error('[EmailVerification] Token creation failed:', error?.message);
+    return null;
+  }
+};
+
+// Verify an email verification token and return user_id if valid
+// Marks token as used upon successful verification
+const verifyEmailVerificationToken = async (env, rawToken) => {
+  if (!env.DB || !rawToken) {
+    return null;
+  }
+  
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[EmailVerification] HASH_SALT not configured');
+    return null;
+  }
+  
+  const tokenHash = await hashEmailVerificationToken(salt, rawToken);
+  const now = nowIso();
+  
+  try {
+    // Find valid, unused token that hasn't expired
+    const result = await env.DB.prepare(
+      `SELECT id, user_id, expires_at
+       FROM email_verification_tokens
+       WHERE token_hash = ?
+         AND used_at IS NULL
+         AND expires_at > ?`
+    )
+      .bind(tokenHash, now)
+      .first();
+    
+    if (!result) {
+      return null;
+    }
+    
+    // Mark token as used
+    await env.DB.prepare(
+      `UPDATE email_verification_tokens
+       SET used_at = ?
+       WHERE id = ?`
+    )
+      .bind(now, result.id)
+      .run();
+    
+    return { userId: result.user_id };
+  } catch (error) {
+    console.error('[EmailVerification] Token verification failed:', error?.message);
+    return null;
+  }
+};
+
+// Clean up expired email verification tokens
+const cleanupExpiredEmailVerificationTokens = async (env) => {
+  if (!env.DB) {
+    return;
+  }
+  
+  try {
+    const now = nowIso();
+    await env.DB.prepare(
+      `DELETE FROM email_verification_tokens
+       WHERE expires_at < ?`
+    )
+      .bind(now)
+      .run();
+  } catch (error) {
+    console.error('[EmailVerification] Cleanup failed:', error?.message);
+  }
+};
+
+// Send email verification email
+const sendEmailVerificationEmail = async (env, { to, verifyUrl, replyTo }) => {
+  const subject = 'Verify your email address';
+  const text = `Click this link to verify your email: ${verifyUrl}`;
+  const html = `Click <a href="${escapeHtml(verifyUrl)}">here</a> to verify your email.`;
+  return sendEmail(env, { to, subject, text, html, replyTo });
+};
+
 const initializeLucia = (env) => {
   const adapter = new D1Adapter(env.DB, { user: 'user', session: 'session' });
   const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
@@ -823,6 +1014,8 @@ const initializeLucia = (env) => {
     sessionExpiresIn: new TimeSpan(getAbsoluteTimeoutDays(env), 'd'),
     getUserAttributes: (attributes) => ({
       email: attributes.email,
+      email_verified_at: attributes.email_verified_at,
+      account_status: attributes.account_status,
     }),
     sessionCookie: {
       name: 'session',
@@ -1111,28 +1304,74 @@ const handleAuthSignup = async (request, env) => {
     return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
   }
 
-  await writeAuditEvent(env, request, { userId, eventType: 'signup_success' });
+  // NEW: Get request signals for audit trail
+  const signals = await getRequestSignals(request, env);
 
-  try {
+  if (shouldBypassEmailVerification(env)) {
+    const verifiedAt = new Date().toISOString();
+    await env.DB.prepare('UPDATE user SET email_verified_at = ?, account_status = ? WHERE id = ?')
+      .bind(verifiedAt, 'active', userId)
+      .run();
+
     const lucia = initializeLucia(env);
+    await lucia.invalidateUserSessions(userId);
     const session = await lucia.createSession(userId, {});
     await stampSessionTimestamps(env, session.id);
     const sessionCookie = lucia.createSessionCookie(session.id);
-    if (isDebug) {
-      logAuthDebug(request, 'POST /api/auth/signup', 'session_created', {
-        userId,
-        sessionId: session.id,
-      });
-    }
+
     const headers = new Headers();
     headers.append('Set-Cookie', sessionCookie.serialize());
-    return jsonResponse({ ok: true }, { headers });
-  } catch (error) {
-    if (isDebug) {
-      logAuthFailureDebug(request, 'POST /api/auth/signup', 'session_create', 'SESSION_ERROR', error?.message);
-    }
-    return jsonResponse({ ok: true }, { status: 200 });
+    return jsonResponse(
+      { ok: true, status: 'VERIFIED_LOCAL', message: 'Email verification bypassed in local environment' },
+      { status: 200, headers }
+    );
   }
+
+  // NEW: Create verification token
+  const rawToken = await createEmailVerificationToken(env, userId, email, signals.ipHash);
+  if (!rawToken) {
+    await writeAuditEvent(env, request, {
+      userId,
+      eventType: 'signup_success',
+      metadata: { reason: 'token_creation_failed' },
+    });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'token_create', 'TOKEN_FAILED', 'Failed to create verification token');
+    }
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
+  }
+
+  // NEW: Build verification URL
+  const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
+  const verifyUrl = new URL('/auth/email-verify/', baseUrl);
+  verifyUrl.searchParams.set('token', rawToken);
+
+  // NEW: Send verification email
+  const emailSent = await sendEmailVerificationEmail(env, {
+    to: email,
+    verifyUrl: verifyUrl.toString(),
+    replyTo: env.EMAIL_FROM,
+  });
+
+  await writeAuditEvent(env, request, {
+    userId,
+    eventType: 'signup_success',
+    metadata: { email_sent: emailSent },
+  });
+
+  if (isDebug) {
+    logAuthDebug(request, 'POST /api/auth/signup', 'verification_sent', {
+      userId,
+      email: email.substring(0, 3) + '***',
+    });
+  }
+
+  // CHANGED: Return success WITHOUT creating session
+  // Client receives VERIFICATION_REQUIRED and must complete email verification
+  return jsonResponse(
+    { ok: true, status: 'VERIFICATION_REQUIRED', message: 'Check your email to verify your account' },
+    { status: 200 }
+  );
 };
 
 const handleAuthLogin = async (request, env) => {
@@ -1248,6 +1487,30 @@ const handleAuthLogin = async (request, env) => {
     if (isDebug) {
       logAuthDebug(request, route, 'password_upgraded', { userId: user.id });
     }
+  }
+
+  // NEW: Check if email is verified and account is active
+  const fullUser = await env.DB.prepare(
+    `SELECT id, email_verified_at, account_status
+     FROM user WHERE id = ?`
+  )
+    .bind(user.id)
+    .first();
+  
+  if (!shouldBypassEmailVerification(env) && (!fullUser.email_verified_at || fullUser.account_status !== 'active')) {
+    await writeAuditEvent(env, request, {
+      userId: user.id,
+      eventType: 'login_failed',
+      metadata: { reason: 'email_not_verified' },
+    });
+    logAuthTiming(route, rayId, 'response_sent', startedAt);
+    if (isDebug) {
+      logAuthFailureDebug(request, route, 'verification_check', 'EMAIL_NOT_VERIFIED', 'Email not verified or account not active');
+    }
+    return jsonResponse(
+      { ok: false, code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email first' },
+      { status: 403 }
+    );
   }
 
   const lucia = initializeLucia(env);
@@ -2350,6 +2613,210 @@ const handleAuthLogout = async (request, env) => {
   return jsonResponse({ ok: true }, { headers });
 };
 
+// ============================================================================
+// EMAIL VERIFICATION ROUTE HANDLERS
+// ============================================================================
+
+// Handle email verification token request (for signup or resend)
+// Input: { email, turnstileToken }
+// Output: { ok: true } (always, to not leak account existence)
+const handleEmailVerifyRequest = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  const body = await parseJsonBody(request);
+  const email = normalizeEmail(body.email || '');
+  const turnstileToken = body.turnstileToken || '';
+  
+  // Verify Turnstile
+  const turnstile = await verifyTurnstile(turnstileToken, request, env);
+  if (!turnstile.ok) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'turnstile_failed', code: turnstile.code },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  // Validate email
+  if (!email || !isValidEmail(email)) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'invalid_email' },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+
+  const salt = getHashSalt(env);
+  const signals = await getRequestSignals(request, env);
+  const emailHash = salt ? await hashSignal(email, salt) : '';
+  const rateLimit = await checkEmailVerificationRateLimit(env, {
+    emailHash,
+    ipHash: signals.ipHash,
+  });
+  if (rateLimit.limited) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_requested',
+      metadata: {
+        reason: 'rate_limited',
+        email_hash: emailHash || null,
+        email_limited: rateLimit.emailLimited,
+        ip_limited: rateLimit.ipLimited,
+      },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+
+  await cleanupExpiredEmailVerificationTokens(env);
+  
+  // Find user by email
+  const user = await env.DB.prepare('SELECT id, email_verified_at, account_status FROM user WHERE email = ?')
+    .bind(email)
+    .first();
+  
+  if (!user) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'no_user', email_hash: emailHash || null },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  // If already verified, return success without creating new token
+  if (user.email_verified_at) {
+    await writeAuditEvent(env, request, {
+      userId: user.id,
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'already_verified', email_hash: emailHash || null },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  // Create verification token
+  const rawToken = await createEmailVerificationToken(env, user.id, email, signals.ipHash);
+  if (!rawToken) {
+    await writeAuditEvent(env, request, {
+      userId: user.id,
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'token_creation_failed', email_hash: emailHash || null },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  // Build verification URL
+  const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
+  const verifyUrl = new URL('/auth/email-verify/', baseUrl);
+  verifyUrl.searchParams.set('token', rawToken);
+  
+  // Send email
+  const sent = await sendEmailVerificationEmail(env, {
+    to: email,
+    verifyUrl: verifyUrl.toString(),
+    replyTo: env.EMAIL_FROM,
+  });
+  
+  await writeAuditEvent(env, request, {
+    userId: user.id,
+    eventType: 'email_verify_requested',
+    metadata: { reason: 'sent', email_hash: emailHash || null, email_sent: sent },
+  });
+  
+  return jsonResponse({ ok: true }, { status: 200 });
+};
+
+// Handle email verification token confirmation
+// Input: { token }
+// Output: { ok: true, message: 'verified' } + session cookie if successful
+const handleEmailVerifyConfirm = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 500 });
+  }
+  
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 400 });
+  }
+  
+  const body = await parseJsonBody(request);
+  const token = (body.token || '').trim();
+  
+  if (!token) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_confirmed',
+      metadata: { reason: 'missing_token' },
+    });
+    return jsonResponse({ ok: false, code: 'INVALID_TOKEN' }, { status: 400 });
+  }
+  
+  // Verify token and get user
+  const verified = await verifyEmailVerificationToken(env, token);
+  if (!verified) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_confirmed',
+      metadata: { reason: 'invalid_token' },
+    });
+    return jsonResponse({ ok: false, code: 'INVALID_TOKEN' }, { status: 400 });
+  }
+  
+  const { userId } = verified;
+  const now = nowIso();
+  
+  try {
+    // Mark user as verified and active
+    await env.DB.prepare(
+      `UPDATE user
+       SET email_verified_at = ?,
+           account_status = 'active'
+       WHERE id = ?`
+    )
+      .bind(now, userId)
+      .run();
+    
+    await writeAuditEvent(env, request, {
+      userId,
+      eventType: 'email_verify_confirmed',
+      metadata: { reason: 'success' },
+    });
+  } catch (error) {
+    console.error('[EmailVerify] Failed to mark user verified:', error?.message);
+    await writeAuditEvent(env, request, {
+      userId,
+      eventType: 'email_verify_confirmed',
+      metadata: { reason: 'db_error', error: error?.message },
+    });
+    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 500 });
+  }
+  
+  // Create Lucia session for the verified user
+  try {
+    const lucia = initializeLucia(env);
+    const session = await lucia.createSession(userId, {});
+    await stampSessionTimestamps(env, session.id);
+    const sessionCookie = lucia.createSessionCookie(session.id);
+    
+    const headers = new Headers();
+    headers.append('Set-Cookie', sessionCookie.serialize());
+    
+    return jsonResponse(
+      { ok: true, message: 'email_verified' },
+      { headers, status: 200 }
+    );
+  } catch (error) {
+    console.error('[EmailVerify] Failed to create session:', error?.message);
+    // User is verified but session creation failed; still return success
+    return jsonResponse(
+      { ok: true, message: 'email_verified_no_session' },
+      { status: 200 }
+    );
+  }
+};
+
 const handleAuthMe = async (request, env) => {
   if (!env.DB) {
     const isDebug = shouldDebugAuth(env, request);
@@ -3120,6 +3587,14 @@ export default {
 
       if (request.method === 'POST' && pathParts[2] === 'password-reset' && pathParts[3] === 'confirm') {
         return handlePasswordResetConfirm(request, env);
+      }
+
+      if (request.method === 'POST' && pathParts[2] === 'email' && pathParts[3] === 'verify' && pathParts[4] === 'request') {
+        return handleEmailVerifyRequest(request, env);
+      }
+
+      if (request.method === 'POST' && pathParts[2] === 'email' && pathParts[3] === 'verify' && pathParts[4] === 'confirm') {
+        return handleEmailVerifyConfirm(request, env);
       }
 
       if (request.method === 'POST' && pathParts[2] === 'passkey' && pathParts[3] === 'register' && pathParts[4] === 'options') {

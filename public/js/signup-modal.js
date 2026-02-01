@@ -116,6 +116,42 @@
     }
   };
 
+  const requestEmailVerification = async (email) => {
+    const trimmed = (email || '').trim();
+    if (!trimmed) {
+      showError('Enter your email to resend the verification link.');
+      return false;
+    }
+    const config = await fetchTurnstileConfig();
+    let token = '';
+    if (!config.bypass) {
+      if (!turnstileClient || turnstileWidgetId === null) {
+        await renderTurnstile();
+      }
+      if (!turnstileClient || turnstileWidgetId === null) {
+        showError('Turnstile failed to load.');
+        return false;
+      }
+      token = await turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
+      if (!token) {
+        showError('Complete the human check to resend the verification email.');
+        return false;
+      }
+      if (tokenInput) {
+        tokenInput.value = token;
+      }
+      lastTurnstileToken = token;
+    }
+    await fetch('/api/auth/email/verify/request', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email: trimmed, turnstileToken: token || '' }),
+    });
+    showError('Verification email sent. Check your inbox.');
+    return true;
+  };
+
   const resetTurnstile = () => {
     if (turnstileClient && turnstileWidgetId !== null) {
       turnstileClient.resetWidget(turnstileWidgetId);
@@ -260,7 +296,20 @@
         resetTurnstile();
         return;
       }
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = null;
+      }
       resetTurnstile();
+      if (data && data.status === 'VERIFICATION_REQUIRED') {
+        showError(
+          'Check your email to verify your account. <button class="link-button" type="button" data-email-verify-resend>Resend verification email</button>.',
+          true
+        );
+        return;
+      }
       showError('Account created. Signing you in.');
       
       // Wait for session cookie to be fully set
@@ -286,6 +335,18 @@
       }
       showError('Account created. Please sign in.');
       authModals.open('login');
+    });
+  }
+
+  if (modal) {
+    modal.addEventListener('click', async (event) => {
+      const target = event.target.closest('[data-email-verify-resend]');
+      if (!target) {
+        return;
+      }
+      event.preventDefault();
+      const email = emailInput ? emailInput.value.trim() : '';
+      await requestEmailVerification(email);
     });
   }
 

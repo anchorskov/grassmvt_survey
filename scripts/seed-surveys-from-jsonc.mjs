@@ -8,17 +8,9 @@ import { spawnSync } from 'child_process';
 const rootDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
 const surveySources = {
-  abortion: {
+  'abortion-v2': {
     slug: 'abortion',
-    file: 'surveys_abortion_v1.jsonc',
-  },
-  'survey-process': {
-    slug: 'survey-process',
-    file: 'surveys_survey_process_v1.jsonc',
-  },
-  security: {
-    slug: 'security',
-    file: 'surveys_security_v1.jsonc',
+    file: 'surveys_abortion_v2.jsonc',
   },
 };
 

@@ -1,0 +1,767 @@
+================================================================================
+EMAIL VERIFICATION FLOW INVENTORY
+Grassroots Movement Survey Platform
+Date: January 30, 2026
+================================================================================
+
+A) FILES AND ROUTES
+================================================================================
+
+Core Auth Files:
+  - src/worker.js (3993 lines) - Main Worker entry point, all auth handlers
+  - src/lib/debug-auth.js - Passkey debug utilities
+  - src/server/email/resend.js (62 lines) - Email sending via Resend API
+  - public/js/auth.js (907 lines) - Login page auth UI
+  - public/js/login-modal.js (839 lines) - Login modal in survey flows
+  - public/js/signup-modal.js - Signup modal
+  - public/auth/login/index.html - Login page
+  - public/auth/signup/index.html - Signup page
+  - public/auth/password-reset/index.html - Password reset page
+
+Database Migrations:
+  - db/migrations/0006_auth_tables.sql - Core user/session/profile tables
+  - db/migrations/0007_password_reset_tokens.sql - Password reset tokens
+  - db/migrations/0008_passkey_tables.sql - WebAuthn/passkey tables
+  - db/migrations/0010_user_email_normalized_unique.sql - Email normalization
+  - db/migrations/0012_oauth_tables.sql - OAuth integration
+
+================================================================================
+B) AUTH ROUTES AND HANDLERS
+================================================================================
+
+Route Dispatch Location: src/worker.js lines 3075-3149 (if/switch pattern)
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║ ROUTE                                      METHOD  HANDLER FUNCTION        ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+Authentication Routes:
+  GET  /api/auth/turnstile                          (inline, ~line 3076)
+       Purpose: Fetch Turnstile site key and bypass flag
+  
+  GET  /api/auth/exists                            (inline, ~line 3083)
+       Purpose: Check if email exists (for signup flow)
+  
+  GET  /api/auth/me                                 handleAuthMe (line 2353)
+       Purpose: Get current logged-in user and session info
+  
+  POST /api/auth/signup                             handleAuthSignup (line 1006)
+       Purpose: Create new user account
+       Validation: Email valid, password >= 8 chars, Turnstile passed
+       Current behavior: 
+         1. Validate email and password
+         2. Verify Turnstile token
+         3. Check email not already registered
+         4. Create user + user_profile rows
+         5. Create Lucia session (NO email verification check)
+         6. Return session cookie
+       Gaps: NO email verification before account activation
+  
+  POST /api/auth/login                              handleAuthLogin (line 1138)
+       Purpose: Authenticate with email/password
+       Validation: Email exists, password matches, Turnstile passed
+       Current behavior:
+         1. Validate email and password present
+         2. Verify Turnstile token
+         3. Look up user by email
+         4. Verify password hash
+         5. Upgrade password hash if needed
+         6. Invalidate old sessions
+         7. Create new Lucia session
+         8. Return session cookie
+       Gaps: NO check for email_verified_at or account_status
+
+Password Reset Routes:
+  POST /api/auth/password-reset/request             handlePasswordResetRequest (line 1477)
+       Purpose: Initiate password reset flow
+       Current: Email token sent (implementation not shown in this excerpt)
+  
+  POST /api/auth/password-reset/confirm             handlePasswordResetConfirm (line 1581)
+       Purpose: Confirm password reset with token
+  
+OAuth Routes:
+  GET  /api/auth/oauth/google/start               handleOAuthStart (line 1303)
+  GET  /api/auth/oauth/google/callback            handleOAuthCallback (line 1343)
+  
+Passkey Routes:
+  POST /api/auth/passkey/register/options          handlePasskeyRegisterOptions (line 1655)
+  POST /api/auth/passkey/register/verify           handlePasskeyRegisterVerify (line 1738)
+  POST /api/auth/passkey/login/options             handlePasskeyLoginOptions (line 1878)
+  POST /api/auth/passkey/login/verify              handlePasskeyLoginVerify (line 1948)
+  GET  /api/auth/passkey/list                      handlePasskeyList (line 2260)
+  DELETE /api/auth/passkey/remove                  handlePasskeyRemove (line 2290)
+
+Logout Route:
+  POST /api/auth/logout                            handleAuthLogout (line 2330)
+       Purpose: Invalidate session and return blank cookie
+
+================================================================================
+C) LUCIA CONFIGURATION
+================================================================================
+
+Location: src/worker.js, initializeLucia() function (lines 792-830)
+
+Adapter: D1 SQLite Adapter
+  const adapter = new D1Adapter(env.DB, { 
+    user: 'user',      // Table name
+    session: 'session' // Table name
+  });
+
+Session Cookie Configuration:
+  Name: 'session'
+  httpOnly: true (always)
+  secure: true (only in production)
+  sameSite: 'lax'
+  path: '/'
+  domain: Set to hostname in production (e.g., 'grassrootsmvt.org')
+
+Session Expiration: Configured via getAbsoluteTimeoutDays(env) (in TimeSpan)
+  (see CONSTANTS section below for timeout values)
+
+User Attributes Loaded:
+  getUserAttributes: (attributes) => ({
+    email: attributes.email,
+  })
+  
+  Note: Only email is loaded into session. NOT loading:
+    - email_verified_at
+    - account_status
+    - user role/permissions
+    - verification flags
+
+Middleware Integration:
+  getSessionUser() (line 287-346) - Validates session and returns user
+  requireSessionUser() - Wrapper that returns error if not authenticated
+  
+  These functions:
+    1. Read session cookie
+    2. Validate session with Lucia
+    3. Check expiration
+    4. Return user object (email only)
+    5. Do NOT check account_status or verification flags
+
+================================================================================
+D) DATABASE SCHEMA SUMMARY
+================================================================================
+
+1. USER TABLE (0006_auth_tables.sql)
+   ┌─────────────────┬──────────┬─────────────────────┬──────────────────┐
+   │ Column          │ Type     │ Constraints         │ Notes            │
+   ├─────────────────┼──────────┼─────────────────────┼──────────────────┤
+   │ id              │ TEXT     │ PRIMARY KEY         │ UUID              │
+   │ email           │ TEXT     │ UNIQUE              │ Raw email        │
+   │ password_hash   │ TEXT     │ NOT NULL            │ scrypt format    │
+   │ created_at      │ TEXT     │ DEFAULT NOW         │ ISO8601 timestamp│
+   └─────────────────┴──────────┴─────────────────────┴──────────────────┘
+   
+   Indexes:
+     - PRIMARY KEY (id)
+     - UNIQUE (email) [raw]
+     - UNIQUE (lower(email)) [from 0010_user_email_normalized_unique.sql]
+   
+   Missing Columns for Email Verification:
+     - email_verified_at (NULL if not verified)
+     - email_verified_token (for verification links)
+     - account_status (ENUM: 'pending', 'active', 'suspended')
+
+2. SESSION TABLE (0006_auth_tables.sql, enhanced by 0011_session_timeouts.sql)
+   ┌─────────────────┬──────────┬─────────────────────┬──────────────────┐
+   │ Column          │ Type     │ Constraints         │ Notes            │
+   ├─────────────────┼──────────┼─────────────────────┼──────────────────┤
+   │ id              │ TEXT     │ PRIMARY KEY         │ UUID              │
+   │ expires_at      │ INTEGER  │ NOT NULL            │ UNIX timestamp   │
+   │ user_id         │ TEXT     │ FOREIGN KEY         │ FK to user(id)   │
+   │ created_at      │ TEXT     │ (from 0011)         │ ISO8601          │
+   │ last_seen_at    │ TEXT     │ (from 0011)         │ ISO8601          │
+   └─────────────────┴──────────┴─────────────────────┴──────────────────┘
+   
+   Indexes:
+     - idx_session_user_id (for session lookups)
+     - idx_session_expires_at (for cleanup)
+   
+   Cleanup: cleanupExpiredSessions(env) called on login/signup
+
+3. USER_PROFILE TABLE (0006_auth_tables.sql)
+   ┌─────────────────┬──────────┬─────────────────────┬──────────────────┐
+   │ Column          │ Type     │ Constraints         │ Notes            │
+   ├─────────────────┼──────────┼─────────────────────┼──────────────────┤
+   │ user_id         │ TEXT     │ PRIMARY KEY         │ FK to user(id)   │
+   │ email           │ TEXT     │                     │ Denormalized     │
+   │ state           │ TEXT     │                     │ User location    │
+   │ wy_house_dist   │ TEXT     │                     │ Wyoming specific │
+   │ created_at      │ TEXT     │ DEFAULT NOW         │ ISO8601          │
+   │ updated_at      │ TEXT     │ DEFAULT NOW         │ ISO8601          │
+   └─────────────────┴──────────┴─────────────────────┴──────────────────┘
+
+4. PASSWORD_RESET_TOKENS TABLE (0007_password_reset_tokens.sql)
+   ┌─────────────────┬──────────┬─────────────────────┬──────────────────┐
+   │ Column          │ Type     │ Constraints         │ Notes            │
+   ├─────────────────┼──────────┼─────────────────────┼──────────────────┤
+   │ id              │ TEXT     │ PRIMARY KEY         │ UUID              │
+   │ user_id         │ TEXT     │ FOREIGN KEY         │ FK to user(id)   │
+   │ token_hash      │ TEXT     │ NOT NULL            │ Hashed for safety│
+   │ expires_at      │ TEXT     │ NOT NULL            │ ISO8601 timestamp│
+   │ used_at         │ TEXT     │                     │ NULL until used  │
+   │ created_at      │ TEXT     │ NOT NULL            │ ISO8601          │
+   │ request_ip_hash │ TEXT     │                     │ For audit trail  │
+   └─────────────────┴──────────┴─────────────────────┴──────────────────┘
+   
+   Design Note: Token stored as hash (not plain text) - best practice
+
+5. PASSKEY_CREDENTIALS TABLE (0008_passkey_tables.sql)
+   ┌─────────────────┬──────────┬─────────────────────┬──────────────────┐
+   │ Column          │ Type     │ Constraints         │ Notes            │
+   ├─────────────────┼──────────┼─────────────────────┼──────────────────┤
+   │ id              │ TEXT     │ PRIMARY KEY         │ UUID              │
+   │ user_id         │ TEXT     │ FOREIGN KEY         │ FK to user(id)   │
+   │ credential_id   │ TEXT     │ UNIQUE              │ WebAuthn ID      │
+   │ public_key      │ TEXT     │ NOT NULL            │ Serialized JSON  │
+   │ counter         │ INTEGER  │ DEFAULT 0           │ WebAuthn counter │
+   │ transports_json │ TEXT     │                     │ usb, nfc, ble... │
+   │ created_at      │ TEXT     │ NOT NULL            │ ISO8601          │
+   │ last_used_at    │ TEXT     │                     │ For analytics    │
+   │ nickname        │ TEXT     │                     │ User label       │
+   └─────────────────┴──────────┴─────────────────────┴──────────────────┘
+
+6. WEBAUTHN_CHALLENGES TABLE (0008_passkey_tables.sql)
+   ┌─────────────────┬──────────┬─────────────────────┬──────────────────┐
+   │ Column          │ Type     │ Constraints         │ Notes            │
+   ├─────────────────┼──────────┼─────────────────────┼──────────────────┤
+   │ id              │ TEXT     │ PRIMARY KEY         │ UUID              │
+   │ kind            │ TEXT     │ NOT NULL            │ registration/auth│
+   │ user_id         │ TEXT     │ FOREIGN KEY         │ NULL for login   │
+   │ challenge       │ TEXT     │ NOT NULL            │ Base64 encoded   │
+   │ created_at      │ TEXT     │ NOT NULL            │ ISO8601          │
+   │ expires_at      │ TEXT     │ NOT NULL            │ ISO8601          │
+   │ used_at         │ TEXT     │                     │ NULL until used  │
+   │ request_ip_hash │ TEXT     │                     │ Audit trail      │
+   │ request_ua_hash │ TEXT     │                     │ Audit trail      │
+   └─────────────────┴──────────┴─────────────────────┴──────────────────┘
+
+7. OAUTH_STATES TABLE (0012_oauth_tables.sql)
+   ┌─────────────────┬──────────┬─────────────────────┬──────────────────┐
+   │ Column          │ Type     │ Constraints         │ Notes            │
+   ├─────────────────┼──────────┼─────────────────────┼──────────────────┤
+   │ state           │ TEXT     │ PRIMARY KEY         │ OAuth state param│
+   │ provider        │ TEXT     │ NOT NULL            │ google, etc.     │
+   │ code_verifier   │ TEXT     │ NOT NULL            │ PKCE challenge   │
+   │ created_at      │ INTEGER  │ NOT NULL            │ Unix timestamp   │
+   └─────────────────┴──────────┴─────────────────────┴──────────────────┘
+
+8. OAUTH_ACCOUNTS TABLE (0012_oauth_tables.sql)
+   ┌─────────────────┬──────────┬─────────────────────┬──────────────────┐
+   │ Column          │ Type     │ Constraints         │ Notes            │
+   ├─────────────────┼──────────┼─────────────────────┼──────────────────┤
+   │ provider        │ TEXT     │ PRIMARY KEY (pt1)   │ google, etc.     │
+   │ provider_sub    │ TEXT     │ PRIMARY KEY (pt2)   │ Provider user ID │
+   │ user_id         │ TEXT     │ FOREIGN KEY         │ FK to user(id)   │
+   │ email           │ TEXT     │                     │ From OAuth       │
+   │ created_at      │ INTEGER  │ NOT NULL            │ Unix timestamp   │
+   └─────────────────┴──────────┴─────────────────────┴──────────────────┘
+
+9. AUDIT_EVENTS TABLE (0006_auth_tables.sql)
+   ┌─────────────────┬──────────┬─────────────────────┬──────────────────┐
+   │ Column          │ Type     │ Constraints         │ Notes            │
+   ├─────────────────┼──────────┼─────────────────────┼──────────────────┤
+   │ id              │ INTEGER  │ PRIMARY KEY AUTO    │ Auto-increment   │
+   │ user_id         │ TEXT     │ FOREIGN KEY (nullable)                 │
+   │ event_type      │ TEXT     │ NOT NULL            │ signup_success   │
+   │ created_at      │ TEXT     │ DEFAULT NOW         │ ISO8601          │
+   │ ip_hash         │ TEXT     │                     │ Anonymized       │
+   │ user_agent_hash │ TEXT     │                     │ Anonymized       │
+   │ metadata_json   │ TEXT     │                     │ {...} as JSON    │
+   └─────────────────┴──────────┴─────────────────────┴──────────────────┘
+   
+   Current event_type values tracked:
+     - signup_success / signup_failed
+     - login_success / login_failed
+     - password_reset_requested
+     - passkey_auth_options_issued
+     - passkey_register_options_issued
+   
+   Metadata stored (examples):
+     - email_hash (hashed for rate limiting)
+     - reason (generic / invalid_email / weak_password / rate_limited)
+     - email_limited / ip_limited (rate limit flags)
+
+================================================================================
+E) CONSTANTS AND CONFIGURATION
+================================================================================
+
+From src/worker.js:
+
+  PASSWORD_MIN_LENGTH = 8
+  PASSWORD_RESET_TOKEN_TTL_MINUTES = 30
+  PASSWORD_RESET_EMAIL_LIMIT = 3
+  PASSWORD_RESET_EMAIL_WINDOW_MINUTES = 15
+  PASSWORD_RESET_IP_LIMIT = 5
+  PASSWORD_RESET_IP_WINDOW_MINUTES = 1
+  WEBAUTHN_CHALLENGE_TTL_MINUTES = 10
+  TURNSTILE_CHALLENGE_TTL_MINUTES = 5
+  
+Session Timeout (lines 240-250):
+  function getAbsoluteTimeoutDays(env):
+    - production: 30 days
+    - local/other: 365 days
+
+Environment Variables:
+  ENVIRONMENT (local | production)
+  WEBAUTHN_RP_ID (grassrootsmvt.org)
+  WEBAUTHN_RP_NAME (defaults to "Grassroots Movement")
+  APP_BASE_URL (http://localhost:8787 or https://grassrootsmvt.org)
+  EMAIL_FROM (noreply@grassrootsmvt.org)
+  SUPPORT_EMAIL_TO (anchorskov@gmail.com)
+  RESEND_API_KEY (for email sending)
+  TURNSTILE_SITE_KEY (0x4AAAAAACUGQXNTcuo9SlgJ)
+  TURNSTILE_SECRET_KEY (server-side verification)
+
+================================================================================
+F) CURRENT EMAIL SENDING SYSTEM
+================================================================================
+
+Provider: Resend API
+Location: src/server/email/resend.js (62 lines)
+
+Function: sendEmail(env, { to, subject, html, text, replyTo })
+  - Base URL: https://api.resend.com/emails
+  - Auth: Bearer token via RESEND_API_KEY env var
+  - In local environment: Stubs email (logs only, no send)
+  - In production: Actually sends via Resend
+
+Current Email Usage:
+  NONE for email verification found in codebase!
+  
+  Password reset mentions sendEmail but implementation not shown.
+  Suggest: Search handlePasswordResetRequest for actual email send.
+
+================================================================================
+G) CURRENT SIGNUP FLOW (DETAILED TRACE)
+================================================================================
+
+START: handleAuthSignup (line 1006)
+
+  1. Validate same-origin request
+  2. Parse JSON body: { email, password, turnstileToken }
+  3. Normalize email (lowercase, trim)
+  4. VALIDATE:
+     - Email is valid format (isValidEmail check)
+     - Password length >= 8 characters
+     - Return 400 error if invalid (generic message to prevent enumeration)
+  5. Verify Turnstile token
+     - If Turnstile fails: return 400 error
+  6. Check email not already registered
+     - Query: SELECT id FROM user WHERE email = ?
+     - Return 409 EMAIL_EXISTS if found
+  7. Create user record:
+     INSERT INTO user (id, email, password_hash)
+       VALUES (crypto.randomUUID(), normalizedEmail, hashedPassword)
+  8. Create user_profile record:
+     INSERT INTO user_profile (user_id, email)
+       VALUES (userId, email)
+  9. Create Lucia session:
+     const session = await lucia.createSession(userId, {})
+     return Set-Cookie header with session token
+  10. Write audit event: signup_success
+
+END: Return 200 OK with session cookie
+
+CRITICAL GAP:
+  - Account is immediately active after signup
+  - NO email verification step required
+  - NO email verification link sent
+  - NO email_verified_at column set
+  - NO account_status column checked
+
+================================================================================
+H) CURRENT LOGIN FLOW (DETAILED TRACE)
+================================================================================
+
+START: handleAuthLogin (line 1138)
+
+  1. Validate same-origin request
+  2. Parse JSON body: { email, password, turnstileToken }
+  3. Normalize email
+  4. VALIDATE:
+     - Email and password both present (return 400 if missing)
+  5. Verify Turnstile token
+     - Return 403 if Turnstile fails
+  6. Query user:
+     SELECT id, email, password_hash FROM user WHERE email = ?
+     - Return 404 ACCOUNT_NOT_FOUND if no match
+  7. Verify password:
+     await verifyPassword(password, user.password_hash)
+     - Return 401 PASSWORD_INCORRECT if mismatch
+  8. Password hash upgrade (if old scrypt format):
+     - Upgrade to new hash algorithm
+  9. Invalidate old sessions:
+     await lucia.invalidateUserSessions(user.id)
+  10. Create new session:
+      const session = await lucia.createSession(user.id, {})
+  11. Stamp session timestamps (updated tracking)
+  12. Return Set-Cookie header
+  13. Write audit event: login_success
+
+END: Return 200 OK with session cookie
+
+CRITICAL GAPS:
+  - Does NOT check email_verified_at
+  - Does NOT check account_status
+  - Does NOT prevent unverified accounts from logging in
+  - No differentiation between active/suspended/pending accounts
+
+================================================================================
+I) PASSWORD RESET FLOW
+================================================================================
+
+Handler: handlePasswordResetRequest (line 1477)
+  - Rate limiting per email and IP
+  - Generates reset token (generateResetToken, line 253)
+  - Token stored in password_reset_tokens table (hashed)
+  - Token expires in 30 minutes
+
+Handler: handlePasswordResetConfirm (line 1581)
+  - Validates token (must be present, not expired, not used)
+  - Updates password hash
+  - Marks token as used (used_at column)
+  - Creates new session
+
+Missing: Email sending implementation shown in audit but not in excerpts
+
+================================================================================
+J) FRONTEND UX / SIGN-UP MESSAGES
+================================================================================
+
+Signup Page: public/auth/signup/index.html
+  - Form: email, password inputs
+  - Submit button
+  - Error messages displayed via JavaScript
+
+Signup Modal: public/js/signup-modal.js
+  - Embedded in survey flow
+  - Same validation as /api/auth/signup
+  - Currently shows generic errors (no verification message)
+
+Login Page: public/auth/login/index.html
+  - Form: email, password inputs
+  - "Sign in with passkey" button
+  - OAuth (Google) button option
+  - Password reset link
+
+Login Modal: public/js/login-modal.js (839 lines)
+  - Turnstile integration with auto-continue
+  - Passkey modal integration
+  - Error message display
+
+Current Error Messages (from code review):
+  - "Email and password are required."
+  - "Password incorrect"
+  - "Account not found"
+  - "Unable to sign in."
+  - "No matching passkey found on this device. Sign in with password, then add a passkey."
+
+Missing:
+  - "Check your email to verify your account" message
+  - Email verification success message
+  - Resend verification link UI
+  - Account status display (if suspended/pending)
+
+================================================================================
+K) RATE LIMITING & ABUSE CONTROLS
+================================================================================
+
+Currently Implemented:
+
+1. Password Reset Rate Limiting (lines 751-788)
+   - Per-email limit: 3 requests per 15 minutes
+   - Per-IP limit: 5 requests per 1 minute
+   - Tracked in audit_events table using email_hash and ip_hash
+   - Returns 429 response if limited
+
+2. Turnstile Verification
+   - Required on signup (checked)
+   - Required on login (checked) - new as of recent deploy
+   - Required on password reset request (checked)
+   - Prevents bot account creation
+
+3. Audit Trail
+   - All auth events logged to audit_events table
+   - Includes event_type, user_id (if applicable), created_at, ip_hash, ua_hash
+   - Metadata stored as JSON
+   - Can be used for detection of abuse patterns
+
+Missing / Not Implemented:
+
+4. Signup Rate Limiting
+   - NO per-email limit to prevent multiple accounts
+   - NO per-IP limit to prevent mass registration
+   - NO check for suspicious patterns
+   - Turnstile is only protection (good but not complete)
+
+5. Login Rate Limiting
+   - NO failed attempt counter
+   - NO exponential backoff
+   - NO account lockout after N failures
+   - Turnstile helps but is not login-specific defense
+
+6. Email Verification Abuse Prevention
+   - NO limit on "resend verification email" button clicks
+   - NO limit on number of verification codes per user
+   - NO limit on verification attempts
+
+7. Device Fingerprinting
+   - ua_hash stored but not used for enforcement
+   - Could be used to detect unusual login locations
+
+8. IP-based Controls
+   - ip_hash stored but not used for blocking
+   - No WAF rules configured (would be at Cloudflare level)
+
+================================================================================
+L) CURRENT USER VERIFICATION STATE
+================================================================================
+
+Schema Gap: No email_verified_at field
+  - Cannot track verification status in database
+  - Cannot prevent access to unverified accounts
+
+Lucia Session: Does not load status
+  - getUserAttributes only loads email
+  - Session doesn't include verification status
+  - Middleware can't enforce verification gate
+
+Login Logic: No verification check
+  - handleAuthLogin doesn't read email_verified_at
+  - handleAuthLogin doesn't read account_status
+  - Any user (verified or not) can log in
+
+Account Status: No field exists
+  - user table has no status column
+  - No way to suspend/deactivate accounts
+  - No way to mark pending/active/suspended
+
+================================================================================
+M) THREAT ANALYSIS & GAPS
+================================================================================
+
+CRITICAL RISKS:
+
+1. MASS ACCOUNT CREATION ABUSE
+   Risk Level: HIGH
+   Current Defense: Turnstile only
+   Gap: No per-email or per-IP limits on signup attempts
+   Impact: Attacker could create thousands of dummy accounts to:
+     - Enumerate valid surveys
+     - Spam responses to bias results
+     - Occupy database storage
+   Fix Needed: Implement signup rate limiting (per-email, per-IP, per-subnet)
+
+2. UNVERIFIED ACCOUNT ACCESS
+   Risk Level: MEDIUM
+   Current: All accounts active immediately after signup
+   Gap: No email verification requirement
+   Impact: 
+     - Typos in email = account inaccessible but active
+     - Fake emails can create accounts
+     - No confirmation of account ownership
+   Fix Needed: Email verification flow with hard gate on login/survey access
+
+3. ACCOUNT ENUMERATION VIA EMAIL
+   Risk Level: MEDIUM
+   Current: Returns different error codes (EMAIL_EXISTS vs ACCOUNT_NOT_FOUND)
+   Gap: Signup returns 409 for existing email, login returns 404
+   Impact: Attacker can determine if email is registered
+   Fix Needed: Return generic error for signup; Consider rate limiting by email
+
+4. PASSWORD RESET ATTACK
+   Risk Level: MEDIUM
+   Current: Rate limiting exists (3 per 15 min per email)
+   Gap: Attacker could brute force across many emails
+   Impact: Could reset other users' passwords if token weakness
+   Fix Needed: Token is UUID (good), but verify token hash validation is strict
+
+5. SESSION HIJACKING VIA UNVERIFIED ACCOUNT
+   Risk Level: LOW (mitigated by Lucia)
+   Current: Session cookie httpOnly + secure in prod
+   Gap: Could be issue if unverified account is compromised
+   Impact: Low since unverified = low-value account
+   Fix Needed: Email verification before session creation
+
+6. LOGIN BRUTE FORCE ATTACK
+   Risk Level: MEDIUM
+   Current: Turnstile on login (NEW, recent deploy)
+   Gap: Turnstile can be bypassed if pass_recovery_code exists (check code)
+   Impact: Attacker could try many password guesses
+   Fix Needed: Implement failed attempt counter with exponential backoff
+
+7. OAUTH ACCOUNT TAKEOVER
+   Risk Level: MEDIUM
+   Current: OAuth flow checks email uniqueness
+   Gap: If attacker hijacks OAuth provider account with victim's email
+   Impact: Attacker could link attacker_oauth_account to victim_email
+   Fix Needed: Email verification before OAuth account linking
+
+8. DISTRIBUTED SPAM SIGNUPS
+   Risk Level: HIGH
+   Current: Turnstile (captcha)
+   Gap: Determined attacker with Turnstile bypass could still spam
+   Impact: Thousands of fake accounts, survey response manipulation
+   Fix Needed: IP-based rate limiting, signup anomaly detection
+
+MODERATE RISKS:
+
+9. Weak Password Acceptance
+   Current: Minimum 8 characters
+   Gap: No complexity rules (upper, lower, digit, special)
+   Impact: Weak passwords could be brute-forced
+   Fix: Add password complexity validation (optional - consider user experience)
+
+10. Session Timeout Not Enforced
+    Current: 30-day sessions in production
+    Gap: Long expiry could mean stale sessions
+    Impact: Stolen session could be valid for 30 days
+    Fix: Implement last-activity timeout, force re-auth for sensitive ops
+
+================================================================================
+N) MISSING FEATURES FOR EMAIL VERIFICATION
+================================================================================
+
+Required Database Changes:
+  
+  1. Add to user table:
+     - email_verified_at (TIMESTAMP, NULL initially)
+     - email_verification_token (TEXT, unique if present)
+     - email_verification_token_expires_at (TIMESTAMP)
+     - account_status (TEXT: pending|active|suspended)
+  
+  2. Create email_verification_tokens table:
+     - id (TEXT PRIMARY KEY)
+     - user_id (TEXT FK)
+     - email (TEXT - in case user changes email during verification)
+     - token_hash (TEXT - hash of actual token)
+     - expires_at (TIMESTAMP)
+     - verified_at (TIMESTAMP, NULL)
+     - created_at (TIMESTAMP)
+     - attempts (INTEGER - for brute force protection)
+
+Required API Routes:
+
+  1. POST /api/auth/email/verify
+     - Accept verification token
+     - Check token validity, expiration, max attempts
+     - Update user.email_verified_at
+     - Mark token as verified
+     - Return success/failure
+
+  2. POST /api/auth/email/resend-verification
+     - Require authentication OR email + rate limiting
+     - Generate new token
+     - Send verification email
+     - Rate limit: 3 per 15 minutes per email
+
+  3. (Optional) POST /api/auth/email/confirm
+     - For changing email after signup
+     - Verify new email before switching
+
+Required Frontend Changes:
+
+  1. Signup page: Add "Check your email to verify your account" message
+  2. Verification page: Add link handler for email?token=xxx
+  3. Login page: Block unverified users with "Please verify your email" message
+  4. Account page: Show verification status, resend button
+
+Required Logic Changes:
+
+  1. handleAuthSignup: 
+     - DO NOT create session immediately
+     - Generate verification token
+     - Send verification email
+     - Return "verification_sent" response
+     - Optionally create session with limited scope
+
+  2. handleAuthLogin:
+     - Check user.email_verified_at is not NULL
+     - Return 403 "email_not_verified" if unverified
+     - Or allow login but show banner "Complete email verification"
+
+  3. Rate limiting on verification resend (same logic as password reset)
+
+================================================================================
+O) QUESTIONS / CLARIFICATIONS NEEDED
+================================================================================
+
+1. Email Sending:
+   Q: Is sendEmail actually being called in handlePasswordResetRequest?
+   A: Need to verify password reset email implementation (not in excerpt)
+
+2. Turnstile Bypass:
+   Q: Is TURNSTILE_BYPASS env var still active in production?
+   A: Check if it can be exploited (currently should be false in prod)
+
+3. Session Timeout Enforcement:
+   Q: Does the `last_seen_at` column actually enforce timeout on each request?
+   A: Need to verify if middleware is checking this
+
+4. Foreign Keys:
+   Q: Are FOREIGN KEY constraints enabled (PRAGMA foreign_keys)?
+   A: Check D1 initialization for pragma setup
+
+5. Password Reset Token Verification:
+   Q: How is the token verified (token_hash comparison)?
+   A: Need to see the verify logic in handlePasswordResetConfirm
+
+6. OAuth Email Verification:
+   Q: Do OAuth-created accounts need email verification?
+   A: Current code creates account immediately; suggest verification needed
+
+7. Audit Metadata:
+   Q: What exactly is stored in metadata_json for rate limiting?
+   A: Only email_hash observed; could expand to include attempt details
+
+================================================================================
+P) SUMMARY OF FINDINGS
+================================================================================
+
+ACCOUNT CREATION STATUS: Immediately active (no verification)
+  ✗ Email not verified
+  ✗ No verification token sent
+  ✗ No verification link provided
+  ✗ No account_status tracking
+  ✓ Turnstile prevents bots
+  ✗ No signup rate limiting
+
+LOGIN STATUS: Works for any account (verified or not)
+  ✓ Password hashing (scrypt)
+  ✓ Lua session creation
+  ✗ No email verification check
+  ✗ No account_status check
+  ✗ No login rate limiting (turnstile helps but not login-specific)
+
+EMAIL INTEGRATION: Infrastructure present (Resend API)
+  ✓ sendEmail function works
+  ✗ No verification emails sent
+  ✗ No templates for verification
+  ✗ No resend endpoint
+
+RATE LIMITING: Partial
+  ✓ Password reset: 3/15min per email, 5/1min per IP
+  ✗ Signup: None (only Turnstile)
+  ✗ Login: None (only Turnstile)
+  ✗ Verification resend: None
+
+ABUSE PREVENTION: Lightweight
+  ✓ Audit logging of all auth events
+  ✓ Turnstile on signup/login
+  ✗ No IP-based blocking
+  ✗ No device fingerprinting enforcement
+  ✗ No anomaly detection
+
+DATABASE: Ready to extend
+  ✓ Flexible audit_events table
+  ✓ Token tables (reset, passkey challenges)
+  ✗ Missing email_verified_at column
+  ✗ Missing account_status column
+  ✗ Missing email verification token table
+
+================================================================================
+END OF INVENTORY
+================================================================================

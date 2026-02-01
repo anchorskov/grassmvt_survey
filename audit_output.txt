@@ -1,0 +1,893 @@
+Email Verification Gating Audit
+
+Repo inventory and migration sanity checks
+- Found: db/migrations/0013_email_verification.sql
+- Found: src/worker.js
+- Found: public/auth/email-verify/index.html
+- Found: public/auth/signup/index.html
+- Found: public/js/signup-modal.js
+- Highest migration number present: 0013 (no duplicate numbers in db/migrations)
+
+Findings table
+| Issue | Severity | File:Line | Why it matters | Fix summary |
+| --- | --- | --- | --- | --- |
+| Signup UI still expects an immediate session after signup, but email verification now defers login | High | public/js/signup-modal.js:306, public/js/auth.js:631 | Users see “Signing you in” then “Please sign in” even though login is blocked until verification, causing a dead-end | Handle VERIFICATION_REQUIRED and show verification instructions with resend option |
+| Login UI does not handle EMAIL_NOT_VERIFIED and shows generic error | High | public/js/login-modal.js:607, public/js/auth.js:601 | Users with pending accounts get no guidance and cannot trigger verification resend | Show explicit message and add resend control that calls /api/auth/email/verify/request |
+| Email verification resend has no server-side throttling | Medium | src/worker.js:2550 | Endpoint can be abused to send repeated emails | Add rate limiting using audit_events and per-email/IP windows |
+| Expired email verification tokens are never cleaned up | Low | src/worker.js:902 | Table can grow unbounded over time | Call cleanupExpiredEmailVerificationTokens during verify request |
+| Email verify page uses inline style/script and inline onclick | Low | public/auth/email-verify/index.html:1 | Will break if strict CSP is enforced later | Optional: move inline code to static JS/CSS and add script tag |
+
+Fix plan
+1) Add rate limiting for email verification requests using audit_events and a shared window for email/IP.
+2) Call cleanupExpiredEmailVerificationTokens during verification requests.
+3) Update login and signup UI flows to handle VERIFICATION_REQUIRED and EMAIL_NOT_VERIFIED with clear messaging.
+4) Add a resend verification action in both modal and page flows that obtains a Turnstile token before calling /api/auth/email/verify/request.
+5) Optional hardening: move inline verification page JS/CSS to external files if CSP is tightened.
+
+Diffs
+--- src/worker.js ---
+```diff
+diff --git a/src/worker.js b/src/worker.js
+index 0dc24d0..4ae11f7 100644
+--- a/src/worker.js
++++ b/src/worker.js
+@@ -126,6 +126,9 @@ const PASSWORD_RESET_EMAIL_LIMIT = 3;
+ const PASSWORD_RESET_IP_LIMIT = 5;
+ const PASSWORD_RESET_EMAIL_WINDOW_MINUTES = 30;
+ const PASSWORD_RESET_IP_WINDOW_MINUTES = 15;
++const EMAIL_VERIFY_EMAIL_LIMIT = 3;
++const EMAIL_VERIFY_IP_LIMIT = 5;
++const EMAIL_VERIFY_WINDOW_MINUTES = 30;
+ const WEBAUTHN_CHALLENGE_TTL_MINUTES = 10;
+ 
+ const normalizeEmail = (value = '') => value.toString().trim().toLowerCase();
+@@ -317,6 +320,14 @@ const getSessionUser = async (request, env) => {
+     headers.append('Set-Cookie', blank.serialize());
+     return { user: null, session: null, lucia, status: 'invalid', headers };
+   }
++  // Check if account is suspended
++  if (user && user.account_status === 'suspended') {
++    await lucia.invalidateSession(sessionId);
++    const blank = lucia.createBlankSessionCookie();
++    const headers = new Headers();
++    headers.append('Set-Cookie', blank.serialize());
++    return { user: null, session: null, lucia, status: 'suspended', headers };
++  }
+   const nowMs = Date.now();
+   const createdAtMs = parseIsoMs(sessionRow.created_at) ?? nowMs;
+   const lastSeenMs = parseIsoMs(sessionRow.last_seen_at) ?? createdAtMs;
+@@ -789,6 +800,175 @@ const checkPasswordResetRateLimit = async (env, { emailHash, ipHash }) => {
+   };
+ };
+ 
++const checkEmailVerificationRateLimit = async (env, { emailHash, ipHash }) => {
++  if (!env.DB) {
++    return { limited: false };
++  }
++  let emailCount = 0;
++  let ipCount = 0;
++  if (emailHash) {
++    const result = await env.DB.prepare(
++      `SELECT COUNT(*) as count
++       FROM audit_events
++       WHERE event_type = 'email_verify_requested'
++         AND json_extract(metadata_json, '$.email_hash') = ?
++         AND datetime(created_at) >= datetime('now', ?)`
++    )
++      .bind(emailHash, `-${EMAIL_VERIFY_WINDOW_MINUTES} minutes`)
++      .first();
++    emailCount = Number(result?.count || 0);
++  }
++  if (ipHash) {
++    const result = await env.DB.prepare(
++      `SELECT COUNT(*) as count
++       FROM audit_events
++       WHERE event_type = 'email_verify_requested'
++         AND ip_hash = ?
++         AND datetime(created_at) >= datetime('now', ?)`
++    )
++      .bind(ipHash, `-${EMAIL_VERIFY_WINDOW_MINUTES} minutes`)
++      .first();
++    ipCount = Number(result?.count || 0);
++  }
++  const emailLimited = emailHash && emailCount >= EMAIL_VERIFY_EMAIL_LIMIT;
++  const ipLimited = ipHash && ipCount >= EMAIL_VERIFY_IP_LIMIT;
++  return {
++    limited: emailLimited || ipLimited,
++    emailCount,
++    ipCount,
++    emailLimited,
++    ipLimited,
++  };
++};
++
++// ============================================================================
++// EMAIL VERIFICATION TOKEN HELPERS
++// ============================================================================
++
++const EMAIL_VERIFICATION_TTL_MINUTES = 30;
++const VERIFICATION_TOKEN_LENGTH = 32;
++
++// Hash a verification token using SHA-256 (same pattern as password reset)
++const hashEmailVerificationToken = async (salt, token) => sha256Hex(`${salt}:${token}`);
++
++// Generate a random email verification token
++const generateEmailVerificationToken = () => {
++  const bytes = new Uint8Array(VERIFICATION_TOKEN_LENGTH);
++  crypto.getRandomValues(bytes);
++  return bytesToHex(bytes);
++};
++
++// Create an email verification token and store it
++// Returns the raw token (only returned once, never stored)
++const createEmailVerificationToken = async (env, userId, email, ipHash) => {
++  if (!env.DB) {
++    console.error('[EmailVerification] DB not available');
++    return null;
++  }
++  
++  const salt = getHashSalt(env);
++  if (!salt) {
++    console.error('[EmailVerification] HASH_SALT not configured');
++    return null;
++  }
++  
++  const rawToken = generateEmailVerificationToken();
++  const tokenHash = await hashEmailVerificationToken(salt, rawToken);
++  const tokenId = crypto.randomUUID();
++  const expiresAt = addMinutesIso(EMAIL_VERIFICATION_TTL_MINUTES);
++  const createdAt = nowIso();
++  
++  try {
++    await env.DB.prepare(
++      `INSERT INTO email_verification_tokens
++       (id, user_id, token_hash, expires_at, used_at, created_at, request_ip_hash)
++       VALUES (?, ?, ?, ?, NULL, ?, ?)`
++    )
++      .bind(tokenId, userId, tokenHash, expiresAt, createdAt, ipHash || null)
++      .run();
++    
++    return rawToken;
++  } catch (error) {
++    console.error('[EmailVerification] Token creation failed:', error?.message);
++    return null;
++  }
++};
++
++// Verify an email verification token and return user_id if valid
++// Marks token as used upon successful verification
++const verifyEmailVerificationToken = async (env, rawToken) => {
++  if (!env.DB || !rawToken) {
++    return null;
++  }
++  
++  const salt = getHashSalt(env);
++  if (!salt) {
++    console.error('[EmailVerification] HASH_SALT not configured');
++    return null;
++  }
++  
++  const tokenHash = await hashEmailVerificationToken(salt, rawToken);
++  const now = nowIso();
++  
++  try {
++    // Find valid, unused token that hasn't expired
++    const result = await env.DB.prepare(
++      `SELECT id, user_id, expires_at
++       FROM email_verification_tokens
++       WHERE token_hash = ?
++         AND used_at IS NULL
++         AND expires_at > ?`
++    )
++      .bind(tokenHash, now)
++      .first();
++    
++    if (!result) {
++      return null;
++    }
++    
++    // Mark token as used
++    await env.DB.prepare(
++      `UPDATE email_verification_tokens
++       SET used_at = ?
++       WHERE id = ?`
++    )
++      .bind(now, result.id)
++      .run();
++    
++    return { userId: result.user_id };
++  } catch (error) {
++    console.error('[EmailVerification] Token verification failed:', error?.message);
++    return null;
++  }
++};
++
++// Clean up expired email verification tokens
++const cleanupExpiredEmailVerificationTokens = async (env) => {
++  if (!env.DB) {
++    return;
++  }
++  
++  try {
++    const now = nowIso();
++    await env.DB.prepare(
++      `DELETE FROM email_verification_tokens
++       WHERE expires_at < ?`
++    )
++      .bind(now)
++      .run();
++  } catch (error) {
++    console.error('[EmailVerification] Cleanup failed:', error?.message);
++  }
++};
++
++// Send email verification email
++const sendEmailVerificationEmail = async (env, { to, verifyUrl, replyTo }) => {
++  const subject = 'Verify your email address';
++  const text = `Click this link to verify your email: ${verifyUrl}`;
++  const html = `Click <a href="${escapeHtml(verifyUrl)}">here</a> to verify your email.`;
++  return sendEmail(env, { to, subject, text, html, replyTo });
++};
++
+ const initializeLucia = (env) => {
+   const adapter = new D1Adapter(env.DB, { user: 'user', session: 'session' });
+   const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
+@@ -823,6 +1003,8 @@ const initializeLucia = (env) => {
+     sessionExpiresIn: new TimeSpan(getAbsoluteTimeoutDays(env), 'd'),
+     getUserAttributes: (attributes) => ({
+       email: attributes.email,
++      email_verified_at: attributes.email_verified_at,
++      account_status: attributes.account_status,
+     }),
+     sessionCookie: {
+       name: 'session',
+@@ -1111,28 +1293,54 @@ const handleAuthSignup = async (request, env) => {
+     return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
+   }
+ 
+-  await writeAuditEvent(env, request, { userId, eventType: 'signup_success' });
++  // NEW: Get request signals for audit trail
++  const signals = await getRequestSignals(request, env);
+ 
+-  try {
+-    const lucia = initializeLucia(env);
+-    const session = await lucia.createSession(userId, {});
+-    await stampSessionTimestamps(env, session.id);
+-    const sessionCookie = lucia.createSessionCookie(session.id);
+-    if (isDebug) {
+-      logAuthDebug(request, 'POST /api/auth/signup', 'session_created', {
+-        userId,
+-        sessionId: session.id,
+-      });
+-    }
+-    const headers = new Headers();
+-    headers.append('Set-Cookie', sessionCookie.serialize());
+-    return jsonResponse({ ok: true }, { headers });
+-  } catch (error) {
++  // NEW: Create verification token
++  const rawToken = await createEmailVerificationToken(env, userId, email, signals.ipHash);
++  if (!rawToken) {
++    await writeAuditEvent(env, request, {
++      userId,
++      eventType: 'signup_success',
++      metadata: { reason: 'token_creation_failed' },
++    });
+     if (isDebug) {
+-      logAuthFailureDebug(request, 'POST /api/auth/signup', 'session_create', 'SESSION_ERROR', error?.message);
++      logAuthFailureDebug(request, 'POST /api/auth/signup', 'token_create', 'TOKEN_FAILED', 'Failed to create verification token');
+     }
+-    return jsonResponse({ ok: true }, { status: 200 });
++    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
++  }
++
++  // NEW: Build verification URL
++  const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
++  const verifyUrl = new URL('/auth/email-verify/', baseUrl);
++  verifyUrl.searchParams.set('token', rawToken);
++
++  // NEW: Send verification email
++  const emailSent = await sendEmailVerificationEmail(env, {
++    to: email,
++    verifyUrl: verifyUrl.toString(),
++    replyTo: env.EMAIL_FROM,
++  });
++
++  await writeAuditEvent(env, request, {
++    userId,
++    eventType: 'signup_success',
++    metadata: { email_sent: emailSent },
++  });
++
++  if (isDebug) {
++    logAuthDebug(request, 'POST /api/auth/signup', 'verification_sent', {
++      userId,
++      email: email.substring(0, 3) + '***',
++    });
+   }
++
++  // CHANGED: Return success WITHOUT creating session
++  // Client receives VERIFICATION_REQUIRED and must complete email verification
++  return jsonResponse(
++    { ok: true, status: 'VERIFICATION_REQUIRED', message: 'Check your email to verify your account' },
++    { status: 200 }
++  );
+ };
+ 
+ const handleAuthLogin = async (request, env) => {
+@@ -1250,6 +1458,30 @@ const handleAuthLogin = async (request, env) => {
+     }
+   }
+ 
++  // NEW: Check if email is verified and account is active
++  const fullUser = await env.DB.prepare(
++    `SELECT id, email_verified_at, account_status
++     FROM user WHERE id = ?`
++  )
++    .bind(user.id)
++    .first();
++  
++  if (!fullUser.email_verified_at || fullUser.account_status !== 'active') {
++    await writeAuditEvent(env, request, {
++      userId: user.id,
++      eventType: 'login_failed',
++      metadata: { reason: 'email_not_verified' },
++    });
++    logAuthTiming(route, rayId, 'response_sent', startedAt);
++    if (isDebug) {
++      logAuthFailureDebug(request, route, 'verification_check', 'EMAIL_NOT_VERIFIED', 'Email not verified or account not active');
++    }
++    return jsonResponse(
++      { ok: false, code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email first' },
++      { status: 403 }
++    );
++  }
++
+   const lucia = initializeLucia(env);
+   await lucia.invalidateUserSessions(user.id);
+   const session = await lucia.createSession(user.id, {});
+@@ -2350,6 +2582,210 @@ const handleAuthLogout = async (request, env) => {
+   return jsonResponse({ ok: true }, { headers });
+ };
+ 
++// ============================================================================
++// EMAIL VERIFICATION ROUTE HANDLERS
++// ============================================================================
++
++// Handle email verification token request (for signup or resend)
++// Input: { email, turnstileToken }
++// Output: { ok: true } (always, to not leak account existence)
++const handleEmailVerifyRequest = async (request, env) => {
++  if (!env.DB) {
++    return jsonResponse({ ok: true }, { status: 200 });
++  }
++  
++  const originError = requireSameOrigin(request, env);
++  if (originError) {
++    return jsonResponse({ ok: true }, { status: 200 });
++  }
++  
++  const body = await parseJsonBody(request);
++  const email = normalizeEmail(body.email || '');
++  const turnstileToken = body.turnstileToken || '';
++  
++  // Verify Turnstile
++  const turnstile = await verifyTurnstile(turnstileToken, request, env);
++  if (!turnstile.ok) {
++    await writeAuditEvent(env, request, {
++      eventType: 'email_verify_requested',
++      metadata: { reason: 'turnstile_failed', code: turnstile.code },
++    });
++    return jsonResponse({ ok: true }, { status: 200 });
++  }
++  
++  // Validate email
++  if (!email || !isValidEmail(email)) {
++    await writeAuditEvent(env, request, {
++      eventType: 'email_verify_requested',
++      metadata: { reason: 'invalid_email' },
++    });
++    return jsonResponse({ ok: true }, { status: 200 });
++  }
++
++  const salt = getHashSalt(env);
++  const signals = await getRequestSignals(request, env);
++  const emailHash = salt ? await hashSignal(email, salt) : '';
++  const rateLimit = await checkEmailVerificationRateLimit(env, {
++    emailHash,
++    ipHash: signals.ipHash,
++  });
++  if (rateLimit.limited) {
++    await writeAuditEvent(env, request, {
++      eventType: 'email_verify_requested',
++      metadata: {
++        reason: 'rate_limited',
++        email_hash: emailHash || null,
++        email_limited: rateLimit.emailLimited,
++        ip_limited: rateLimit.ipLimited,
++      },
++    });
++    return jsonResponse({ ok: true }, { status: 200 });
++  }
++
++  await cleanupExpiredEmailVerificationTokens(env);
++  
++  // Find user by email
++  const user = await env.DB.prepare('SELECT id, email_verified_at, account_status FROM user WHERE email = ?')
++    .bind(email)
++    .first();
++  
++  if (!user) {
++    await writeAuditEvent(env, request, {
++      eventType: 'email_verify_requested',
++      metadata: { reason: 'no_user', email_hash: emailHash || null },
++    });
++    return jsonResponse({ ok: true }, { status: 200 });
++  }
++  
++  // If already verified, return success without creating new token
++  if (user.email_verified_at) {
++    await writeAuditEvent(env, request, {
++      userId: user.id,
++      eventType: 'email_verify_requested',
++      metadata: { reason: 'already_verified', email_hash: emailHash || null },
++    });
++    return jsonResponse({ ok: true }, { status: 200 });
++  }
++  
++  // Create verification token
++  const rawToken = await createEmailVerificationToken(env, user.id, email, signals.ipHash);
++  if (!rawToken) {
++    await writeAuditEvent(env, request, {
++      userId: user.id,
++      eventType: 'email_verify_requested',
++      metadata: { reason: 'token_creation_failed', email_hash: emailHash || null },
++    });
++    return jsonResponse({ ok: true }, { status: 200 });
++  }
++  
++  // Build verification URL
++  const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
++  const verifyUrl = new URL('/auth/email-verify/', baseUrl);
++  verifyUrl.searchParams.set('token', rawToken);
++  
++  // Send email
++  const sent = await sendEmailVerificationEmail(env, {
++    to: email,
++    verifyUrl: verifyUrl.toString(),
++    replyTo: env.EMAIL_FROM,
++  });
++  
++  await writeAuditEvent(env, request, {
++    userId: user.id,
++    eventType: 'email_verify_requested',
++    metadata: { reason: 'sent', email_hash: emailHash || null, email_sent: sent },
++  });
++  
++  return jsonResponse({ ok: true }, { status: 200 });
++};
++
++// Handle email verification token confirmation
++// Input: { token }
++// Output: { ok: true, message: 'verified' } + session cookie if successful
++const handleEmailVerifyConfirm = async (request, env) => {
++  if (!env.DB) {
++    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 500 });
++  }
++  
++  const originError = requireSameOrigin(request, env);
++  if (originError) {
++    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 400 });
++  }
++  
++  const body = await parseJsonBody(request);
++  const token = (body.token || '').trim();
++  
++  if (!token) {
++    await writeAuditEvent(env, request, {
++      eventType: 'email_verify_confirmed',
++      metadata: { reason: 'missing_token' },
++    });
++    return jsonResponse({ ok: false, code: 'INVALID_TOKEN' }, { status: 400 });
++  }
++  
++  // Verify token and get user
++  const verified = await verifyEmailVerificationToken(env, token);
++  if (!verified) {
++    await writeAuditEvent(env, request, {
++      eventType: 'email_verify_confirmed',
++      metadata: { reason: 'invalid_token' },
++    });
++    return jsonResponse({ ok: false, code: 'INVALID_TOKEN' }, { status: 400 });
++  }
++  
++  const { userId } = verified;
++  const now = nowIso();
++  
++  try {
++    // Mark user as verified and active
++    await env.DB.prepare(
++      `UPDATE user
++       SET email_verified_at = ?,
++           account_status = 'active'
++       WHERE id = ?`
++    )
++      .bind(now, userId)
++      .run();
++    
++    await writeAuditEvent(env, request, {
++      userId,
++      eventType: 'email_verify_confirmed',
++      metadata: { reason: 'success' },
++    });
++  } catch (error) {
++    console.error('[EmailVerify] Failed to mark user verified:', error?.message);
++    await writeAuditEvent(env, request, {
++      userId,
++      eventType: 'email_verify_confirmed',
++      metadata: { reason: 'db_error', error: error?.message },
++    });
++    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 500 });
++  }
++  
++  // Create Lucia session for the verified user
++  try {
++    const lucia = initializeLucia(env);
++    const session = await lucia.createSession(userId, {});
++    await stampSessionTimestamps(env, session.id);
++    const sessionCookie = lucia.createSessionCookie(session.id);
++    
++    const headers = new Headers();
++    headers.append('Set-Cookie', sessionCookie.serialize());
++    
++    return jsonResponse(
++      { ok: true, message: 'email_verified' },
++      { headers, status: 200 }
++    );
++  } catch (error) {
++    console.error('[EmailVerify] Failed to create session:', error?.message);
++    // User is verified but session creation failed; still return success
++    return jsonResponse(
++      { ok: true, message: 'email_verified_no_session' },
++      { status: 200 }
++    );
++  }
++};
++
+ const handleAuthMe = async (request, env) => {
+   if (!env.DB) {
+     const isDebug = shouldDebugAuth(env, request);
+@@ -3122,6 +3558,14 @@ export default {
+         return handlePasswordResetConfirm(request, env);
+       }
+ 
++      if (request.method === 'POST' && pathParts[2] === 'email' && pathParts[3] === 'verify' && pathParts[4] === 'request') {
++        return handleEmailVerifyRequest(request, env);
++      }
++
++      if (request.method === 'POST' && pathParts[2] === 'email' && pathParts[3] === 'verify' && pathParts[4] === 'confirm') {
++        return handleEmailVerifyConfirm(request, env);
++      }
++
+       if (request.method === 'POST' && pathParts[2] === 'passkey' && pathParts[3] === 'register' && pathParts[4] === 'options') {
+         return handlePasskeyRegisterOptions(request, env);
+       }
+```
+
+--- public/js/login-modal.js ---
+```diff
+diff --git a/public/js/login-modal.js b/public/js/login-modal.js
+index 6e82de6..596b062 100644
+--- a/public/js/login-modal.js
++++ b/public/js/login-modal.js
+@@ -76,16 +76,21 @@
+   const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
+   const PASSKEY_NUDGE_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
+ 
+-  const showError = (message) => {
++  const showError = (message, allowHtml = false) => {
+     if (!errorEl) {
+       return;
+     }
+     if (!message) {
+       errorEl.textContent = '';
++      errorEl.innerHTML = '';
+       errorEl.classList.add('is-hidden');
+       return;
+     }
+-    errorEl.textContent = message;
++    if (allowHtml) {
++      errorEl.innerHTML = message;
++    } else {
++      errorEl.textContent = message;
++    }
+     errorEl.classList.remove('is-hidden');
+   };
+ 
+@@ -176,6 +181,44 @@
+     }
+   };
+ 
++  const requestEmailVerification = async (email) => {
++    const trimmed = (email || '').trim();
++    if (!trimmed) {
++      showError('Enter your email to resend the verification link.');
++      return false;
++    }
++    if (!turnstileConfig.siteKey && !turnstileConfig.bypass) {
++      turnstileConfig = await fetchTurnstileConfig();
++    }
++    let token = '';
++    if (!turnstileConfig.bypass) {
++      if (!turnstileClient || turnstileWidgetId === null) {
++        showError('Turnstile failed to load.');
++        return false;
++      }
++      setTurnstileState('running');
++      token = await turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
++      if (!token) {
++        setTurnstileState('failed');
++        showError('Complete the human check to resend the verification email.');
++        return false;
++      }
++      if (tokenInput) {
++        tokenInput.value = token;
++      }
++      lastTurnstileToken = token;
++      setTurnstileState('ready');
++    }
++    await fetch('/api/auth/email/verify/request', {
++      method: 'POST',
++      headers: { 'content-type': 'application/json' },
++      credentials: 'include',
++      body: JSON.stringify({ email: trimmed, turnstileToken: token || '' }),
++    });
++    showError('Verification email sent. Check your inbox.');
++    return true;
++  };
++
+   const shouldShowPasskeyNudge = () => {
+     if (!passkeyNudgeEl) {
+       return false;
+@@ -526,6 +569,18 @@
+     });
+   }
+ 
++  if (modal) {
++    modal.addEventListener('click', async (event) => {
++      const target = event.target.closest('[data-email-verify-resend]');
++      if (!target) {
++        return;
++      }
++      event.preventDefault();
++      const email = emailInput ? emailInput.value.trim() : '';
++      await requestEmailVerification(email);
++    });
++  }
++
+   // Core login function - separated to allow auto-continue after Turnstile
+   const performLogin = async (email, password, tokenValue) => {
+     const response = await fetch('/api/auth/login', {
+@@ -545,14 +600,19 @@
+       } catch (error) {
+         data = null;
+       }
+-      if (data && data.code === 'PASSWORD_INCORRECT') {
+-        showError('Password incorrect');
+-      } else if (data && data.code === 'ACCOUNT_NOT_FOUND') {
+-        showError('Account not found');
+-      } else if (response.status === 404) {
+-        showError('Account not found');
+-      } else if (response.status === 401) {
+-        showError('Password incorrect');
++        if (data && data.code === 'PASSWORD_INCORRECT') {
++          showError('Password incorrect');
++        } else if (data && data.code === 'ACCOUNT_NOT_FOUND') {
++          showError('Account not found');
++        } else if (data && data.code === 'EMAIL_NOT_VERIFIED') {
++          showError(
++            'Email not verified. Check your inbox or <button class="link-button" type="button" data-email-verify-resend>resend verification email</button>.',
++            true
++          );
++        } else if (response.status === 404) {
++          showError('Account not found');
++        } else if (response.status === 401) {
++          showError('Password incorrect');
+       } else {
+         showError('Unable to sign in.');
+       }
+```
+
+--- public/js/signup-modal.js ---
+```diff
+diff --git a/public/js/signup-modal.js b/public/js/signup-modal.js
+index 73d4a7c..87babcc 100644
+--- a/public/js/signup-modal.js
++++ b/public/js/signup-modal.js
+@@ -116,6 +116,42 @@
+     }
+   };
+ 
++  const requestEmailVerification = async (email) => {
++    const trimmed = (email || '').trim();
++    if (!trimmed) {
++      showError('Enter your email to resend the verification link.');
++      return false;
++    }
++    const config = await fetchTurnstileConfig();
++    let token = '';
++    if (!config.bypass) {
++      if (!turnstileClient || turnstileWidgetId === null) {
++        await renderTurnstile();
++      }
++      if (!turnstileClient || turnstileWidgetId === null) {
++        showError('Turnstile failed to load.');
++        return false;
++      }
++      token = await turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
++      if (!token) {
++        showError('Complete the human check to resend the verification email.');
++        return false;
++      }
++      if (tokenInput) {
++        tokenInput.value = token;
++      }
++      lastTurnstileToken = token;
++    }
++    await fetch('/api/auth/email/verify/request', {
++      method: 'POST',
++      headers: { 'content-type': 'application/json' },
++      credentials: 'include',
++      body: JSON.stringify({ email: trimmed, turnstileToken: token || '' }),
++    });
++    showError('Verification email sent. Check your inbox.');
++    return true;
++  };
++
+   const resetTurnstile = () => {
+     if (turnstileClient && turnstileWidgetId !== null) {
+       turnstileClient.resetWidget(turnstileWidgetId);
+@@ -260,7 +296,20 @@
+         resetTurnstile();
+         return;
+       }
++      let data = null;
++      try {
++        data = await response.json();
++      } catch (error) {
++        data = null;
++      }
+       resetTurnstile();
++      if (data && data.status === 'VERIFICATION_REQUIRED') {
++        showError(
++          'Check your email to verify your account. <button class="link-button" type="button" data-email-verify-resend>Resend verification email</button>.',
++          true
++        );
++        return;
++      }
+       showError('Account created. Signing you in.');
+       
+       // Wait for session cookie to be fully set
+@@ -289,6 +338,18 @@
+     });
+   }
+ 
++  if (modal) {
++    modal.addEventListener('click', async (event) => {
++      const target = event.target.closest('[data-email-verify-resend]');
++      if (!target) {
++        return;
++      }
++      event.preventDefault();
++      const email = emailInput ? emailInput.value.trim() : '';
++      await requestEmailVerification(email);
++    });
++  }
++
+   authModals.register('signup', {
+     open: openModal,
+     close: closeModal,
+```
+
+--- public/js/auth.js ---
+```diff
+diff --git a/public/js/auth.js b/public/js/auth.js
+index c2ff5c6..40cc74e 100644
+--- a/public/js/auth.js
++++ b/public/js/auth.js
+@@ -371,6 +371,35 @@
+     }
+   };
+ 
++  const requestEmailVerification = async (email) => {
++    const trimmed = (email || '').trim();
++    if (!trimmed) {
++      showError('Enter your email to resend the verification link.');
++      return false;
++    }
++    if (!turnstileConfig.siteKey && !turnstileConfig.bypass) {
++      turnstileConfig = await fetchTurnstileConfig();
++    }
++    let token = '';
++    if (!turnstileConfig.bypass) {
++      await renderTurnstile(true);
++      await executeTurnstileOnce();
++      token = (tokenInput && tokenInput.value) || lastTurnstileToken || '';
++      if (!token) {
++        showError('Complete the human check to resend the verification email.');
++        return false;
++      }
++    }
++    await fetch('/api/auth/email/verify/request', {
++      method: 'POST',
++      headers: { 'content-type': 'application/json' },
++      credentials: 'include',
++      body: JSON.stringify({ email: trimmed, turnstileToken: token || '' }),
++    });
++    showError('Verification email sent. Check your inbox.');
++    return true;
++  };
++
+   const fetchPasskeys = async () => {
+     const response = await fetch('/api/auth/passkey/list', { credentials: 'include', cache: 'no-store' });
+     if (!response.ok) {
+@@ -569,6 +598,11 @@
+         logDebug('Server error: ' + (errorBody.code || 'unknown'));
+         if (authMode === 'signup' && response.status === 409 && errorBody.code === 'EMAIL_EXISTS') {
+           showDuplicateEmailMessage();
++        } else if (authMode === 'login' && errorBody.code === 'EMAIL_NOT_VERIFIED') {
++          showError(
++            'Email not verified. Check your inbox or <button class="link-button" type="button" data-email-verify-resend>resend verification email</button>.',
++            true
++          );
+         } else if (authMode === 'login' && (errorBody.code === 'PASSWORD_INCORRECT' || response.status === 401)) {
+           showError('Password incorrect');
+         } else if (authMode === 'login' && (errorBody.code === 'ACCOUNT_NOT_FOUND' || response.status === 404)) {
+@@ -593,6 +627,14 @@
+       turnstileSubmitted = false;
+       setTurnstileState('idle');
+       logDebug(authMode + ' successful');
++      const successData = await response.json().catch(() => ({}));
++      if (authMode === 'signup' && successData && successData.status === 'VERIFICATION_REQUIRED') {
++        showError(
++          'Check your email to verify your account. <button class="link-button" type="button" data-email-verify-resend>Resend verification email</button>.',
++          true
++        );
++        return;
++      }
+       const authenticated = await waitForAuthState();
+       if (window.AuthUI && typeof window.AuthUI.fetchAuthState === 'function') {
+         await window.AuthUI.fetchAuthState();
+@@ -618,6 +660,18 @@
+     });
+   }
+ 
++  if (form) {
++    form.addEventListener('click', async (event) => {
++      const target = event.target.closest('[data-email-verify-resend]');
++      if (!target) {
++        return;
++      }
++      event.preventDefault();
++      const email = emailInput ? emailInput.value.trim() : '';
++      await requestEmailVerification(email);
++    });
++  }
++
+   // Core passkey authentication function for login page
+   const doPasskeyLogin = async (attachmentHint) => {
+     // User activation guard: prevent double-calls
+```
+
+Local execution checks (commands only, not run)
+1) Apply migrations locally:
+   wrangler d1 migrations apply wy_local --local
+2) Validate schema:
+   wrangler d1 execute wy_local --local "PRAGMA table_info(email_verification_tokens);"
+   wrangler d1 execute wy_local --local "SELECT id,email_verified_at,account_status FROM user LIMIT 3;"
+3) Smoke test endpoints with curl:
+   curl -i -X POST http://localhost:8787/api/auth/email/verify/request \
+     -H "content-type: application/json" \
+     -d "{"email":"test@example.com","turnstileToken":"TEST_TOKEN"}"
+   curl -i -X POST http://localhost:8787/api/auth/email/verify/confirm \
+     -H "content-type: application/json" \
+     -d "{"token":"INVALID_TOKEN"}"

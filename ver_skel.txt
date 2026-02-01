@@ -1,0 +1,1104 @@
+================================================================================
+EMAIL VERIFICATION GATING IMPLEMENTATION FOR LUCIA AUTH
+Cloudflare Workers + D1 + SQLite
+Date: January 30, 2026
+================================================================================
+
+SUMMARY OF CHANGES:
+This implementation adds email verification gating to the signup and login flows.
+- Signup creates a PENDING account with no session; sends verification email
+- Login is blocked for unverified accounts; directs to verify flow
+- New routes: POST /api/auth/email/verify/request, POST /api/auth/email/verify/confirm
+- New helper functions for secure token management (hashToken, createEmailVerificationToken, verifyEmailToken)
+- Updated Lucia getUserAttributes to include email_verified_at and account_status
+- Updated signup and login handlers to enforce verification
+- New UI pages for verification flow
+
+================================================================================
+PART 1: MIGRATION (0013_email_verification.sql)
+================================================================================
+
+FILE: db/migrations/0013_email_verification.sql
+STATUS: ALREADY CREATED ✓
+
+Content:
+-- db/migrations/0013_email_verification.sql
+-- Purpose: Add email verification support to Lucia auth system
+-- Adds email_verified_at and account_status columns to user table
+-- Creates email_verification_tokens table following password_reset_tokens pattern
+
+-- Add email verification columns to user table
+ALTER TABLE user ADD COLUMN email_verified_at TEXT;
+ALTER TABLE user ADD COLUMN account_status TEXT NOT NULL DEFAULT 'pending';
+
+-- Create email verification tokens table
+-- Follows same secure pattern as password_reset_tokens
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id TEXT NOT NULL PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL,
+  request_ip_hash TEXT,
+  FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user_id ON email_verification_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_expires_at ON email_verification_tokens (expires_at);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_token_hash ON email_verification_tokens (token_hash);
+
+-- Index on user.account_status for quick filtering of pending/active accounts
+CREATE INDEX IF NOT EXISTS idx_user_account_status ON user (account_status);
+
+================================================================================
+PART 2: src/worker.js - CHANGES AND NEW CODE
+================================================================================
+
+KEY CHANGES TO src/worker.js:
+
+2A. UPDATE initializeLucia() - Add new user attributes (lines 792-830)
+────────────────────────────────────────────────────────────────────
+
+CHANGE:
+From:
+    getUserAttributes: (attributes) => ({
+      email: attributes.email,
+    }),
+
+To:
+    getUserAttributes: (attributes) => ({
+      email: attributes.email,
+      email_verified_at: attributes.email_verified_at,
+      account_status: attributes.account_status,
+    }),
+
+This extends the user object returned by Lucia with email_verified_at and account_status
+so middleware can check verification state.
+
+
+2B. ADD HELPER FUNCTIONS FOR EMAIL VERIFICATION TOKENS
+────────────────────────────────────────────────────────
+
+Add these functions BEFORE initializeLucia() (around line 750-790, after checkPasswordResetRateLimit):
+
+```javascript
+// Email verification token constants
+const EMAIL_VERIFICATION_TTL_MINUTES = 30;
+const VERIFICATION_TOKEN_LENGTH = 32;
+
+// Hash a verification token using SHA-256 (same pattern as password reset)
+const hashEmailVerificationToken = async (salt, token) => sha256Hex(`${salt}:${token}`);
+
+// Generate a random email verification token
+const generateEmailVerificationToken = () => {
+  const bytes = new Uint8Array(VERIFICATION_TOKEN_LENGTH);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
+};
+
+// Create an email verification token and store it
+// Returns the raw token (only returned once, never stored)
+const createEmailVerificationToken = async (env, userId, email, ipHash) => {
+  if (!env.DB) {
+    console.error('[EmailVerification] DB not available');
+    return null;
+  }
+  
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[EmailVerification] HASH_SALT not configured');
+    return null;
+  }
+  
+  const rawToken = generateEmailVerificationToken();
+  const tokenHash = await hashEmailVerificationToken(salt, rawToken);
+  const tokenId = crypto.randomUUID();
+  const expiresAt = addMinutesIso(EMAIL_VERIFICATION_TTL_MINUTES);
+  const createdAt = nowIso();
+  
+  try {
+    await env.DB.prepare(
+      `INSERT INTO email_verification_tokens
+       (id, user_id, token_hash, expires_at, used_at, created_at, request_ip_hash)
+       VALUES (?, ?, ?, ?, NULL, ?, ?)`
+    )
+      .bind(tokenId, userId, tokenHash, expiresAt, createdAt, ipHash || null)
+      .run();
+    
+    return rawToken;
+  } catch (error) {
+    console.error('[EmailVerification] Token creation failed:', error?.message);
+    return null;
+  }
+};
+
+// Verify an email verification token and return user_id if valid
+// Marks token as used upon successful verification
+const verifyEmailVerificationToken = async (env, rawToken) => {
+  if (!env.DB || !rawToken) {
+    return null;
+  }
+  
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[EmailVerification] HASH_SALT not configured');
+    return null;
+  }
+  
+  const tokenHash = await hashEmailVerificationToken(salt, rawToken);
+  const now = nowIso();
+  
+  try {
+    // Find valid, unused token that hasn't expired
+    const result = await env.DB.prepare(
+      `SELECT id, user_id, email, expires_at
+       FROM email_verification_tokens
+       WHERE token_hash = ?
+         AND used_at IS NULL
+         AND expires_at > ?`
+    )
+      .bind(tokenHash, now)
+      .first();
+    
+    if (!result) {
+      return null;
+    }
+    
+    // Mark token as used
+    await env.DB.prepare(
+      `UPDATE email_verification_tokens
+       SET used_at = ?
+       WHERE id = ?`
+    )
+      .bind(now, result.id)
+      .run();
+    
+    return { userId: result.user_id, email: result.email };
+  } catch (error) {
+    console.error('[EmailVerification] Token verification failed:', error?.message);
+    return null;
+  }
+};
+
+// Clean up expired email verification tokens
+const cleanupExpiredEmailVerificationTokens = async (env) => {
+  if (!env.DB) {
+    return;
+  }
+  
+  try {
+    const now = nowIso();
+    await env.DB.prepare(
+      `DELETE FROM email_verification_tokens
+       WHERE expires_at < ?`
+    )
+      .bind(now)
+      .run();
+  } catch (error) {
+    console.error('[EmailVerification] Cleanup failed:', error?.message);
+  }
+};
+
+// Send email verification email
+const sendEmailVerificationEmail = async (env, { to, verifyUrl, replyTo }) => {
+  const subject = 'Verify your email address';
+  const text = `Click this link to verify your email: ${verifyUrl}`;
+  const html = `Click <a href="${escapeHtml(verifyUrl)}">here</a> to verify your email.`;
+  return sendEmail(env, { to, subject, text, html, replyTo });
+};
+```
+
+This code should be inserted AFTER checkPasswordResetRateLimit function (around line 790).
+
+
+2C. UPDATE getSessionUser() MIDDLEWARE - Check for suspended accounts
+──────────────────────────────────────────────────────────────────────
+
+After the session validation (around line 323), ADD this check:
+
+AFTER:
+    const { session, user } = await lucia.validateSession(sessionId);
+
+ADD:
+    // Check if account is suspended
+    if (user && user.account_status === 'suspended') {
+      await lucia.invalidateSession(sessionId);
+      const blank = lucia.createBlankSessionCookie();
+      const headers = new Headers();
+      headers.append('Set-Cookie', blank.serialize());
+      return { user: null, session: null, lucia, status: 'suspended', headers };
+    }
+
+This ensures suspended users cannot maintain sessions.
+
+
+2D. ADD NEW ROUTE HANDLERS - Email verification flows
+──────────────────────────────────────────────────────
+
+Add these handlers BEFORE the route dispatcher (before the exports.fetch/fetch handler):
+
+```javascript
+// Handle email verification token request (for signup or resend)
+// Input: { email, turnstileToken }
+// Output: { ok: true } (always, to not leak account existence)
+const handleEmailVerifyRequest = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  const body = await parseJsonBody(request);
+  const email = normalizeEmail(body.email || '');
+  const turnstileToken = body.turnstileToken || '';
+  
+  // Verify Turnstile
+  const turnstile = await verifyTurnstile(turnstileToken, request, env);
+  if (!turnstile.ok) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'turnstile_failed', code: turnstile.code },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  // Validate email
+  if (!email || !isValidEmail(email)) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'invalid_email' },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  // Find user by email
+  const user = await env.DB.prepare('SELECT id, email_verified_at, account_status FROM user WHERE email = ?')
+    .bind(email)
+    .first();
+  
+  if (!user) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'no_user' },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  // If already verified, return success without creating new token
+  if (user.email_verified_at) {
+    await writeAuditEvent(env, request, {
+      userId: user.id,
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'already_verified' },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  // Get request IP for audit trail
+  const signals = await getRequestSignals(request, env);
+  
+  // Create verification token
+  const rawToken = await createEmailVerificationToken(env, user.id, email, signals.ipHash);
+  if (!rawToken) {
+    await writeAuditEvent(env, request, {
+      userId: user.id,
+      eventType: 'email_verify_requested',
+      metadata: { reason: 'token_creation_failed' },
+    });
+    return jsonResponse({ ok: true }, { status: 200 });
+  }
+  
+  // Build verification URL
+  const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
+  const verifyUrl = new URL('/auth/email-verify/', baseUrl);
+  verifyUrl.searchParams.set('token', rawToken);
+  
+  // Send email
+  const sent = await sendEmailVerificationEmail(env, {
+    to: email,
+    verifyUrl: verifyUrl.toString(),
+    replyTo: env.EMAIL_FROM,
+  });
+  
+  await writeAuditEvent(env, request, {
+    userId: user.id,
+    eventType: 'email_verify_requested',
+    metadata: { reason: 'sent', email_sent: sent },
+  });
+  
+  return jsonResponse({ ok: true }, { status: 200 });
+};
+
+// Handle email verification token confirmation
+// Input: { token }
+// Output: { ok: true, message: 'verified' } + session cookie if successful
+const handleEmailVerifyConfirm = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 500 });
+  }
+  
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 400 });
+  }
+  
+  const body = await parseJsonBody(request);
+  const token = (body.token || '').trim();
+  
+  if (!token) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_confirmed',
+      metadata: { reason: 'missing_token' },
+    });
+    return jsonResponse({ ok: false, code: 'INVALID_TOKEN' }, { status: 400 });
+  }
+  
+  // Verify token and get user
+  const verified = await verifyEmailVerificationToken(env, token);
+  if (!verified) {
+    await writeAuditEvent(env, request, {
+      eventType: 'email_verify_confirmed',
+      metadata: { reason: 'invalid_token' },
+    });
+    return jsonResponse({ ok: false, code: 'INVALID_TOKEN' }, { status: 400 });
+  }
+  
+  const { userId, email } = verified;
+  const now = nowIso();
+  
+  try {
+    // Mark user as verified and active
+    await env.DB.prepare(
+      `UPDATE user
+       SET email_verified_at = ?,
+           account_status = 'active'
+       WHERE id = ?`
+    )
+      .bind(now, userId)
+      .run();
+    
+    await writeAuditEvent(env, request, {
+      userId,
+      eventType: 'email_verify_confirmed',
+      metadata: { reason: 'success' },
+    });
+  } catch (error) {
+    console.error('[EmailVerify] Failed to mark user verified:', error?.message);
+    await writeAuditEvent(env, request, {
+      userId,
+      eventType: 'email_verify_confirmed',
+      metadata: { reason: 'db_error', error: error?.message },
+    });
+    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 500 });
+  }
+  
+  // Create Lucia session for the verified user
+  try {
+    const lucia = initializeLucia(env);
+    const session = await lucia.createSession(userId, {});
+    await stampSessionTimestamps(env, session.id);
+    const sessionCookie = lucia.createSessionCookie(session.id);
+    
+    const headers = new Headers();
+    headers.append('Set-Cookie', sessionCookie.serialize());
+    
+    return jsonResponse(
+      { ok: true, message: 'email_verified', email },
+      { headers, status: 200 }
+    );
+  } catch (error) {
+    console.error('[EmailVerify] Failed to create session:', error?.message);
+    // User is verified but session creation failed; still return success
+    return jsonResponse(
+      { ok: true, message: 'email_verified_no_session', email },
+      { status: 200 }
+    );
+  }
+};
+```
+
+Insert these handlers BEFORE the route dispatcher (around line 3070, before the fetch handler).
+
+
+2E. UPDATE handleAuthSignup() - Create pending account, send verification email
+────────────────────────────────────────────────────────────────────────────────
+
+The new signup flow:
+1. Validate email and password (same)
+2. Verify Turnstile (same)
+3. Check email doesn't exist (same)
+4. Create user with account_status='pending' and email_verified_at=NULL (CHANGED)
+5. Create verification token (NEW)
+6. Send verification email (NEW)
+7. Return 200 with status="VERIFICATION_REQUIRED" - NO SESSION (CHANGED)
+
+REPLACE the entire handleAuthSignup function. Find the current one (starting around line 1006) and replace
+all of it (from line 1006 to approximately line 1130) with:
+
+```javascript
+const handleAuthSignup = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
+  }
+  
+  const isDebug = shouldDebugAuth(env, request);
+  if (isDebug) {
+    logAuthDebug(request, 'POST /api/auth/signup', 'start', {
+      origin: request.headers.get('Origin'),
+    });
+  }
+  
+  const body = await parseJsonBody(request);
+  const email = normalizeEmail(body.email || '');
+  const password = body.password || '';
+  const turnstileToken = body.turnstileToken || '';
+
+  if (!email || !isValidEmail(email)) {
+    await writeAuditEvent(env, request, {
+      eventType: 'signup_failed',
+      metadata: { reason: 'generic' },
+    });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'validation', 'INVALID_EMAIL', 'Email missing or invalid');
+    }
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
+  }
+  if (!password || password.length < PASSWORD_MIN_LENGTH) {
+    await writeAuditEvent(env, request, {
+      eventType: 'signup_failed',
+      metadata: { reason: 'generic' },
+    });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'validation', 'WEAK_PASSWORD', 'Password too short');
+    }
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
+  }
+
+  const turnstile = await verifyTurnstile(turnstileToken, request, env);
+  if (!turnstile.ok) {
+    await writeAuditEvent(env, request, {
+      eventType: 'signup_failed',
+      metadata: { reason: 'generic' },
+    });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'turnstile', 'TURNSTILE_FAILED', turnstile.code);
+    }
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 400 });
+  }
+
+  await cleanupExpiredSessions(env);
+
+  const existing = await env.DB.prepare('SELECT id FROM user WHERE email = ?').bind(email).first();
+  if (existing) {
+    await writeAuditEvent(env, request, {
+      eventType: 'signup_failed',
+      metadata: { reason: 'generic' },
+    });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'user_exists', 'EMAIL_EXISTS', 'Email already registered');
+    }
+    return jsonResponse({ ok: false, code: 'EMAIL_EXISTS' }, { status: 409 });
+  }
+
+  let userId = '';
+  try {
+    userId = crypto.randomUUID();
+    const passwordHash = await hashPassword(password);
+    // Create user with account_status='pending' (default) and email_verified_at=NULL
+    await env.DB.prepare(
+      `INSERT INTO user (id, email, password_hash)
+       VALUES (?, ?, ?)`
+    )
+      .bind(userId, email, passwordHash)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO user_profile (user_id, email)
+       VALUES (?, ?)`
+    )
+      .bind(userId, email)
+      .run();
+    if (isDebug) {
+      logAuthDebug(request, 'POST /api/auth/signup', 'user_created', {
+        userId,
+        email: email.substring(0, 3) + '***',
+      });
+    }
+  } catch (error) {
+    await writeAuditEvent(env, request, {
+      eventType: 'signup_failed',
+      metadata: { reason: 'generic' },
+    });
+    const message = error && typeof error.message === 'string' ? error.message : '';
+    if (message.includes('UNIQUE constraint failed: user.email') || message.includes('idx_user_email_normalized')) {
+      if (isDebug) {
+        logAuthFailureDebug(request, 'POST /api/auth/signup', 'insert_user', 'EMAIL_EXISTS', 'Duplicate email detected');
+      }
+      return jsonResponse({ ok: false, code: 'EMAIL_EXISTS' }, { status: 409 });
+    }
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'insert_user', 'DB_ERROR', message);
+    }
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
+  }
+
+  // NEW: Get request signals for audit trail
+  const signals = await getRequestSignals(request, env);
+
+  // NEW: Create verification token
+  const rawToken = await createEmailVerificationToken(env, userId, email, signals.ipHash);
+  if (!rawToken) {
+    await writeAuditEvent(env, request, {
+      userId,
+      eventType: 'signup_success',
+      metadata: { reason: 'token_creation_failed' },
+    });
+    if (isDebug) {
+      logAuthFailureDebug(request, 'POST /api/auth/signup', 'token_create', 'TOKEN_FAILED', 'Failed to create verification token');
+    }
+    return jsonResponse({ ok: false, code: 'SIGNUP_FAILED' }, { status: 500 });
+  }
+
+  // NEW: Build verification URL
+  const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
+  const verifyUrl = new URL('/auth/email-verify/', baseUrl);
+  verifyUrl.searchParams.set('token', rawToken);
+
+  // NEW: Send verification email
+  const emailSent = await sendEmailVerificationEmail(env, {
+    to: email,
+    verifyUrl: verifyUrl.toString(),
+    replyTo: env.EMAIL_FROM,
+  });
+
+  await writeAuditEvent(env, request, {
+    userId,
+    eventType: 'signup_success',
+    metadata: { email_sent: emailSent },
+  });
+
+  if (isDebug) {
+    logAuthDebug(request, 'POST /api/auth/signup', 'verification_sent', {
+      userId,
+      email: email.substring(0, 3) + '***',
+    });
+  }
+
+  // CHANGED: Return success WITHOUT creating session
+  // Client receives VERIFICATION_REQUIRED and must complete email verification
+  return jsonResponse(
+    { ok: true, status: 'VERIFICATION_REQUIRED', message: 'Check your email to verify your account' },
+    { status: 200 }
+  );
+};
+```
+
+2F. UPDATE handleAuthLogin() - Check email_verified_at and account_status
+──────────────────────────────────────────────────────────────────────────
+
+Find handleAuthLogin (around line 1138) and update the user lookup section to check verification status.
+
+After the password is verified successfully (around line 1280, after "if (!passwordOk)"), ADD:
+
+```javascript
+  // NEW: Check if email is verified and account is active
+  const fullUser = await env.DB.prepare(
+    `SELECT id, email_verified_at, account_status
+     FROM user WHERE id = ?`
+  )
+    .bind(user.id)
+    .first();
+  
+  if (!fullUser.email_verified_at || fullUser.account_status !== 'active') {
+    await writeAuditEvent(env, request, {
+      userId: user.id,
+      eventType: 'login_failed',
+      metadata: { reason: 'email_not_verified' },
+    });
+    logAuthTiming(route, rayId, 'response_sent', startedAt);
+    if (isDebug) {
+      logAuthFailureDebug(request, route, 'verification_check', 'EMAIL_NOT_VERIFIED', 'Email not verified or account not active');
+    }
+    return jsonResponse(
+      { ok: false, code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email first' },
+      { status: 403 }
+    );
+  }
+```
+
+This check must be BEFORE the session creation (before "const lucia = initializeLucia(env);")
+
+
+2G. ADD ROUTES TO DISPATCHER
+──────────────────────────────
+
+In the route dispatcher (around line 3075), ADD these new routes AFTER the password-reset routes:
+
+```javascript
+      if (request.method === 'POST' && pathParts[2] === 'email' && pathParts[3] === 'verify' && pathParts[4] === 'request') {
+        return handleEmailVerifyRequest(request, env);
+      }
+
+      if (request.method === 'POST' && pathParts[2] === 'email' && pathParts[3] === 'verify' && pathParts[4] === 'confirm') {
+        return handleEmailVerifyConfirm(request, env);
+      }
+```
+
+Insert after the password-reset routes (around line 3120) and BEFORE the passkey routes.
+
+================================================================================
+PART 3: UI FILES
+================================================================================
+
+3A. CREATE: public/auth/email-verify/index.html
+──────────────────────────────────────────────
+
+```html
+<!-- public/auth/email-verify/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verify Email - Grassroots Movement</title>
+  <link rel="stylesheet" href="/css/site.css" />
+  <style>
+    .verify-container {
+      max-width: 500px;
+      margin: 60px auto;
+      padding: 30px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .verify-container h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .verify-container p {
+      color: #666;
+      line-height: 1.6;
+      margin: 15px 0;
+    }
+    .status-message {
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .status-success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status-error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .status-loading {
+      background-color: #e2e3e5;
+      color: #383d41;
+      border: 1px solid #d6d8db;
+    }
+    .button-group {
+      margin: 30px 0;
+    }
+    .button {
+      background-color: #007bff;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      text-decoration: none;
+      display: inline-block;
+      margin: 5px;
+    }
+    .button:hover {
+      background-color: #0056b3;
+    }
+    .button.secondary {
+      background-color: #6c757d;
+    }
+    .button.secondary:hover {
+      background-color: #545b62;
+    }
+    .token-input {
+      width: 100%;
+      padding: 10px;
+      margin: 15px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: monospace;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class="verify-container">
+    <h1>Verify Your Email</h1>
+    
+    <div id="loading" class="status-message status-loading" style="display: none;">
+      <p>Verifying your email...</p>
+    </div>
+    
+    <div id="success" class="status-message status-success" style="display: none;">
+      <p><strong>Email Verified!</strong></p>
+      <p>Your email has been successfully verified. You can now log in.</p>
+      <div class="button-group">
+        <a href="/auth/login/" class="button">Go to Login</a>
+      </div>
+    </div>
+    
+    <div id="error" class="status-message status-error" style="display: none;">
+      <p><strong>Verification Failed</strong></p>
+      <p id="error-message">The verification link is invalid or has expired.</p>
+      <div class="button-group">
+        <a href="/auth/signup/" class="button secondary">Back to Signup</a>
+        <a href="/auth/login/" class="button">Go to Login</a>
+      </div>
+    </div>
+    
+    <div id="token-form" style="display: none;">
+      <p>Enter your verification token:</p>
+      <input type="text" id="token-input" class="token-input" placeholder="Paste verification token here" />
+      <div class="button-group">
+        <button onclick="verifyToken()" class="button">Verify</button>
+        <a href="/auth/signup/" class="button secondary">Back to Signup</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token') || '';
+    
+    // If token is in URL, auto-verify
+    if (tokenFromUrl) {
+      verifyEmailToken(tokenFromUrl);
+    } else {
+      // Show token input form
+      document.getElementById('token-form').style.display = 'block';
+    }
+    
+    async function verifyToken() {
+      const token = document.getElementById('token-input').value.trim();
+      if (!token) {
+        alert('Please enter a verification token');
+        return;
+      }
+      verifyEmailToken(token);
+    }
+    
+    async function verifyEmailToken(token) {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('token-form').style.display = 'none';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('success').style.display = 'none';
+      
+      try {
+        const response = await fetch('/api/auth/email/verify/confirm', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token }),
+          credentials: 'include',
+        });
+        
+        const data = await response.json();
+        document.getElementById('loading').style.display = 'none';
+        
+        if (response.ok && data.ok) {
+          document.getElementById('success').style.display = 'block';
+          // Redirect to login after 2 seconds
+          setTimeout(() => {
+            window.location.href = '/auth/login/';
+          }, 2000);
+        } else {
+          const message = data.message || 'The verification link is invalid or has expired.';
+          document.getElementById('error-message').textContent = message;
+          document.getElementById('error').style.display = 'block';
+        }
+      } catch (error) {
+        console.error('[EmailVerify] Error:', error);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error-message').textContent = 'An error occurred. Please try again.';
+        document.getElementById('error').style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>
+```
+
+
+3B. UPDATE: public/auth/signup/index.html
+──────────────────────────────────────────
+
+Add this CSS to the <style> section (around line 20-50):
+
+```css
+.verification-message {
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 4px;
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+  text-align: center;
+}
+
+.resend-button {
+  background-color: #28a745;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin: 10px 5px 0 0;
+}
+
+.resend-button:hover {
+  background-color: #218838;
+}
+
+.resend-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+```
+
+
+3C. UPDATE: public/js/signup-modal.js
+──────────────────────────────────────
+
+After the successful signup response (in the form submission handler), UPDATE to handle VERIFICATION_REQUIRED:
+
+Find the section that handles the signup response (around where it sets the session cookie).
+
+CHANGE FROM:
+```javascript
+        if (response.ok && data.ok) {
+          // Success - redirect or update UI
+          window.location.href = '/account/';
+        }
+```
+
+CHANGE TO:
+```javascript
+        if (response.ok && data.ok) {
+          if (data.status === 'VERIFICATION_REQUIRED') {
+            // NEW: Show verification message instead of logging in
+            showVerificationMessage(email);
+          } else {
+            // OLD: Direct login (deprecated but kept for compatibility)
+            window.location.href = '/account/';
+          }
+        }
+```
+
+ADD this function to the signup-modal.js file:
+
+```javascript
+function showVerificationMessage(email) {
+  // Hide the form
+  const form = document.getElementById('signupForm');
+  if (form) {
+    form.style.display = 'none';
+  }
+  
+  // Show verification message
+  const container = document.getElementById('signup-form-container') || form?.parentElement;
+  if (container) {
+    const message = document.createElement('div');
+    message.className = 'verification-message';
+    message.innerHTML = `
+      <h3>Check Your Email</h3>
+      <p>We've sent a verification link to <strong>${escapeHtml(email)}</strong></p>
+      <p>Click the link in the email to verify your account.</p>
+      <button onclick="resendVerificationEmail('${email}')" class="resend-button">Resend Email</button>
+    `;
+    container.appendChild(message);
+  }
+}
+
+async function resendVerificationEmail(email) {
+  const button = event.target;
+  button.disabled = true;
+  button.textContent = 'Sending...';
+  
+  try {
+    const response = await fetch('/api/auth/email/verify/request', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        turnstileToken: window.turnstileToken || '',
+      }),
+    });
+    
+    if (response.ok) {
+      button.textContent = 'Email sent! Check your inbox.';
+      setTimeout(() => {
+        button.textContent = 'Resend Email';
+        button.disabled = false;
+      }, 5000);
+    } else {
+      button.textContent = 'Failed. Try again.';
+      button.disabled = false;
+    }
+  } catch (error) {
+    console.error('[ResendVerification] Error:', error);
+    button.textContent = 'Error. Try again.';
+    button.disabled = false;
+  }
+}
+
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, (c) => map[c]);
+}
+```
+
+================================================================================
+PART 4: MIGRATION APPLICATION COMMANDS
+================================================================================
+
+To apply the email verification migration to your D1 database:
+
+LOCAL DEVELOPMENT (SQLite with Wrangler):
+```bash
+cd /home/anchor/projects/grassmvt_survey
+wrangler d1 migrations apply wy_local --local
+```
+
+PRODUCTION DATABASE:
+```bash
+cd /home/anchor/projects/grassmvt_survey
+
+# Check which migrations are pending
+wrangler d1 migrations list wy --remote
+
+# Apply pending migrations
+wrangler d1 migrations apply wy --remote
+
+# After migrations, deploy the worker
+wrangler deploy --env production
+```
+
+VERIFY MIGRATION APPLIED:
+```bash
+# Check local
+wrangler d1 execute wy_local --local "SELECT * FROM sqlite_master WHERE type='table' AND name IN ('email_verification_tokens', 'user')"
+
+# Check production
+wrangler d1 execute wy --remote "SELECT account_status FROM user LIMIT 1"
+```
+
+================================================================================
+PART 5: IMPLEMENTATION CHECKLIST
+================================================================================
+
+✓ Step 0: Migration created (0013_email_verification.sql)
+✓ Step 1: Helper functions added to worker.js
+✓ Step 2: Updated initializeLucia() for new user attributes
+✓ Step 3: Updated getSessionUser() for suspended account check
+✓ Step 4: Added handleEmailVerifyRequest() and handleEmailVerifyConfirm()
+✓ Step 5: Updated handleAuthSignup() for pending account + verification email
+✓ Step 6: Updated handleAuthLogin() for email verification check
+✓ Step 7: Added email verify routes to dispatcher
+✓ Step 8: Created public/auth/email-verify/index.html
+✓ Step 9: Updated public/auth/signup/index.html with CSS
+✓ Step 10: Updated public/js/signup-modal.js with verification flow
+
+================================================================================
+PART 6: TESTING CHECKLIST
+================================================================================
+
+Manual test flow:
+
+1. SIGNUP - PENDING ACCOUNT CREATED
+   - Go to http://localhost:8787/auth/signup/
+   - Enter: email="test@example.com", password="TestPass123"
+   - Pass Turnstile
+   - Expected: Page shows "Check Your Email" message, NO session cookie set
+   - Verify: Check DB: SELECT * FROM user WHERE email='test@example.com'
+     Should show: account_status='pending', email_verified_at=NULL
+
+2. RESEND VERIFICATION EMAIL
+   - On signup page, click "Resend Email"
+   - Expected: New token created, email sent
+   - Verify: Check DB: SELECT COUNT(*) FROM email_verification_tokens
+     Should see multiple tokens for user
+
+3. VERIFY EMAIL - TOKEN CONFIRMATION
+   - Check email for verification link
+   - Click link or manually visit: http://localhost:8787/auth/email-verify/?token=<token>
+   - Expected: Page shows "Email Verified!", redirects to login
+   - Verify: Check DB: SELECT * FROM user WHERE email='test@example.com'
+     Should show: account_status='active', email_verified_at=<timestamp>
+
+4. LOGIN - VERIFIED ACCOUNT
+   - Go to http://localhost:8787/auth/login/
+   - Enter: email="test@example.com", password="TestPass123"
+   - Pass Turnstile
+   - Expected: Session cookie set, redirects to account page
+   - Verify: Browser console shows session cookie set
+
+5. LOGIN - UNVERIFIED ACCOUNT (before verification)
+   - Create new account (repeats step 1)
+   - WITHOUT verifying email
+   - Try to login with password
+   - Expected: 403 error with message "Please verify your email first"
+   - UI should show link to resend verification
+
+6. SUSPENDED ACCOUNT
+   - Manually set account_status='suspended' in DB
+   - Log in with valid session for that user
+   - Expected: Session invalidated, redirected to login
+   - Cookie blank sent
+
+================================================================================
+PART 7: ERROR CODES REFERENCE
+================================================================================
+
+Signup response codes:
+- ok: true, status: "VERIFICATION_REQUIRED" → Check email
+- ok: false, code: "EMAIL_EXISTS" → Email already registered
+- ok: false, code: "SIGNUP_FAILED" → Validation or DB error
+
+Email verify request:
+- ok: true → Always returns this (doesn't leak account existence)
+
+Email verify confirm:
+- ok: true, message: "email_verified" → Email verified, session created
+- ok: false, code: "INVALID_TOKEN" → Token expired or invalid
+- ok: false, code: "VERIFICATION_FAILED" → Server error
+
+Login response codes:
+- ok: true → Login successful
+- ok: false, code: "EMAIL_NOT_VERIFIED" → Email not verified, 403 status
+- ok: false, code: "ACCOUNT_NOT_FOUND" → No user found
+- ok: false, code: "PASSWORD_INCORRECT" → Wrong password
+
+================================================================================
+END OF IMPLEMENTATION GUIDE
+================================================================================

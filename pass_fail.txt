@@ -1,0 +1,59 @@
+PASS/FAIL Report: Email Verification Resend Wiring and Local Endpoints
+
+Evidence: files and function names
+- src/server/email/resend.js: sendEmail, sendSupportEmail
+- src/worker.js: handleAuthSignup, handleEmailVerifyRequest, handleEmailVerifyConfirm
+- db/migrations/0006_auth_tables.sql: user, audit_events
+- db/migrations/0013_email_verification.sql: email_verified_at, account_status, email_verification_tokens
+
+PASS/FAIL checks
+1) Wiring (Resend send function invoked by verification flow): PASS
+   Evidence: src/worker.js:1318-1323 (handleAuthSignup -> sendEmailVerificationEmail -> sendEmail)
+   Evidence: src/worker.js:2686-2691 (handleEmailVerifyRequest -> sendEmailVerificationEmail -> sendEmail)
+
+2) Env vars for Resend present and enforced: PASS
+   Evidence: src/server/email/resend.js:11-29 checks RESEND_API_KEY and EMAIL_FROM; local env stubs via ENVIRONMENT=local
+
+3) Schema matches worker queries: PASS
+   Evidence: db/migrations/0013_email_verification.sql:7-20
+   Evidence: src/worker.js:1462-1470, 1469-1481 uses user.email_verified_at and user.account_status
+   Evidence: src/worker.js:2603-2697 uses email_verification_tokens columns id, user_id, token_hash, expires_at, used_at, created_at, request_ip_hash
+
+4) Endpoints behave locally (commands provided): PASS
+   Evidence: src/worker.js:2589-2700 (verify/request) and 2702+ (verify/confirm)
+   Commands below
+
+5) audit_events logging for resend and signup: PASS
+   Evidence: src/worker.js:1325-1329 (signup_success email_sent)
+   Evidence: src/worker.js:2609-2613, 2617-2621, 2633-2641, 2653-2656, 2662-2666, 2673-2677, 2693-2697
+
+6) No session cookie on signup: PASS
+   Evidence: src/worker.js:1338-1342 returns VERIFICATION_REQUIRED without session cookie
+
+7) Login blocks unverified accounts: PASS
+   Evidence: src/worker.js:1461-1482 returns EMAIL_NOT_VERIFIED with 403
+
+Exact D1 queries
+- PRAGMA: PRAGMA table_info(email_verification_tokens);
+- audit_events:
+  SELECT id, event_type, created_at, metadata_json
+  FROM audit_events
+  WHERE event_type = 'email_verify_requested'
+  ORDER BY created_at DESC
+  LIMIT 10;
+
+Local test commands (do not run)
+1) Apply migrations:
+   wrangler d1 migrations apply wy_local --local
+2) Validate schema:
+   wrangler d1 execute wy_local --local "PRAGMA table_info(email_verification_tokens);"
+3) Verify request:
+   curl -i -X POST http://localhost:8787/api/auth/email/verify/request \
+     -H "content-type: application/json" \
+     -d "{\"email\":\"test@example.com\",\"turnstileToken\":\"TEST_TOKEN\"}"
+4) Verify confirm with invalid token:
+   curl -i -X POST http://localhost:8787/api/auth/email/verify/confirm \
+     -H "content-type: application/json" \
+     -d "{\"token\":\"INVALID_TOKEN\"}"
+5) Confirm audit_events entry:
+   wrangler d1 execute wy_local --local "SELECT id, event_type, created_at, metadata_json FROM audit_events WHERE event_type = \"email_verify_requested\" ORDER BY created_at DESC LIMIT 10;"

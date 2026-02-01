@@ -1,0 +1,195 @@
+// surveys_security_v1.jsonc
+// slug: security
+// version: 1
+// purpose: Detailed feedback on security practices, privacy, verification methods, and data handling.
+// notes:
+// - Aligned with /security page content
+// - Do not ask for names, addresses, or personal identifiers
+// - Each question asks about specific security/privacy topics with improvement suggestions
+// - Designed for users concerned about civic platform integrity
+{
+  "title": "Security and Trust Feedback",
+  "description": "Help us build a trustworthy platform that resists spam while protecting your privacy. We published a detailed security page explaining what we store, what we don't, and how we verify responses. This survey gathers your feedback on our approach. No personal information is collected.",
+  "completedHtml": "<p><strong>Thank you!</strong></p><p>We'll publish aggregated results and use your feedback to improve our security practices. Security is not a static promise—it's a process, and your input matters.</p>",
+  "pages": [
+    {
+      "name": "p1",
+      "title": "Data Storage and Privacy",
+      "elements": [
+        {
+          "type": "html",
+          "name": "p1_intro",
+          "html": "<p><strong>We store:</strong> Email, password hash, survey responses, response timestamps, and jurisdiction keys (state, district). <br><strong>We do NOT store:</strong> Plaintext passwords, precise device location, or street addresses (only hashed districts).</p>"
+        },
+        {
+          "type": "rating",
+          "name": "data_storage_clarity",
+          "title": "How clear is our explanation of what data we store vs. what we do not store?",
+          "rateMin": 1,
+          "rateMax": 5,
+          "minRateDescription": "Very unclear",
+          "maxRateDescription": "Very clear"
+        },
+        {
+          "type": "comment",
+          "name": "data_storage_improve",
+          "title": "How could we better explain our data storage practices?",
+          "placeholder": "Examples: use simpler language, add diagrams, explain more about security hashes, clarify what 'jurisdiction keys' means..."
+        },
+        {
+          "type": "rating",
+          "name": "privacy_comfort",
+          "title": "How comfortable are you with the data we collect to run the platform?",
+          "rateMin": 1,
+          "rateMax": 5,
+          "minRateDescription": "Not comfortable",
+          "maxRateDescription": "Very comfortable"
+        },
+        {
+          "type": "comment",
+          "name": "privacy_concerns",
+          "title": "What specific data practices concern you or would you change?",
+          "placeholder": "For example: concerns about password security, address hashing, session tracking, email collection..."
+        }
+      ]
+    },
+    {
+      "name": "p2",
+      "title": "Verification and Tiers",
+      "elements": [
+        {
+          "type": "html",
+          "name": "p2_intro",
+          "html": "<p><strong>Tier 1 (General Public):</strong> Any account, no verification needed. Responses counted from all participants.</p><p><strong>Tier 2 (Verified Address):</strong> Accounts that complete address verification. Enables filtering by state, federal district, state house district, state senate district.</p><p>This two-tier system shows broad participation and high-confidence participation separately.</p>"
+        },
+        {
+          "type": "rating",
+          "name": "tier_system_clarity",
+          "title": "How clear is the explanation of our two-tier reporting system?",
+          "rateMin": 1,
+          "rateMax": 5,
+          "minRateDescription": "Confusing",
+          "maxRateDescription": "Crystal clear"
+        },
+        {
+          "type": "comment",
+          "name": "tier_system_improve",
+          "title": "How could we explain the tiers better?",
+          "placeholder": "Examples: explain why tiers matter, clarify what 'federal house district' means, show sample results, explain privacy tradeoffs..."
+        },
+        {
+          "type": "rating",
+          "name": "tier_fairness",
+          "title": "Do you think dividing results into verified and unverified tiers is fair?",
+          "rateMin": 1,
+          "rateMax": 5,
+          "minRateDescription": "Unfair",
+          "maxRateDescription": "Fair and reasonable"
+        },
+        {
+          "type": "checkbox",
+          "name": "verification_methods_acceptable",
+          "title": "Which verification methods would you be willing to use? (Select all that apply)",
+          "choices": [
+            { "value": "address_verification", "text": "Provide an address for district verification (we store jurisdiction keys, not the address)" },
+            { "value": "address_hash", "text": "Provide an address and let us store a one-way hash for deduplication" },
+            { "value": "proximity_check", "text": "One-time proximity check at your home address (we store pass/fail outcome, not your location)" },
+            { "value": "phone_verification", "text": "SMS phone verification" },
+            { "value": "passkey", "text": "Passkey sign-in (like face/fingerprint on your device)" },
+            { "value": "none", "text": "I prefer not to verify; Tier 1 results are sufficient" }
+          ],
+          "showOtherItem": true,
+          "otherText": "Other verification methods"
+        },
+        {
+          "type": "comment",
+          "name": "verification_concerns",
+          "title": "What verification concerns do you have? (privacy, complexity, trust, etc.)",
+          "placeholder": "Tell us what worries you about verification—we want to understand barriers to participation..."
+        }
+      ]
+    },
+    {
+      "name": "p3",
+      "title": "Anti-Spam and Response Editing",
+      "elements": [
+        {
+          "type": "html",
+          "name": "p3_intro",
+          "html": "<p><strong>How we reduce spam:</strong> Bot challenges on signup, rate limiting on abuse-prone actions, one response per user per survey version, and audit logging to detect suspicious patterns.</p><p><strong>Response editing:</strong> You can revise your answers after submission. Each account has one counted response per survey version. Edits create an audit record. The survey list shows completion date and edit status.</p>"
+        },
+        {
+          "type": "rating",
+          "name": "spam_protection_adequate",
+          "title": "How confident are you that these anti-spam protections will reduce manipulation?",
+          "rateMin": 1,
+          "rateMax": 5,
+          "minRateDescription": "Not confident",
+          "maxRateDescription": "Very confident"
+        },
+        {
+          "type": "comment",
+          "name": "spam_improvement",
+          "title": "What else could we do to reduce spam and ensure real voices are heard?",
+          "placeholder": "Examples: stronger verification, limit edits, publish audit logs, hourly rate limits, geographic checks..."
+        },
+        {
+          "type": "rating",
+          "name": "editing_comfort",
+          "title": "How do you feel about being able to edit your survey responses after submission?",
+          "rateMin": 1,
+          "rateMax": 5,
+          "minRateDescription": "Uncomfortable",
+          "maxRateDescription": "Very comfortable"
+        },
+        {
+          "type": "comment",
+          "name": "editing_concerns",
+          "title": "Do you have concerns about response editing? (fraud, data integrity, timing, etc.)",
+          "placeholder": "For example: concerns about last-minute edits, how edits are counted, whether edit history is visible..."
+        }
+      ]
+    },
+    {
+      "name": "p4",
+      "title": "Survey Transparency and Overall Trust",
+      "elements": [
+        {
+          "type": "html",
+          "name": "p4_intro",
+          "html": "<p><strong>Survey transparency:</strong> We publish surveys from JSONC source files. Each version gets a hash so any change to wording creates a new version. Anyone can see exactly what changed between versions.</p><p><strong>Audit trail:</strong> We log security-relevant events (signups, password resets, address verifications, spam detection) so we can investigate problems and show a clear history.</p>"
+        },
+        {
+          "type": "rating",
+          "name": "survey_transparency_clarity",
+          "title": "How clear is our commitment to survey transparency and versioning?",
+          "rateMin": 1,
+          "rateMax": 5,
+          "minRateDescription": "Not clear",
+          "maxRateDescription": "Very clear"
+        },
+        {
+          "type": "comment",
+          "name": "transparency_improve",
+          "title": "How could we demonstrate transparency better?",
+          "placeholder": "Examples: publish version changelogs, show survey hashes, link to JSONC source, explain why versioning matters..."
+        },
+        {
+          "type": "rating",
+          "name": "overall_trust",
+          "title": "Overall, how much do you trust this platform to handle your responses fairly and securely?",
+          "rateMin": 1,
+          "rateMax": 5,
+          "minRateDescription": "Low trust",
+          "maxRateDescription": "High trust"
+        },
+        {
+          "type": "comment",
+          "name": "overall_feedback",
+          "title": "Final thoughts: What would most increase your trust in this platform?",
+          "placeholder": "Be specific: governance structures, third-party audits, transparency reports, specific security practices..."
+        }
+      ]
+    }
+  ]
+}

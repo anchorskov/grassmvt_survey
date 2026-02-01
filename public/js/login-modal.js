@@ -76,16 +76,21 @@
   const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
   const PASSKEY_NUDGE_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
 
-  const showError = (message) => {
+  const showError = (message, allowHtml = false) => {
     if (!errorEl) {
       return;
     }
     if (!message) {
       errorEl.textContent = '';
+      errorEl.innerHTML = '';
       errorEl.classList.add('is-hidden');
       return;
     }
-    errorEl.textContent = message;
+    if (allowHtml) {
+      errorEl.innerHTML = message;
+    } else {
+      errorEl.textContent = message;
+    }
     errorEl.classList.remove('is-hidden');
   };
 
@@ -174,6 +179,44 @@
     } catch (error) {
       return null;
     }
+  };
+
+  const requestEmailVerification = async (email) => {
+    const trimmed = (email || '').trim();
+    if (!trimmed) {
+      showError('Enter your email to resend the verification link.');
+      return false;
+    }
+    if (!turnstileConfig.siteKey && !turnstileConfig.bypass) {
+      turnstileConfig = await fetchTurnstileConfig();
+    }
+    let token = '';
+    if (!turnstileConfig.bypass) {
+      if (!turnstileClient || turnstileWidgetId === null) {
+        showError('Turnstile failed to load.');
+        return false;
+      }
+      setTurnstileState('running');
+      token = await turnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
+      if (!token) {
+        setTurnstileState('failed');
+        showError('Complete the human check to resend the verification email.');
+        return false;
+      }
+      if (tokenInput) {
+        tokenInput.value = token;
+      }
+      lastTurnstileToken = token;
+      setTurnstileState('ready');
+    }
+    await fetch('/api/auth/email/verify/request', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email: trimmed, turnstileToken: token || '' }),
+    });
+    showError('Verification email sent. Check your inbox.');
+    return true;
   };
 
   const shouldShowPasskeyNudge = () => {
@@ -526,6 +569,18 @@
     });
   }
 
+  if (modal) {
+    modal.addEventListener('click', async (event) => {
+      const target = event.target.closest('[data-email-verify-resend]');
+      if (!target) {
+        return;
+      }
+      event.preventDefault();
+      const email = emailInput ? emailInput.value.trim() : '';
+      await requestEmailVerification(email);
+    });
+  }
+
   // Core login function - separated to allow auto-continue after Turnstile
   const performLogin = async (email, password, tokenValue) => {
     const response = await fetch('/api/auth/login', {
@@ -545,14 +600,19 @@
       } catch (error) {
         data = null;
       }
-      if (data && data.code === 'PASSWORD_INCORRECT') {
-        showError('Password incorrect');
-      } else if (data && data.code === 'ACCOUNT_NOT_FOUND') {
-        showError('Account not found');
-      } else if (response.status === 404) {
-        showError('Account not found');
-      } else if (response.status === 401) {
-        showError('Password incorrect');
+        if (data && data.code === 'PASSWORD_INCORRECT') {
+          showError('Password incorrect');
+        } else if (data && data.code === 'ACCOUNT_NOT_FOUND') {
+          showError('Account not found');
+        } else if (data && data.code === 'EMAIL_NOT_VERIFIED') {
+          showError(
+            'Email not verified. Check your inbox or <button class="link-button" type="button" data-email-verify-resend>resend verification email</button>.',
+            true
+          );
+        } else if (response.status === 404) {
+          showError('Account not found');
+        } else if (response.status === 401) {
+          showError('Password incorrect');
       } else {
         showError('Unable to sign in.');
       }
