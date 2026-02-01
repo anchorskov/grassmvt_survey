@@ -1247,6 +1247,13 @@ const sendEmailVerificationEmail = async (env, { to, verifyUrl, replyTo }) => {
   return sendEmail(env, { to, subject, text, html, replyTo });
 };
 
+const sendPhoneVerificationEmail = async (env, { to, verifyUrl, replyTo }) => {
+  const subject = 'Verify your location on your phone';
+  const text = `Open this link on your phone to verify your location: ${verifyUrl}`;
+  const html = `Open this link on your phone to verify your location: <a href="${escapeHtml(verifyUrl)}">Verify on phone</a>.`;
+  return sendEmail(env, { to, subject, text, html, replyTo });
+};
+
 const initializeLucia = (env) => {
   const adapter = new D1Adapter(env.DB, { user: 'user', session: 'session' });
   const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
@@ -4145,6 +4152,70 @@ export default {
           accuracy_m: Math.round(accuracy),
           reason: verified ? null : 'TOO_FAR',
         },
+        { headers: { 'cache-control': 'no-store' } }
+      );
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/location/verify-on-phone') {
+      const auth = await requireSessionUser(request, env);
+      if (auth.response) {
+        return auth.response;
+      }
+      const userId = auth.user?.id || '';
+      if (!env.DB || !userId) {
+        return jsonResponse(
+          { ok: false, code: 'NOT_AUTHENTICATED' },
+          { status: 401, headers: { 'cache-control': 'no-store' } }
+        );
+      }
+      const userRow = await env.DB.prepare('SELECT email FROM user WHERE id = ?')
+        .bind(userId)
+        .first();
+      const email = normalizeEmail(userRow?.email || '');
+      if (!email || !isValidEmail(email)) {
+        return jsonResponse(
+          { ok: false, code: 'INVALID_EMAIL' },
+          { status: 400, headers: { 'cache-control': 'no-store' } }
+        );
+      }
+      const salt = getHashSalt(env);
+      const signals = await getRequestSignals(request, env);
+      const emailHash = salt ? await hashSignal(email, salt) : '';
+      const rateLimit = await checkEmailVerificationRateLimit(env, {
+        emailHash,
+        ipHash: signals.ipHash,
+      });
+      if (rateLimit.limited) {
+        await writeAuditEvent(env, request, {
+          eventType: 'email_verify_requested',
+          metadata: {
+            reason: 'rate_limited',
+            email_hash: emailHash || null,
+            email_limited: rateLimit.emailLimited,
+            ip_limited: rateLimit.ipLimited,
+          },
+        });
+        return jsonResponse(
+          { ok: true, sent: false },
+          { headers: { 'cache-control': 'no-store' } }
+        );
+      }
+      const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
+      const verifyUrl = new URL('/account/location', baseUrl);
+      verifyUrl.searchParams.set('phoneVerify', '1');
+      const sent = await sendPhoneVerificationEmail(env, {
+        to: email,
+        verifyUrl: verifyUrl.toString(),
+        replyTo: env.EMAIL_FROM,
+      });
+      console.log('[Location] phone_verify_email', {
+        email_masked: maskEmailForLogs(email),
+        ok: !!sent.ok,
+        code: sent.code || null,
+        status: sent.status || null,
+      });
+      return jsonResponse(
+        { ok: true, sent: !!sent.ok },
         { headers: { 'cache-control': 'no-store' } }
       );
     }

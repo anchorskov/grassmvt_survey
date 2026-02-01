@@ -341,7 +341,7 @@
         window.dispatchEvent(
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
         );
-        if (authUI.state && authUI.state.addressVerified === false) {
+        if (!authUI.state || authUI.state.addressVerified !== true) {
           closeModal();
           if (!window.location.pathname.startsWith('/account/location')) {
             window.location.href = '/account/location';

@@ -12,6 +12,9 @@
   const deviceSubmit = document.getElementById('device-submit');
   const deviceError = document.getElementById('device-error');
   const deviceResult = document.getElementById('device-result');
+  const deviceNote = document.getElementById('device-note');
+  const phoneVerifyButton = document.getElementById('phone-verify-button');
+  const phoneVerifyStatus = document.getElementById('phone-verify-status');
   const stateSelect = document.getElementById('state');
 
   if (!addressForm || !stateSelect) {
@@ -99,6 +102,11 @@
     el.classList.remove('is-hidden');
   };
 
+  const isLikelyMobile = () => {
+    const ua = navigator.userAgent || '';
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  };
+
   const setAddressEnabled = (enabled) => {
     if (!addressFieldset) {
       return;
@@ -113,6 +121,16 @@
       return;
     }
     deviceSection.classList.toggle('is-hidden', !visible);
+  };
+
+  const setPhoneVerifyVisible = (visible) => {
+    if (!phoneVerifyButton || !phoneVerifyStatus) {
+      return;
+    }
+    phoneVerifyButton.classList.toggle('is-hidden', !visible);
+    if (!visible) {
+      showMessage(phoneVerifyStatus, '');
+    }
   };
 
   const fetchGeo = async () => {
@@ -173,6 +191,21 @@
     return data;
   };
 
+  const sendPhoneVerifyLink = async () => {
+    const response = await fetch('/api/location/verify-on-phone', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) {
+      showMessage(phoneVerifyStatus, 'Unable to send verification email. Please try again.');
+      return;
+    }
+    showMessage(phoneVerifyStatus, 'Verification email sent. Open it on your phone.');
+  };
+
   addressForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     showMessage(addressError, '');
@@ -205,10 +238,16 @@
     if (addressLat === null || addressLng === null) {
       showMessage(addressNote, 'Address validated, district mapping pending. Device check not available yet.');
       setDeviceSectionVisible(false);
+      setPhoneVerifyVisible(false);
       return;
     }
 
     setDeviceSectionVisible(true);
+    setPhoneVerifyVisible(false);
+    showMessage(deviceNote, isLikelyMobile()
+      ? 'Phone detected. GPS should be accurate.'
+      : 'Desktops often use service-provider location and can be inaccurate. For best results, verify on a phone.'
+    );
   });
 
   if (deviceSubmit) {
@@ -242,13 +281,16 @@
           }
           if (result.verified) {
             showMessage(deviceResult, `Verified. Distance: ${result.distance_m}m. Accuracy: ${result.accuracy_m}m.`);
+            setPhoneVerifyVisible(false);
           } else {
             showMessage(deviceResult, `Not verified. Distance: ${result.distance_m ?? '--'}m. Reason: ${result.reason || 'UNKNOWN'}.`);
+            setPhoneVerifyVisible(true);
           }
         },
         () => {
           deviceSubmit.disabled = false;
           showMessage(deviceError, 'Unable to access device location.');
+          setPhoneVerifyVisible(true);
         },
         {
           enableHighAccuracy: true,
@@ -259,6 +301,17 @@
     });
   }
 
+  if (phoneVerifyButton) {
+    phoneVerifyButton.addEventListener('click', async () => {
+      await sendPhoneVerifyLink();
+    });
+  }
+
   populateStates();
   handleGeo();
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('phoneVerify') === '1') {
+    showMessage(deviceNote, 'Phone verification mode. Share device location to complete verification.');
+  }
 })();

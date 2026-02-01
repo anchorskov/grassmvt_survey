@@ -59,9 +59,12 @@
       <section class="survey-form is-hidden" id="device-section" aria-live="polite">
         <h2>Device Check</h2>
         <p class="helper-text">We compare your device location to the address you entered.</p>
+        <p class="helper-text" id="device-note"></p>
         <button class="button button--primary" type="button" id="device-submit">Share device location now</button>
         <p class="form-error is-hidden" id="device-error" role="alert"></p>
         <p class="helper-text is-hidden" id="device-result" role="status"></p>
+        <button class="button button--secondary is-hidden" type="button" id="phone-verify-button">Send link to verify on phone</button>
+        <p class="helper-text is-hidden" id="phone-verify-status" role="status"></p>
       </section>
     </main>
     <div data-include="/partials/footer.html"></div>
