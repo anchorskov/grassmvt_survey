@@ -1,0 +1,44 @@
+DATABASE UPDATE SUMMARY - Production D1
+========================================
+Date: 2026-02-01
+Environment: production (4b4227f1-bf30-4fcf-8a08-6967b536a5ab)
+
+ACTIONS COMPLETED:
+1. Deleted survey-process (ID: 7) and all its versions
+   - This survey had no associated responses
+   - Status: DELETED
+
+2. Updated abortion survey (ID: 6)
+   - Changed slug from "abortion-policy" to "abortion"
+   - Changed title to "Abortion Survey (v2)"
+   - Updated version 1 to version 2 with new JSON schema
+   - New schema hash: 5ba49f799abe077e46f3754521c8f637935561f4d289f6d56948d9b8561ef30f
+   - Schema includes: 6 core questions + 1 optional comment field
+   - Status: UPDATED
+
+3. Preserved security survey (ID: 8)
+   - Reason: 1 response record linked to this survey
+   - Response ID: df8a7fc4-ee96-4f72-88e0-077bcfe8e06a
+   - Kept for data integrity (FK constraint)
+   - Status: ARCHIVED (no longer published, kept for historical response)
+
+CURRENT PRODUCTION DATABASE STATE:
+- Total surveys: 2 (abortion, security)
+- Total survey versions: 2 (abortion v2, security v1)
+- Total responses: 1 (linked to security survey)
+
+SCHEMA CHANGES:
+- Removed old v1 surveys (survey-process)
+- Upgraded abortion survey to v2 with updated questions
+- Email verification infrastructure in place and working
+
+LOCAL DATABASE STATE (for reference):
+- Matches production for abortion survey (v2)
+- Already seeded during development
+- Used for local testing and migrations
+
+NEXT STEPS:
+1. Test abortion v2 survey in production (public URL: https://grassrootsmvt.org/surveys/)
+2. Verify email verification flow works end-to-end
+3. Monitor for any issues in production logs
+4. Consider archiving security survey after historical responses are handled

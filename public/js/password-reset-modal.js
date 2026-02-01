@@ -47,6 +47,7 @@
   const tokenInput = document.getElementById('password-reset-modal-token');
   const errorEl = document.getElementById('password-reset-modal-error');
   const successEl = document.getElementById('password-reset-modal-success');
+  const submitButton = form ? form.querySelector('button[type="submit"]') : null;
   const turnstileContainer = document.getElementById('password-reset-modal-turnstile');
   const turnstileClient = window.TurnstileClient;
 
@@ -54,6 +55,21 @@
   let lastTurnstileToken = '';
   let turnstileExecuted = false;
   let turnstileSubmitted = false;
+  let resetCompleted = false;
+  const defaultSubmitText = submitButton ? submitButton.textContent : 'Send reset link';
+
+  const setSubmitMode = (mode) => {
+    if (!submitButton) {
+      return;
+    }
+    if (mode === 'signin') {
+      submitButton.type = 'button';
+      submitButton.textContent = 'Sign in';
+      return;
+    }
+    submitButton.type = 'submit';
+    submitButton.textContent = defaultSubmitText;
+  };
 
   const showError = (message) => {
     if (!errorEl) {
@@ -160,6 +176,8 @@
     document.body.classList.add('no-scroll');
     showError('');
     showSuccess('');
+    resetCompleted = false;
+    setSubmitMode('submit');
     turnstileExecuted = false;
     turnstileSubmitted = false;
     await renderTurnstile();
@@ -171,6 +189,8 @@
     document.body.classList.remove('no-scroll');
     showError('');
     showSuccess('');
+    resetCompleted = false;
+    setSubmitMode('submit');
     resetTurnstile();
     if (turnstileContainer) {
       turnstileContainer.classList.add('is-hidden');
@@ -217,6 +237,18 @@
       }
       resetTurnstile();
       showSuccess('If an account exists, a reset link has been sent.');
+      resetCompleted = true;
+      setSubmitMode('signin');
+    });
+  }
+
+  if (submitButton) {
+    submitButton.addEventListener('click', (event) => {
+      if (!resetCompleted) {
+        return;
+      }
+      event.preventDefault();
+      authModals.open('login');
     });
   }
 

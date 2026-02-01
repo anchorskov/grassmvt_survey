@@ -41,6 +41,20 @@ const truncateValue = (value, maxLength) => {
   return value.slice(0, maxLength);
 };
 
+const maskEmailForLogs = (value) => {
+  const input = (value || '').trim();
+  const atIndex = input.indexOf('@');
+  if (atIndex <= 0) {
+    return '***';
+  }
+  const local = input.slice(0, atIndex);
+  const domain = input.slice(atIndex + 1);
+  const maskedLocal = local.length <= 3 ? `${local[0] || ''}**` : `${local.slice(0, 3)}***`;
+  const domainParts = domain.split('.');
+  const tld = domainParts.length > 1 ? domainParts[domainParts.length - 1] : '';
+  return `${maskedLocal}@***.${tld || '***'}`;
+};
+
 const generateRequestId = () => {
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
@@ -1491,6 +1505,13 @@ const handleAuthSignup = async (request, env) => {
     replyTo: env.EMAIL_FROM,
   });
 
+  console.log('[EmailVerification] signup_send', {
+    email_masked: maskEmailForLogs(email),
+    ok: !!emailSent.ok,
+    code: emailSent.code || null,
+    status: emailSent.status || null,
+  });
+
   await writeAuditEvent(env, request, {
     userId,
     eventType: 'signup_success',
@@ -2857,6 +2878,13 @@ const handleEmailVerifyRequest = async (request, env) => {
     to: email,
     verifyUrl: verifyUrl.toString(),
     replyTo: env.EMAIL_FROM,
+  });
+
+  console.log('[EmailVerification] resend_send', {
+    email_masked: maskEmailForLogs(email),
+    ok: !!sent.ok,
+    code: sent.code || null,
+    status: sent.status || null,
   });
   
   await writeAuditEvent(env, request, {

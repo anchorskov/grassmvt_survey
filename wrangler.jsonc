@@ -12,7 +12,8 @@
   },
   "vars": {
     "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ",
-    "EMAIL_FROM": "noreply@grassrootsmvt.org",
+    "EMAIL_FROM": "Grassroots Movement <verify@grassrootsmvt.org>",
+    "EMAIL_REPLY_TO": "support@grassrootsmvt.org",
     "SUPPORT_EMAIL_TO": "anchorskov@gmail.com",
     "APP_BASE_URL": "http://localhost:8787",
     "ENVIRONMENT": "local",
@@ -45,7 +46,8 @@
       "vars": {
         "ENVIRONMENT": "production",
         "TURNSTILE_SITE_KEY": "0x4AAAAAACUGQXNTcuo9SlgJ",
-        "EMAIL_FROM": "noreply@grassrootsmvt.org",
+        "EMAIL_FROM": "Grassroots Movement <verify@grassrootsmvt.org>",
+        "EMAIL_REPLY_TO": "support@grassrootsmvt.org",
         "SUPPORT_EMAIL_TO": "anchorskov@gmail.com",
         "APP_BASE_URL": "https://grassrootsmvt.org",
         "OAUTH_REDIRECT_BASE": "",
