@@ -6,33 +6,137 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>District Verification | Grassroots Movement</title>
     <link rel="stylesheet" href="/css/site.css" />
+    <style>
+      .district-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+      }
+      .district-row .district-label {
+        flex: 1 1 180px;
+        font-weight: 600;
+      }
+      .district-row .district-value {
+        flex: 1 1 100px;
+        font-family: monospace;
+        font-size: 1.1rem;
+      }
+      .district-row .district-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .district-row .district-actions button {
+        padding: 0.375rem 1rem;
+        font-size: 0.875rem;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+      }
+      .district-row .district-actions button.btn-yes {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+      }
+      .district-row .district-actions button.btn-no {
+        background: #dc3545;
+        color: white;
+        border-color: #dc3545;
+      }
+      .district-row .district-actions button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .district-row .district-status {
+        flex: 0 0 auto;
+        font-size: 0.875rem;
+      }
+      .district-row .district-status.confirmed {
+        color: #28a745;
+      }
+      .district-row .district-status.rejected {
+        color: #dc3545;
+      }
+      .voter-verified {
+        color: #28a745;
+        font-weight: 600;
+      }
+      .voter-unverified {
+        color: #6c757d;
+      }
+      .voter-no-data {
+        color: #6c757d;
+        font-style: italic;
+      }
+    </style>
   </head>
   <body>
     <div data-include="/partials/header.html"></div>
     <main>
       <h1>District Verification</h1>
       <p class="helper-text">Confirm your districts so your responses count in the right place.</p>
+      <p class="helper-text" id="district-status">Loading your verification status...</p>
+      <p class="helper-text" id="voter-status"></p>
 
       <section class="survey-form" aria-live="polite">
-        <h2>Detected location</h2>
-        <p class="helper-text" id="district-status">Loading your verification status...</p>
-        <p class="helper-text">
-          State: <span id="district-state">--</span>
-        </p>
-        <p class="helper-text">
-          Federal district: <span id="district-federal">--</span>
-        </p>
-        <p class="helper-text">
-          State house district: <span id="district-house">--</span>
-        </p>
-        <p class="helper-text">
-          State senate district: <span id="district-senate">--</span>
-        </p>
+        <h2>Your Detected Districts</h2>
+        <p class="helper-text">Please confirm each district is correct by clicking Yes or No.</p>
+
+        <div class="district-row" id="row-state">
+          <span class="district-label">State:</span>
+          <span class="district-value" id="district-state">--</span>
+          <span class="district-actions">
+            <button type="button" class="btn-yes" data-district="state" data-confirm="yes">Yes</button>
+            <button type="button" class="btn-no" data-district="state" data-confirm="no">No</button>
+          </span>
+          <span class="district-status" id="status-state"></span>
+        </div>
+
+        <div class="district-row" id="row-federal">
+          <span class="district-label">Congressional District:</span>
+          <span class="district-value" id="district-federal">--</span>
+          <span class="district-actions">
+            <button type="button" class="btn-yes" data-district="federal" data-confirm="yes">Yes</button>
+            <button type="button" class="btn-no" data-district="federal" data-confirm="no">No</button>
+          </span>
+          <span class="district-status" id="status-federal"></span>
+        </div>
+
+        <div class="district-row" id="row-house">
+          <span class="district-label">State House District:</span>
+          <span class="district-value" id="district-house">--</span>
+          <span class="district-actions">
+            <button type="button" class="btn-yes" data-district="house" data-confirm="yes">Yes</button>
+            <button type="button" class="btn-no" data-district="house" data-confirm="no">No</button>
+          </span>
+          <span class="district-status" id="status-house"></span>
+        </div>
+
+        <div class="district-row" id="row-senate">
+          <span class="district-label">State Senate District:</span>
+          <span class="district-value" id="district-senate">--</span>
+          <span class="district-actions">
+            <button type="button" class="btn-yes" data-district="senate" data-confirm="yes">Yes</button>
+            <button type="button" class="btn-no" data-district="senate" data-confirm="no">No</button>
+          </span>
+          <span class="district-status" id="status-senate"></span>
+        </div>
+
+        <p class="form-error is-hidden" id="district-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="district-result" role="status"></p>
+
+        <button class="button button--primary is-hidden" type="button" id="district-save">Save District Confirmations</button>
+        <button class="button button--secondary" type="button" id="district-continue">Continue to Surveys</button>
+        <button class="button button--outline" type="button" id="district-back">Back to Location Setup</button>
       </section>
 
-      <section class="survey-form" id="wy-voter-section" aria-live="polite">
-        <h2>Wyoming voter verification</h2>
-        <p class="helper-text">If you are a registered Wyoming voter, verify with your name and address.</p>
+      <section class="survey-form is-hidden" id="wy-voter-section" aria-live="polite">
+        <h2>Wyoming Voter Verification (Optional)</h2>
+        <p class="helper-text">If you are a registered Wyoming voter, verify for enhanced credibility.</p>
         <form id="wy-voter-form">
           <div class="form-row">
             <label for="wy-first-name">First name</label>
@@ -56,8 +160,7 @@
           </div>
           <p class="form-error is-hidden" id="wy-voter-error" role="alert"></p>
           <p class="helper-text is-hidden" id="wy-voter-result" role="status"></p>
-          <button class="button button--primary" type="submit">Verify voter registration</button>
-          <button class="button button--secondary" type="button" id="district-continue">Continue to surveys</button>
+          <button class="button button--primary" type="submit">Verify Voter Registration</button>
         </form>
       </section>
     </main>

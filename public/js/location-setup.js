@@ -15,6 +15,7 @@
   const deviceNote = document.getElementById('device-note');
   const phoneVerifyButton = document.getElementById('phone-verify-button');
   const phoneVerifyStatus = document.getElementById('phone-verify-status');
+  const districtsContinueButton = document.getElementById('districts-continue-button');
   const stateSelect = document.getElementById('state');
 
   if (!addressForm || !stateSelect) {
@@ -80,6 +81,8 @@
   let addressState = '';
   let addressStateFips = '';
   let addressDistrict = '';
+  let addressSenateDist = '';
+  let addressHouseDist = '';
 
   const populateStates = () => {
     const fragment = document.createDocumentFragment();
@@ -136,6 +139,13 @@
     }
   };
 
+  const setDistrictsContinueVisible = (visible) => {
+    if (!districtsContinueButton) {
+      return;
+    }
+    districtsContinueButton.classList.toggle('is-hidden', !visible);
+  };
+
   const fetchGeo = async () => {
     try {
       const response = await fetch('/api/geo', { credentials: 'include' });
@@ -147,6 +157,14 @@
     } catch (error) {
       return { country: 'XX', risk: 'high' };
     }
+  };
+
+  const fetchAuthState = async () => {
+    const response = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
+    if (!response.ok) {
+      return null;
+    }
+    return response.json();
   };
 
   const handleGeo = async () => {
@@ -236,22 +254,29 @@
     const normalized = result.normalized || {};
     const summary = `${normalized.street1 || ''} ${normalized.street2 || ''}, ${normalized.city || ''}, ${normalized.state || ''} ${normalized.zip || ''}`.trim();
     showMessage(addressSuccess, `Address validated: ${summary}`);
+    if (addressFieldset) {
+      addressFieldset.setAttribute('disabled', 'disabled');
+    }
 
     addressLat = result.addr_lat;
     addressLng = result.addr_lng;
     addressState = normalized.state || '';
     addressStateFips = result.state_fips || '';
     addressDistrict = result.district || '';
+    addressSenateDist = result.state_senate_dist || '';
+    addressHouseDist = result.state_house_dist || '';
 
-      if (addressLat === null || addressLng === null) {
-        showMessage(addressNote, 'Address validated, district mapping pending. Device check not available yet.');
-        setDeviceSectionVisible(false);
-        setPhoneVerifyVisible(false);
-        return;
-      }
-
-      setDeviceSectionVisible(true);
+    if (addressLat === null || addressLng === null) {
+      showMessage(addressNote, 'Address validated, district mapping pending. Device check not available yet.');
+      setDeviceSectionVisible(false);
       setPhoneVerifyVisible(false);
+      setDistrictsContinueVisible(true);
+      return;
+    }
+
+    setDeviceSectionVisible(true);
+    setPhoneVerifyVisible(false);
+    setDistrictsContinueVisible(false);
       showMessage(deviceNote, isLikelyMobile()
         ? 'Phone detected. GPS should be accurate.'
       : 'Desktops often use service-provider location and can be inaccurate. For best results, verify on a phone.'
@@ -283,6 +308,8 @@
             state: addressState,
             state_fips: addressStateFips,
             district: addressDistrict,
+            state_senate_dist: addressSenateDist,
+            state_house_dist: addressHouseDist,
           };
           const result = await verifyDevice(payload);
           deviceSubmit.disabled = false;
@@ -293,18 +320,21 @@
           if (result.verified) {
             showMessage(deviceResult, `Verified. Distance: ${result.distance_m}m. Accuracy: ${result.accuracy_m}m.`);
             setPhoneVerifyVisible(false);
+            setDistrictsContinueVisible(false);
             setTimeout(() => {
               window.location.href = '/account/districts';
             }, 1200);
           } else {
             showMessage(deviceResult, `Not verified. Distance: ${result.distance_m ?? '--'}m. Reason: ${result.reason || 'UNKNOWN'}.`);
             setPhoneVerifyVisible(true);
+            setDistrictsContinueVisible(true);
           }
         },
         () => {
           deviceSubmit.disabled = false;
           showMessage(deviceError, 'Unable to access device location.');
           setPhoneVerifyVisible(true);
+          setDistrictsContinueVisible(true);
         },
         {
           enableHighAccuracy: true,
@@ -321,8 +351,22 @@
     });
   }
 
+  if (districtsContinueButton) {
+    districtsContinueButton.addEventListener('click', () => {
+      window.location.href = '/account/districts';
+    });
+  }
+
   populateStates();
   handleGeo();
+
+  fetchAuthState()
+    .then((data) => {
+      if (data && data.authenticated && data.user && data.user.address_verified === true) {
+        window.location.href = '/account/districts';
+      }
+    })
+    .catch(() => {});
 
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('phoneVerify') === '1') {

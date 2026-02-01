@@ -358,6 +358,8 @@ const fetchGeocodeByAddress = async ({ street, city, state, zip }) => {
   const geographies = match?.geographies || {};
   const stateGeo = geographies.States?.[0];
   const stateFips = stateGeo?.STATE || stateGeo?.GEOID || null;
+  
+  // Congressional District (federal)
   const districtGeo =
     geographies['119th Congressional Districts']?.[0] ||
     geographies['118th Congressional Districts']?.[0] ||
@@ -378,7 +380,23 @@ const fetchGeocodeByAddress = async ({ street, city, state, zip }) => {
     district = '00';
   }
 
-  return { lat: coords.y, lng: coords.x, stateFips, district };
+  // State Legislative Districts - Upper (State Senate)
+  const slduGeo =
+    geographies['2024 State Legislative Districts - Upper']?.[0] ||
+    geographies['2022 State Legislative Districts - Upper']?.[0] ||
+    geographies['State Legislative Districts - Upper']?.[0] ||
+    null;
+  const sldu = slduGeo?.SLDU || slduGeo?.BASENAME || null;
+
+  // State Legislative Districts - Lower (State House)
+  const sldlGeo =
+    geographies['2024 State Legislative Districts - Lower']?.[0] ||
+    geographies['2022 State Legislative Districts - Lower']?.[0] ||
+    geographies['State Legislative Districts - Lower']?.[0] ||
+    null;
+  const sldl = sldlGeo?.SLDL || sldlGeo?.BASENAME || null;
+
+  return { lat: coords.y, lng: coords.x, stateFips, district, sldu, sldl };
 };
 
 const PASSWORD_MIN_LENGTH = 12;
@@ -3192,7 +3210,7 @@ const handleAuthMe = async (request, env) => {
   }
 
   const profile = await env.DB.prepare(
-    `SELECT state, wy_house_district
+    `SELECT state, wy_house_district, state_senate_dist
      FROM user_profile
      WHERE user_id = ?`
   )
@@ -3224,6 +3242,7 @@ const handleAuthMe = async (request, env) => {
       profile: {
         state: profile?.state || null,
         wy_house_district: profile?.wy_house_district || null,
+        state_senate_dist: profile?.state_senate_dist || null,
       },
       verification: {
         voter_match_status: verification?.voter_match_status || null,
@@ -3232,7 +3251,8 @@ const handleAuthMe = async (request, env) => {
       address_verified: addressVerified,
       address_verification: {
         state_fips: addressVerification?.state_fips || null,
-        district: addressVerification?.district || null,
+        state_house_dist: addressVerification?.state_house_dist || null,
+        state_senate_dist: addressVerification?.state_senate_dist || null,
         verified_at: addressVerification?.verified_at || null,
       },
     },
@@ -4037,7 +4057,7 @@ export default {
         zip: zipNormalized,
       };
 
-      let coords = { lat: null, lng: null, stateFips: null, district: null };
+      let coords = { lat: null, lng: null, stateFips: null, district: null, sldu: null, sldl: null };
       try {
         coords = await fetchGeocodeByAddress({
           street: normalized.street1,
@@ -4057,6 +4077,8 @@ export default {
           addr_lng: coords.lng,
           state_fips: coords.stateFips,
           district: coords.district,
+          state_senate_dist: coords.sldu,
+          state_house_dist: coords.sldl,
         },
         { headers: { 'cache-control': 'no-store' } }
       );
@@ -4072,7 +4094,9 @@ export default {
       const timestamp = Number(body.timestamp_ms);
       const stateCode = (body.state || '').toString().trim().toUpperCase();
       const stateFips = body.state_fips || '';
-      const district = body.district || '';
+      const congressionalDist = body.district || '';
+      const stateSenateDist = body.state_senate_dist || '';
+      const stateHouseDist = body.state_house_dist || '';
 
       if (
         !Number.isFinite(addrLat) ||
@@ -4109,46 +4133,42 @@ export default {
       // If verified and user is logged in, persist verification record
       if (verified && env.DB) {
         try {
-          const sessionCookie = request.headers.get('cookie')?.split(';').find((c) => c.trim().startsWith('session='));
-          if (sessionCookie) {
-            const sessionId = sessionCookie.split('=')[1]?.trim();
-            if (sessionId) {
-              const session = await env.DB.prepare('SELECT user_id FROM session WHERE id = ?').bind(sessionId).first();
-              if (session?.user_id) {
-                const verifiedAt = nowIso();
-                // Upsert into user_address_verification
-                await env.DB.prepare(
-                  `INSERT INTO user_address_verification 
-                   (user_id, state_fips, district, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, verified_at, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(user_id) DO UPDATE SET
-                     state_fips = excluded.state_fips,
-                     district = excluded.district,
-                     addr_lat = excluded.addr_lat,
-                     addr_lng = excluded.addr_lng,
-                     device_lat = excluded.device_lat,
-                     device_lng = excluded.device_lng,
-                     distance_m = excluded.distance_m,
-                     accuracy_m = excluded.accuracy_m,
-                     verified_at = excluded.verified_at,
-                     updated_at = excluded.updated_at
-                  `
-                )
-                  .bind(session.user_id, stateFips, district, addrLat, addrLng, deviceLat, deviceLng, Math.round(distance), Math.round(accuracy), verifiedAt, verifiedAt, verifiedAt)
-                  .run();
+          const sessionResult = await getSessionUser(request, env);
+          if (sessionResult.status === 'valid' && sessionResult.user?.id) {
+            const userId = sessionResult.user.id;
+            const verifiedAt = nowIso();
+            await env.DB.prepare(
+              `INSERT INTO user_address_verification 
+               (user_id, state_fips, state_house_dist, state_senate_dist, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, verified_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                 state_fips = excluded.state_fips,
+                 state_house_dist = excluded.state_house_dist,
+                 state_senate_dist = excluded.state_senate_dist,
+                 addr_lat = excluded.addr_lat,
+                 addr_lng = excluded.addr_lng,
+                 device_lat = excluded.device_lat,
+                 device_lng = excluded.device_lng,
+                 distance_m = excluded.distance_m,
+                 accuracy_m = excluded.accuracy_m,
+                 verified_at = excluded.verified_at,
+                 updated_at = excluded.updated_at
+              `
+            )
+              .bind(userId, stateFips, stateHouseDist, stateSenateDist, addrLat, addrLng, deviceLat, deviceLng, Math.round(distance), Math.round(accuracy), verifiedAt, verifiedAt, verifiedAt)
+              .run();
 
-                if (stateCode) {
-                  await env.DB.prepare(
-                    `INSERT INTO user_profile (user_id, state, created_at, updated_at)
-                     VALUES (?, ?, ?, ?)
-                     ON CONFLICT(user_id) DO UPDATE SET
-                       state = excluded.state,
-                       updated_at = excluded.updated_at`
-                  )
-                    .bind(session.user_id, stateCode, verifiedAt, verifiedAt)
-                    .run();
-                }
-              }
+            if (stateCode) {
+              await env.DB.prepare(
+                `INSERT INTO user_profile (user_id, state, state_senate_dist, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON CONFLICT(user_id) DO UPDATE SET
+                   state = excluded.state,
+                   state_senate_dist = excluded.state_senate_dist,
+                   updated_at = excluded.updated_at`
+              )
+                .bind(userId, stateCode, stateSenateDist, verifiedAt, verifiedAt)
+                .run();
             }
           }
         } catch (error) {
