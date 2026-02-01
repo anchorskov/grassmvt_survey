@@ -290,7 +290,7 @@ const getAddressVerification = async (db, userId) => {
   }
   return db
     .prepare(
-      `SELECT state_fips, district, verified_at
+      `SELECT state_fips, state_house_dist, state_senate_dist, verified_at
        FROM user_address_verification
        WHERE user_id = ?`
     )
