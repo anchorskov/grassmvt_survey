@@ -255,6 +255,32 @@ main {
   font-weight: 600;
 }
 
+.user-info-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.4rem 1rem;
+  background: #e8e2d8;
+  border-bottom: 1px solid var(--header-border);
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.user-info__email {
+  font-weight: 600;
+  color: var(--link-color);
+}
+
+.user-info__divider {
+  color: #aaa;
+}
+
+.user-info__districts {
+  font-family: system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.02em;
+}
+
 .no-scroll {
   overflow: hidden;
 }
