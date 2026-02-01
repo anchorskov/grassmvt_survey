@@ -232,13 +232,34 @@
         return;
       }
       if (result.matched) {
-        showMessage(resultEl, 'Voter verified. Redirecting to surveys...');
+        let msg = '✓ Verified as registered Wyoming voter';
+        if (result.confidence === 'high') {
+          msg += ' (high confidence match)';
+        } else if (result.confidence === 'medium') {
+          msg += ' (name match confirmed)';
+        }
+        if (result.house) {
+          msg += `. House District: HD-${parseInt(result.house, 10)}`;
+        }
+        if (result.senate) {
+          msg += `, Senate District: SD-${parseInt(result.senate, 10)}`;
+        }
+        showMessage(resultEl, msg);
+        // Update voter status display
+        if (voterStatusEl) {
+          voterStatusEl.textContent = '✓ Verified Registered Voter';
+          voterStatusEl.className = 'helper-text voter-verified';
+        }
+        // Hide the WY voter form since verification is complete
+        if (wySection) {
+          wySection.classList.add('is-hidden');
+        }
         setTimeout(() => {
           window.location.href = '/surveys/list/';
-        }, 1200);
+        }, 2500);
         return;
       }
-      showMessage(resultEl, 'We could not confirm a registered Wyoming voter at this address. You can continue as unverified.');
+      showMessage(resultEl, 'We could not find a registered Wyoming voter matching this name and address. You can continue as address-verified.');
     });
   }
 

@@ -4291,23 +4291,91 @@ export default {
         );
       }
 
-      const addrKey = street1.toLowerCase().replace(/[\s.]/g, '');
+      // Normalize inputs for matching
       const fnKey = firstName.toLowerCase().trim();
       const lnKey = lastName.toLowerCase().trim();
       const cityKey = city.toLowerCase().trim();
+      
+      // Extract house number from street address (first numeric sequence)
+      const houseNumMatch = street1.match(/^(\d+)/);
+      const houseNum = houseNumMatch ? houseNumMatch[1] : null;
+      
+      // Extract street name: remove house number and normalize
+      // "123 N 7th St" -> "n7thst", "123 North Seventh Street" -> "northseventhstreet"
+      const streetNorm = street1
+        .toLowerCase()
+        .replace(/^\d+\s*[a-z]?\s*/i, '') // remove house number and optional unit letter
+        .replace(/[\s.,#-]+/g, '')        // remove spaces, punctuation
+        .replace(/street$/i, 'st')        // normalize "street" to "st"
+        .replace(/avenue$/i, 'ave')       // normalize "avenue" to "ave"
+        .replace(/drive$/i, 'dr')
+        .replace(/road$/i, 'rd')
+        .replace(/boulevard$/i, 'blvd')
+        .replace(/lane$/i, 'ln')
+        .replace(/court$/i, 'ct')
+        .replace(/circle$/i, 'cir')
+        .replace(/place$/i, 'pl');
 
-      const match = await env.WY_VOTERS_DB.prepare(
-        `SELECT voter_id, house, senate
-         FROM voters_addr_norm
-         WHERE lower(fn) = ?
-           AND lower(ln) = ?
-           AND lower(city) = ?
-           AND replace(replace(lower(addr1), ' ', ''), '.', '') = ?
-           AND (zip = ? OR zip = ?)
-         LIMIT 1`
-      )
-        .bind(fnKey, lnKey, cityKey, addrKey, zip, zip.replace('-', ''))
-        .first();
+      let match = null;
+      let matchConfidence = 'low';
+
+      // Strategy 1: Try exact name + house number + city match (high confidence)
+      if (houseNum) {
+        const candidates = await env.WY_VOTERS_DB.prepare(
+          `SELECT voter_id, house, senate, addr1, zip
+           FROM voters_addr_norm
+           WHERE lower(fn) = ?
+             AND lower(ln) = ?
+             AND lower(city) = ?
+           LIMIT 50`
+        )
+          .bind(fnKey, lnKey, cityKey)
+          .all();
+
+        if (candidates.results && candidates.results.length > 0) {
+          for (const row of candidates.results) {
+            // Extract house number from stored address
+            const storedHouseMatch = (row.addr1 || '').match(/^(\d+)/);
+            const storedHouseNum = storedHouseMatch ? storedHouseMatch[1] : null;
+            
+            // Normalize stored street
+            const storedStreetNorm = (row.addr1 || '')
+              .toLowerCase()
+              .replace(/^\d+\s*[a-z]?\s*/i, '')
+              .replace(/[\s.,#-]+/g, '')
+              .replace(/street$/i, 'st')
+              .replace(/avenue$/i, 'ave')
+              .replace(/drive$/i, 'dr')
+              .replace(/road$/i, 'rd')
+              .replace(/boulevard$/i, 'blvd')
+              .replace(/lane$/i, 'ln')
+              .replace(/court$/i, 'ct')
+              .replace(/circle$/i, 'cir')
+              .replace(/place$/i, 'pl');
+
+            // House number must match exactly
+            if (storedHouseNum === houseNum) {
+              // Check if street names are similar enough
+              // Either exact match or one contains the other (handles "7th" vs "7 th")
+              const streetMatch = storedStreetNorm === streetNorm ||
+                storedStreetNorm.includes(streetNorm.replace(/\s/g, '')) ||
+                streetNorm.includes(storedStreetNorm.replace(/\s/g, ''));
+              
+              if (streetMatch) {
+                match = row;
+                matchConfidence = 'high';
+                break;
+              }
+            }
+          }
+          
+          // Strategy 2: If no exact house match, check if name + city has only one result (medium confidence)
+          if (!match && candidates.results.length === 1) {
+            match = candidates.results[0];
+            matchConfidence = 'medium';
+          }
+        }
+      }
 
       if (!match) {
         await env.DB.prepare(
@@ -4328,15 +4396,16 @@ export default {
       }
 
       await env.DB.prepare(
-        `INSERT INTO user_verification (user_id, voter_match_status, residence_confidence, last_check_at, created_at, updated_at)
-         VALUES (?, 'verified', 'high', ?, ?, ?)
+        `INSERT INTO user_verification (user_id, voter_match_status, residence_confidence, wy_voter_id, last_check_at, created_at, updated_at)
+         VALUES (?, 'verified', ?, ?, ?, ?, ?)
          ON CONFLICT(user_id) DO UPDATE SET
            voter_match_status = 'verified',
-           residence_confidence = 'high',
+           residence_confidence = excluded.residence_confidence,
+           wy_voter_id = excluded.wy_voter_id,
            last_check_at = excluded.last_check_at,
            updated_at = excluded.updated_at`
       )
-        .bind(userId, nowIso(), nowIso(), nowIso())
+        .bind(userId, matchConfidence, match.voter_id || null, nowIso(), nowIso(), nowIso())
         .run();
 
       await env.DB.prepare(
@@ -4352,7 +4421,14 @@ export default {
         .run();
 
       return jsonResponse(
-        { ok: true, matched: true, house: match.house || null, senate: match.senate || null },
+        { 
+          ok: true, 
+          matched: true, 
+          confidence: matchConfidence,
+          voter_id: match.voter_id || null,
+          house: match.house || null, 
+          senate: match.senate || null 
+        },
         { headers: { 'cache-control': 'no-store' } }
       );
     }
