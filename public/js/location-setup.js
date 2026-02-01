@@ -352,7 +352,30 @@
   }
 
   if (districtsContinueButton) {
-    districtsContinueButton.addEventListener('click', () => {
+    districtsContinueButton.addEventListener('click', async () => {
+      // Save the address data even without device verification
+      try {
+        const response = await fetch('/api/location/save-address', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            addr_lat: addressLat,
+            addr_lng: addressLng,
+            state: addressState,
+            state_fips: addressStateFips,
+            district: addressDistrict,
+            state_senate_dist: addressSenateDist,
+            state_house_dist: addressHouseDist,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!data.ok) {
+          console.warn('[Location] Save address failed:', data);
+        }
+      } catch (e) {
+        console.warn('[Location] Save address error:', e);
+      }
       window.location.href = '/account/districts';
     });
   }

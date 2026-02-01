@@ -4084,6 +4084,63 @@ export default {
       );
     }
 
+    // Save address verification without device check (for users who skip GPS verification)
+    if (request.method === 'POST' && url.pathname === '/api/location/save-address') {
+      const auth = await requireSessionUser(request, env);
+      if (auth.response) {
+        return auth.response;
+      }
+      const body = await parseJsonBody(request);
+      const addrLat = body.addr_lat !== undefined && body.addr_lat !== null ? Number(body.addr_lat) : null;
+      const addrLng = body.addr_lng !== undefined && body.addr_lng !== null ? Number(body.addr_lng) : null;
+      const stateCode = (body.state || '').toString().trim().toUpperCase();
+      const stateFips = body.state_fips || '';
+      const stateSenateDist = body.state_senate_dist || '';
+      const stateHouseDist = body.state_house_dist || '';
+      const userId = auth.user?.id || '';
+
+      if (!stateCode) {
+        return jsonResponse(
+          { ok: false, reason: 'BAD_INPUT' },
+          { status: 400, headers: { 'cache-control': 'no-store' } }
+        );
+      }
+
+      const verifiedAt = nowIso();
+      await env.DB.prepare(
+        `INSERT INTO user_address_verification 
+         (user_id, state_fips, state_house_dist, state_senate_dist, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, verified_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+           state_fips = excluded.state_fips,
+           state_house_dist = excluded.state_house_dist,
+           state_senate_dist = excluded.state_senate_dist,
+           addr_lat = excluded.addr_lat,
+           addr_lng = excluded.addr_lng,
+           verified_at = excluded.verified_at,
+           updated_at = excluded.updated_at
+        `
+      )
+        .bind(userId, stateFips, stateHouseDist, stateSenateDist, addrLat, addrLng, verifiedAt, verifiedAt, verifiedAt)
+        .run();
+
+      await env.DB.prepare(
+        `INSERT INTO user_profile (user_id, state, state_senate_dist, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+           state = excluded.state,
+           state_senate_dist = excluded.state_senate_dist,
+           updated_at = excluded.updated_at`
+      )
+        .bind(userId, stateCode, stateSenateDist, verifiedAt, verifiedAt)
+        .run();
+
+      return jsonResponse(
+        { ok: true, saved: true },
+        { headers: { 'cache-control': 'no-store' } }
+      );
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/location/verify-device') {
       const body = await parseJsonBody(request);
       const addrLat = Number(body.addr_lat);
