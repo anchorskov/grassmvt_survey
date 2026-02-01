@@ -1,0 +1,71 @@
+<!-- public/account/location/index.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Location Setup | Grassroots Movement</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <div data-include="/partials/header.html"></div>
+    <main>
+      <h1>Location Setup</h1>
+      <p class="helper-text">Verify your USA address to unlock location-based surveys.</p>
+
+      <section class="survey-form" aria-live="polite">
+        <h2>Connection</h2>
+        <p class="helper-text" id="geo-status">Detecting location...</p>
+        <p class="helper-text">
+          Country: <span id="geo-country">--</span>
+        </p>
+        <p class="form-error is-hidden" id="geo-warning" role="alert"></p>
+      </section>
+
+      <section class="survey-form" aria-live="polite">
+        <h2>Verify USA Address</h2>
+        <p class="helper-text" id="address-note"></p>
+        <form id="address-form">
+          <fieldset id="address-fieldset">
+            <div class="form-row">
+              <label for="street1">Street address</label>
+              <input id="street1" name="street1" type="text" autocomplete="address-line1" required />
+            </div>
+            <div class="form-row">
+              <label for="street2">Address line 2 (optional)</label>
+              <input id="street2" name="street2" type="text" autocomplete="address-line2" />
+            </div>
+            <div class="form-row">
+              <label for="city">City</label>
+              <input id="city" name="city" type="text" autocomplete="address-level2" required />
+            </div>
+            <div class="form-row">
+              <label for="state">State</label>
+              <select id="state" name="state" required>
+                <option value="">Select a state</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="zip">ZIP code</label>
+              <input id="zip" name="zip" type="text" autocomplete="postal-code" required />
+            </div>
+            <p class="form-error is-hidden" id="address-error" role="alert"></p>
+            <p class="helper-text is-hidden" id="address-success" role="status"></p>
+            <button class="button button--primary" type="submit" id="address-submit">Validate Address</button>
+          </fieldset>
+        </form>
+      </section>
+
+      <section class="survey-form is-hidden" id="device-section" aria-live="polite">
+        <h2>Device Check</h2>
+        <p class="helper-text">We compare your device location to the address you entered.</p>
+        <button class="button button--primary" type="button" id="device-submit">Share device location now</button>
+        <p class="form-error is-hidden" id="device-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="device-result" role="status"></p>
+      </section>
+    </main>
+    <div data-include="/partials/footer.html"></div>
+    <script src="/js/include-partials.js"></script>
+    <script src="/js/location-setup.js" defer></script>
+  </body>
+</html>

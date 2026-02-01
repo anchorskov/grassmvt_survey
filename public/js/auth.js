@@ -659,6 +659,12 @@
         new CustomEvent('auth:changed', { detail: { authenticated: !!authenticated } })
       );
       if (authMode === 'login' && authenticated) {
+        if (window.AuthUI && window.AuthUI.state && window.AuthUI.state.addressVerified === false) {
+          if (!window.location.pathname.startsWith('/account/location')) {
+            window.location.href = '/account/location';
+          }
+          return;
+        }
         const nudged = await maybeShowPasskeyNudge();
         if (nudged) {
           return;

@@ -30,6 +30,8 @@ const AUTH_LOG_PATHS = new Set([
   '/api/auth/email/verify/request',
   '/api/auth/email/verify/confirm',
 ]);
+const GEO_UNKNOWN = 'XX';
+const GEO_TEST = 'T1';
 
 const truncateValue = (value, maxLength) => {
   if (!value) {
@@ -264,6 +266,119 @@ const parseFormBody = async (request) => {
   } catch (error) {
     return {};
   }
+};
+
+const normalizeCountryCode = (value) => {
+  const upper = (value || '').toString().trim().toUpperCase();
+  return upper || GEO_UNKNOWN;
+};
+
+const getGeoCountry = (request) => {
+  const headerValue = request.headers.get('CF-IPCountry');
+  if (headerValue) {
+    return normalizeCountryCode(headerValue);
+  }
+  if (request.cf && request.cf.country) {
+    return normalizeCountryCode(request.cf.country);
+  }
+  return GEO_UNKNOWN;
+};
+
+const getAddressVerification = async (db, userId) => {
+  if (!db || !userId) {
+    return null;
+  }
+  return db
+    .prepare(
+      `SELECT state_fips, district, verified_at
+       FROM user_address_verification
+       WHERE user_id = ?`
+    )
+    .bind(userId)
+    .first();
+};
+
+const isValidZip = (value) => {
+  if (!value) {
+    return false;
+  }
+  return /^\d{5}(-\d{4})?$/.test(value);
+};
+
+const normalizeZip = (value) => {
+  const digits = (value || '').replace(/\D/g, '');
+  if (digits.length === 5) {
+    return digits;
+  }
+  if (digits.length === 9) {
+    return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  }
+  return '';
+};
+
+const haversineMeters = (lat1, lon1, lat2, lon2) => {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const r = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return r * c;
+};
+
+const fetchGeocodeByAddress = async ({ street, city, state, zip }) => {
+  const endpoint = `https://geocoding.geo.census.gov/geocoder/geographies/address?street=${encodeURIComponent(
+    street
+  )}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(
+    state
+  )}&zip=${encodeURIComponent(zip)}&benchmark=Public_AR_Current&vintage=Current_Current&format=json`;
+
+  const response = await fetch(endpoint);
+  if (!response.ok) {
+    throw new Error(`Census geolocation HTTP error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const matches = data?.result?.addressMatches;
+  if (!matches || matches.length === 0) {
+    throw new Error('No matching addresses found in Census data.');
+  }
+
+  const match = matches[0];
+  const coords = match?.coordinates;
+  if (!coords || typeof coords.x !== 'number' || typeof coords.y !== 'number') {
+    throw new Error('Coordinates missing in Census response.');
+  }
+
+  const geographies = match?.geographies || {};
+  const stateGeo = geographies.States?.[0];
+  const stateFips = stateGeo?.STATE || stateGeo?.GEOID || null;
+  const districtGeo =
+    geographies['119th Congressional Districts']?.[0] ||
+    geographies['118th Congressional Districts']?.[0] ||
+    geographies['116th Congressional Districts']?.[0] ||
+    null;
+  let district =
+    districtGeo?.CD ||
+    districtGeo?.CD119 ||
+    districtGeo?.CD118 ||
+    districtGeo?.CD116 ||
+    districtGeo?.BASENAME ||
+    null;
+  if (
+    district === 0 ||
+    district === '0' ||
+    (typeof district === 'string' && district.trim().toLowerCase() === 'at large')
+  ) {
+    district = '00';
+  }
+
+  return { lat: coords.y, lng: coords.x, stateFips, district };
 };
 
 const PASSWORD_MIN_LENGTH = 12;
@@ -3083,6 +3198,8 @@ const handleAuthMe = async (request, env) => {
   )
     .bind(user.id)
     .first();
+  const addressVerification = await getAddressVerification(env.DB, user.id);
+  const addressVerified = !!addressVerification?.verified_at;
 
   if (isDebug) {
     logAuthDebug(request, 'GET /api/auth/me', 'response_ready', {
@@ -3104,6 +3221,12 @@ const handleAuthMe = async (request, env) => {
       verification: {
         voter_match_status: verification?.voter_match_status || null,
         residence_confidence: verification?.residence_confidence || null,
+      },
+      address_verified: addressVerified,
+      address_verification: {
+        state_fips: addressVerification?.state_fips || null,
+        district: addressVerification?.district || null,
+        verified_at: addressVerification?.verified_at || null,
       },
     },
   });
@@ -3800,6 +3923,15 @@ export default {
         const sessionResult = await getSessionUser(request, env);
         const user = sessionResult.status === 'valid' ? sessionResult.user : null;
         const userId = user ? user.id : '';
+        if (userId) {
+          const addressVerification = await getAddressVerification(env.DB, userId);
+          if (!addressVerification?.verified_at) {
+            return jsonResponse(
+              { ok: false, code: 'ADDRESS_NOT_VERIFIED', message: 'Address verification required.' },
+              { status: 403, headers: sessionResult.headers || undefined }
+            );
+          }
+        }
         const result = await env.DB.prepare(
           `SELECT s.slug,
                   s.title,
@@ -3857,6 +3989,164 @@ export default {
       } catch (error) {
         return jsonResponse({ error: error.message }, { status: 500 });
       }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/geo') {
+      const country = getGeoCountry(request);
+      const risk = country === 'US' ? 'low' : 'high';
+      return jsonResponse(
+        { ok: true, country, risk },
+        {
+          headers: {
+            'cache-control': 'no-store',
+            'x-geo-country': country,
+            'Access-Control-Expose-Headers': 'x-geo-country',
+          },
+        }
+      );
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/location/validate-address') {
+      const body = await parseJsonBody(request);
+      const street1 = (body.street1 || '').trim();
+      const street2 = (body.street2 || '').trim();
+      const city = (body.city || '').trim();
+      const stateRaw = (body.state || '').trim().toUpperCase();
+      const zipNormalized = normalizeZip(body.zip || '');
+
+      const stateCodes = new Set(getUsStates().map((item) => item.code));
+      if (!street1 || !city || !stateCodes.has(stateRaw) || !isValidZip(zipNormalized)) {
+        return jsonResponse(
+          { ok: false, error: 'US_ONLY', message: 'USA addresses only for now.' },
+          { status: 400, headers: { 'cache-control': 'no-store' } }
+        );
+      }
+
+      const normalized = {
+        street1,
+        street2,
+        city,
+        state: stateRaw,
+        zip: zipNormalized,
+      };
+
+      let coords = { lat: null, lng: null, stateFips: null, district: null };
+      try {
+        coords = await fetchGeocodeByAddress({
+          street: normalized.street1,
+          city: normalized.city,
+          state: normalized.state,
+          zip: normalized.zip,
+        });
+      } catch (error) {
+        console.error('[Geocode] Address lookup failed:', error?.message);
+      }
+
+      return jsonResponse(
+        {
+          ok: true,
+          normalized,
+          addr_lat: coords.lat,
+          addr_lng: coords.lng,
+          state_fips: coords.stateFips,
+          district: coords.district,
+        },
+        { headers: { 'cache-control': 'no-store' } }
+      );
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/location/verify-device') {
+      const body = await parseJsonBody(request);
+      const addrLat = Number(body.addr_lat);
+      const addrLng = Number(body.addr_lng);
+      const deviceLat = Number(body.device_lat);
+      const deviceLng = Number(body.device_lng);
+      const accuracy = Number(body.accuracy_m);
+      const timestamp = Number(body.timestamp_ms);
+      const stateFips = body.state_fips || '';
+      const district = body.district || '';
+
+      if (
+        !Number.isFinite(addrLat) ||
+        !Number.isFinite(addrLng) ||
+        !Number.isFinite(deviceLat) ||
+        !Number.isFinite(deviceLng) ||
+        !Number.isFinite(accuracy) ||
+        !Number.isFinite(timestamp)
+      ) {
+        return jsonResponse(
+          { ok: false, reason: 'BAD_INPUT' },
+          { status: 400, headers: { 'cache-control': 'no-store' } }
+        );
+      }
+
+      const now = Date.now();
+      if (Math.abs(now - timestamp) > 2 * 60 * 1000) {
+        return jsonResponse(
+          {
+            ok: true,
+            verified: false,
+            distance_m: null,
+            accuracy_m: accuracy,
+            reason: 'STALE',
+          },
+          { headers: { 'cache-control': 'no-store' } }
+        );
+      }
+
+      const distance = haversineMeters(addrLat, addrLng, deviceLat, deviceLng);
+      const threshold = Math.max(accuracy * 2, 250);
+      const verified = distance <= threshold && distance <= 1500;
+
+      // If verified and user is logged in, persist verification record
+      if (verified && env.DB) {
+        try {
+          const sessionCookie = request.headers.get('cookie')?.split(';').find((c) => c.trim().startsWith('session='));
+          if (sessionCookie) {
+            const sessionId = sessionCookie.split('=')[1]?.trim();
+            if (sessionId) {
+              const session = await env.DB.prepare('SELECT user_id FROM session WHERE id = ?').bind(sessionId).first();
+              if (session?.user_id) {
+                const verifiedAt = nowIso();
+                // Upsert into user_address_verification
+                await env.DB.prepare(
+                  `INSERT INTO user_address_verification 
+                   (user_id, state_fips, district, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, verified_at, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(user_id) DO UPDATE SET
+                     state_fips = excluded.state_fips,
+                     district = excluded.district,
+                     addr_lat = excluded.addr_lat,
+                     addr_lng = excluded.addr_lng,
+                     device_lat = excluded.device_lat,
+                     device_lng = excluded.device_lng,
+                     distance_m = excluded.distance_m,
+                     accuracy_m = excluded.accuracy_m,
+                     verified_at = excluded.verified_at,
+                     updated_at = excluded.updated_at
+                  `
+                )
+                  .bind(session.user_id, stateFips, district, addrLat, addrLng, deviceLat, deviceLng, Math.round(distance), Math.round(accuracy), verifiedAt, verifiedAt, verifiedAt)
+                  .run();
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[Location] Verification record persistence failed:', error);
+          // Don't fail the response if DB write fails; just log the error
+        }
+      }
+
+      return jsonResponse(
+        {
+          ok: true,
+          verified,
+          distance_m: Math.round(distance),
+          accuracy_m: Math.round(accuracy),
+          reason: verified ? null : 'TOO_FAR',
+        },
+        { headers: { 'cache-control': 'no-store' } }
+      );
     }
 
     if (request.method === 'GET' && url.pathname === '/api/responses/mine') {
@@ -4617,6 +4907,16 @@ export default {
         title: 'Survey summary',
         bodyHtml,
       });
+      return new Response(page, {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    if (request.method === 'GET' && (url.pathname === '/account/location' || url.pathname === '/account/location/')) {
+      const page = await fetchAssetText(env, url, '/account/location/index.html');
+      if (!page) {
+        return new Response('Not Found', { status: 404 });
+      }
       return new Response(page, {
         headers: { 'content-type': 'text/html; charset=utf-8' },
       });

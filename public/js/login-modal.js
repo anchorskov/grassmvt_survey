@@ -636,10 +636,17 @@
     }
     resetTurnstile();
     const authenticated = await waitForAuthState();
-    if (authenticated) {
-      window.dispatchEvent(
-        new CustomEvent('auth:changed', { detail: { authenticated: true } })
-      );
+      if (authenticated) {
+        window.dispatchEvent(
+          new CustomEvent('auth:changed', { detail: { authenticated: true } })
+        );
+      if (!authUI.state || authUI.state.addressVerified !== true) {
+        closeModal();
+        if (!window.location.pathname.startsWith('/account/location')) {
+          window.location.href = '/account/location';
+        }
+        return;
+      }
       if (window.PasskeyPrompt && typeof window.PasskeyPrompt.queueAfterPasswordLogin === 'function') {
         window.PasskeyPrompt.queueAfterPasswordLogin();
       }

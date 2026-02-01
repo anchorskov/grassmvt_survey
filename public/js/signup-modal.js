@@ -341,6 +341,13 @@
         window.dispatchEvent(
           new CustomEvent('auth:changed', { detail: { authenticated: true } })
         );
+        if (authUI.state && authUI.state.addressVerified === false) {
+          closeModal();
+          if (!window.location.pathname.startsWith('/account/location')) {
+            window.location.href = '/account/location';
+          }
+          return;
+        }
         
         // Close signup modal and open login modal with passkey nudge flag
         closeModal();

@@ -46,6 +46,7 @@
   const state = {
     authenticated: false,
     email: '',
+    addressVerified: false,
   };
 
   const PASSKEY_PROMPT_SUPPRESS_KEY = 'passkey_prompt_dismissed_at';
@@ -201,6 +202,7 @@
       const data = await response.json();
       if (data.authenticated) {
         setLoggedInState(true, data.user?.email || '');
+        state.addressVerified = !!data.user?.address_verified;
         if (consumePostVerifyFlag()) {
           AuthModals.closeAll();
         }
@@ -242,6 +244,12 @@
     const authenticated = await fetchAuthState();
     if (!authenticated) {
       AuthModals.open('login');
+      return;
+    }
+    if (!state.addressVerified) {
+      if (!window.location.pathname.startsWith('/account/location')) {
+        window.location.href = '/account/location';
+      }
     }
   };
 
