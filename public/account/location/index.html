@@ -28,6 +28,14 @@
         <form id="address-form">
           <fieldset id="address-fieldset">
             <div class="form-row">
+              <label for="first-name">First name</label>
+              <input id="first-name" name="first_name" type="text" autocomplete="given-name" required />
+            </div>
+            <div class="form-row">
+              <label for="last-name">Last name</label>
+              <input id="last-name" name="last_name" type="text" autocomplete="family-name" required />
+            </div>
+            <div class="form-row">
               <label for="street1">Street address</label>
               <input id="street1" name="street1" type="text" autocomplete="address-line1" required />
             </div>
@@ -66,6 +74,7 @@
         <button class="button button--secondary is-hidden" type="button" id="phone-verify-button">Send link to verify on phone</button>
         <p class="helper-text is-hidden" id="phone-verify-status" role="status"></p>
       </section>
+
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>

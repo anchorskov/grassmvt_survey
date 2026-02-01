@@ -4070,6 +4070,7 @@ export default {
       const deviceLng = Number(body.device_lng);
       const accuracy = Number(body.accuracy_m);
       const timestamp = Number(body.timestamp_ms);
+      const stateCode = (body.state || '').toString().trim().toUpperCase();
       const stateFips = body.state_fips || '';
       const district = body.district || '';
 
@@ -4135,6 +4136,18 @@ export default {
                 )
                   .bind(session.user_id, stateFips, district, addrLat, addrLng, deviceLat, deviceLng, Math.round(distance), Math.round(accuracy), verifiedAt, verifiedAt, verifiedAt)
                   .run();
+
+                if (stateCode) {
+                  await env.DB.prepare(
+                    `INSERT INTO user_profile (user_id, state, created_at, updated_at)
+                     VALUES (?, ?, ?, ?)
+                     ON CONFLICT(user_id) DO UPDATE SET
+                       state = excluded.state,
+                       updated_at = excluded.updated_at`
+                  )
+                    .bind(session.user_id, stateCode, verifiedAt, verifiedAt)
+                    .run();
+                }
               }
             }
           }
@@ -4216,6 +4229,110 @@ export default {
       });
       return jsonResponse(
         { ok: true, sent: !!sent.ok },
+        { headers: { 'cache-control': 'no-store' } }
+      );
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/location/verify-voter') {
+      const auth = await requireSessionUser(request, env);
+      if (auth.response) {
+        return auth.response;
+      }
+      const body = await parseJsonBody(request);
+      const firstName = (body.first_name || '').trim();
+      const lastName = (body.last_name || '').trim();
+      const street1 = (body.street1 || '').trim();
+      const city = (body.city || '').trim();
+      const state = (body.state || '').trim().toUpperCase();
+      const zip = normalizeZip(body.zip || '');
+      const userId = auth.user?.id || '';
+
+      if (!firstName || !lastName || !street1 || !city || !state || !zip) {
+        return jsonResponse(
+          { ok: false, reason: 'BAD_INPUT' },
+          { status: 400, headers: { 'cache-control': 'no-store' } }
+        );
+      }
+      if (state !== 'WY' || !env.WY_VOTERS_DB) {
+        await env.DB.prepare(
+          `INSERT INTO user_verification (user_id, voter_match_status, residence_confidence, last_check_at, created_at, updated_at)
+           VALUES (?, 'unverified', 'low', ?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET
+             voter_match_status = 'unverified',
+             residence_confidence = 'low',
+             last_check_at = excluded.last_check_at,
+             updated_at = excluded.updated_at`
+        )
+          .bind(userId, nowIso(), nowIso(), nowIso())
+          .run();
+        return jsonResponse(
+          { ok: true, matched: false, reason: 'STATE_NOT_SUPPORTED' },
+          { headers: { 'cache-control': 'no-store' } }
+        );
+      }
+
+      const addrKey = street1.toLowerCase().replace(/[\s.]/g, '');
+      const fnKey = firstName.toLowerCase().trim();
+      const lnKey = lastName.toLowerCase().trim();
+      const cityKey = city.toLowerCase().trim();
+
+      const match = await env.WY_VOTERS_DB.prepare(
+        `SELECT voter_id, house, senate
+         FROM voters_addr_norm
+         WHERE lower(fn) = ?
+           AND lower(ln) = ?
+           AND lower(city) = ?
+           AND replace(replace(lower(addr1), ' ', ''), '.', '') = ?
+           AND (zip = ? OR zip = ?)
+         LIMIT 1`
+      )
+        .bind(fnKey, lnKey, cityKey, addrKey, zip, zip.replace('-', ''))
+        .first();
+
+      if (!match) {
+        await env.DB.prepare(
+          `INSERT INTO user_verification (user_id, voter_match_status, residence_confidence, last_check_at, created_at, updated_at)
+           VALUES (?, 'unverified', 'low', ?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET
+             voter_match_status = 'unverified',
+             residence_confidence = 'low',
+             last_check_at = excluded.last_check_at,
+             updated_at = excluded.updated_at`
+        )
+          .bind(userId, nowIso(), nowIso(), nowIso())
+          .run();
+        return jsonResponse(
+          { ok: true, matched: false, reason: 'NO_MATCH' },
+          { headers: { 'cache-control': 'no-store' } }
+        );
+      }
+
+      await env.DB.prepare(
+        `INSERT INTO user_verification (user_id, voter_match_status, residence_confidence, last_check_at, created_at, updated_at)
+         VALUES (?, 'verified', 'high', ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+           voter_match_status = 'verified',
+           residence_confidence = 'high',
+           last_check_at = excluded.last_check_at,
+           updated_at = excluded.updated_at`
+      )
+        .bind(userId, nowIso(), nowIso(), nowIso())
+        .run();
+
+      await env.DB.prepare(
+        `INSERT INTO user_profile (user_id, state, wy_house_district, state_senate_dist, created_at, updated_at)
+         VALUES (?, 'WY', ?, ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+           state = 'WY',
+           wy_house_district = excluded.wy_house_district,
+           state_senate_dist = excluded.state_senate_dist,
+           updated_at = excluded.updated_at`
+      )
+        .bind(userId, match.house || null, match.senate || null, nowIso(), nowIso())
+        .run();
+
+      return jsonResponse(
+        { ok: true, matched: true, house: match.house || null, senate: match.senate || null },
         { headers: { 'cache-control': 'no-store' } }
       );
     }
@@ -4985,6 +5102,16 @@ export default {
 
     if (request.method === 'GET' && (url.pathname === '/account/location' || url.pathname === '/account/location/')) {
       const page = await fetchAssetText(env, url, '/account/location/index.html');
+      if (!page) {
+        return new Response('Not Found', { status: 404 });
+      }
+      return new Response(page, {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    if (request.method === 'GET' && (url.pathname === '/account/districts' || url.pathname === '/account/districts/')) {
+      const page = await fetchAssetText(env, url, '/account/districts/index.html');
       if (!page) {
         return new Response('Not Found', { status: 404 });
       }

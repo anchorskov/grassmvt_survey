@@ -1,0 +1,68 @@
+<!-- public/account/districts/index.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>District Verification | Grassroots Movement</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <div data-include="/partials/header.html"></div>
+    <main>
+      <h1>District Verification</h1>
+      <p class="helper-text">Confirm your districts so your responses count in the right place.</p>
+
+      <section class="survey-form" aria-live="polite">
+        <h2>Detected location</h2>
+        <p class="helper-text" id="district-status">Loading your verification status...</p>
+        <p class="helper-text">
+          State: <span id="district-state">--</span>
+        </p>
+        <p class="helper-text">
+          Federal district: <span id="district-federal">--</span>
+        </p>
+        <p class="helper-text">
+          State house district: <span id="district-house">--</span>
+        </p>
+        <p class="helper-text">
+          State senate district: <span id="district-senate">--</span>
+        </p>
+      </section>
+
+      <section class="survey-form" id="wy-voter-section" aria-live="polite">
+        <h2>Wyoming voter verification</h2>
+        <p class="helper-text">If you are a registered Wyoming voter, verify with your name and address.</p>
+        <form id="wy-voter-form">
+          <div class="form-row">
+            <label for="wy-first-name">First name</label>
+            <input id="wy-first-name" name="first_name" type="text" autocomplete="given-name" required />
+          </div>
+          <div class="form-row">
+            <label for="wy-last-name">Last name</label>
+            <input id="wy-last-name" name="last_name" type="text" autocomplete="family-name" required />
+          </div>
+          <div class="form-row">
+            <label for="wy-street">Street address</label>
+            <input id="wy-street" name="street1" type="text" autocomplete="address-line1" required />
+          </div>
+          <div class="form-row">
+            <label for="wy-city">City</label>
+            <input id="wy-city" name="city" type="text" autocomplete="address-level2" required />
+          </div>
+          <div class="form-row">
+            <label for="wy-zip">ZIP code</label>
+            <input id="wy-zip" name="zip" type="text" autocomplete="postal-code" required />
+          </div>
+          <p class="form-error is-hidden" id="wy-voter-error" role="alert"></p>
+          <p class="helper-text is-hidden" id="wy-voter-result" role="status"></p>
+          <button class="button button--primary" type="submit">Verify voter registration</button>
+          <button class="button button--secondary" type="button" id="district-continue">Continue to surveys</button>
+        </form>
+      </section>
+    </main>
+    <div data-include="/partials/footer.html"></div>
+    <script src="/js/include-partials.js"></script>
+    <script src="/js/districts-verify.js" defer></script>
+  </body>
+</html>

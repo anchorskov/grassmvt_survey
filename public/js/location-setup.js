@@ -77,6 +77,9 @@
 
   let addressLat = null;
   let addressLng = null;
+  let addressState = '';
+  let addressStateFips = '';
+  let addressDistrict = '';
 
   const populateStates = () => {
     const fragment = document.createDocumentFragment();
@@ -215,6 +218,8 @@
     addressLng = null;
 
     const payload = {
+      first_name: document.getElementById('first-name').value,
+      last_name: document.getElementById('last-name').value,
       street1: document.getElementById('street1').value,
       street2: document.getElementById('street2').value,
       city: document.getElementById('city').value,
@@ -234,20 +239,23 @@
 
     addressLat = result.addr_lat;
     addressLng = result.addr_lng;
+    addressState = normalized.state || '';
+    addressStateFips = result.state_fips || '';
+    addressDistrict = result.district || '';
 
-    if (addressLat === null || addressLng === null) {
-      showMessage(addressNote, 'Address validated, district mapping pending. Device check not available yet.');
-      setDeviceSectionVisible(false);
+      if (addressLat === null || addressLng === null) {
+        showMessage(addressNote, 'Address validated, district mapping pending. Device check not available yet.');
+        setDeviceSectionVisible(false);
+        setPhoneVerifyVisible(false);
+        return;
+      }
+
+      setDeviceSectionVisible(true);
       setPhoneVerifyVisible(false);
-      return;
-    }
-
-    setDeviceSectionVisible(true);
-    setPhoneVerifyVisible(false);
-    showMessage(deviceNote, isLikelyMobile()
-      ? 'Phone detected. GPS should be accurate.'
+      showMessage(deviceNote, isLikelyMobile()
+        ? 'Phone detected. GPS should be accurate.'
       : 'Desktops often use service-provider location and can be inaccurate. For best results, verify on a phone.'
-    );
+      );
   });
 
   if (deviceSubmit) {
@@ -272,6 +280,9 @@
             device_lng: position.coords.longitude,
             accuracy_m: position.coords.accuracy,
             timestamp_ms: position.timestamp,
+            state: addressState,
+            state_fips: addressStateFips,
+            district: addressDistrict,
           };
           const result = await verifyDevice(payload);
           deviceSubmit.disabled = false;
@@ -282,6 +293,9 @@
           if (result.verified) {
             showMessage(deviceResult, `Verified. Distance: ${result.distance_m}m. Accuracy: ${result.accuracy_m}m.`);
             setPhoneVerifyVisible(false);
+            setTimeout(() => {
+              window.location.href = '/account/districts';
+            }, 1200);
           } else {
             showMessage(deviceResult, `Not verified. Distance: ${result.distance_m ?? '--'}m. Reason: ${result.reason || 'UNKNOWN'}.`);
             setPhoneVerifyVisible(true);
