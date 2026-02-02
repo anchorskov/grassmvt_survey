@@ -4452,6 +4452,34 @@ export default {
         );
       }
 
+      // Check if this voter_id is already claimed by another user
+      if (match.voter_id) {
+        const existingClaim = await env.DB.prepare(
+          `SELECT user_id FROM user_verification WHERE wy_voter_id = ? AND user_id != ?`
+        )
+          .bind(match.voter_id, userId)
+          .first();
+        
+        if (existingClaim) {
+          // This voter is already verified by another account
+          await env.DB.prepare(
+            `INSERT INTO user_verification (user_id, voter_match_status, residence_confidence, last_check_at, created_at, updated_at)
+             VALUES (?, 'unverified', 'low', ?, ?, ?)
+             ON CONFLICT(user_id) DO UPDATE SET
+               voter_match_status = 'unverified',
+               residence_confidence = 'low',
+               last_check_at = excluded.last_check_at,
+               updated_at = excluded.updated_at`
+          )
+            .bind(userId, nowIso(), nowIso(), nowIso())
+            .run();
+          return jsonResponse(
+            { ok: true, matched: false, reason: 'VOTER_ALREADY_CLAIMED' },
+            { headers: { 'cache-control': 'no-store' } }
+          );
+        }
+      }
+
       await env.DB.prepare(
         `INSERT INTO user_verification (user_id, voter_match_status, residence_confidence, wy_voter_id, last_check_at, created_at, updated_at)
          VALUES (?, 'verified', ?, ?, ?, ?, ?)

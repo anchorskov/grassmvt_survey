@@ -259,6 +259,11 @@
         }, 2500);
         return;
       }
+      // Handle specific error reasons
+      if (result.reason === 'VOTER_ALREADY_CLAIMED') {
+        showMessage(errorEl, 'This voter registration is already associated with another account. Each person may only have one account.');
+        return;
+      }
       showMessage(resultEl, 'We could not find a registered Wyoming voter matching this name and address. You can continue as address-verified.');
     });
   }
