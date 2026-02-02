@@ -25,6 +25,7 @@
   let currentGeoKey = 'ALL';
   let geoOptions = [];
   let voterSnapshots = null;
+  let districtContext = null;
 
   const escapeHtml = (str) => {
     if (!str) return '';
@@ -182,10 +183,80 @@
     `;
   };
 
+  const renderDistrictContext = () => {
+    if (!districtContext) return '';
+    if (!districtContext.representatives || districtContext.representatives.length === 0) return '';
+
+    const isDistrict = districtContext.geo_type === 'state_house' || districtContext.geo_type === 'state_senate';
+    if (!isDistrict) return '';
+
+    let repsHtml = '';
+    for (const rep of districtContext.representatives) {
+      const voterCountHtml = districtContext.voter_count > 0 
+        ? `<p class="district-voter-count">Registered voters in ${rep.chamber} District ${rep.district}: ${districtContext.voter_count.toLocaleString()}</p>`
+        : '';
+
+      let contactHtml = '';
+      if (rep.phone || rep.email) {
+        contactHtml = '<div class="rep-contact">';
+        if (rep.phone) {
+          contactHtml += `<a href="tel:${rep.phone}" class="contact-link phone">${escapeHtml(rep.phone)}</a>`;
+        }
+        if (rep.email) {
+          contactHtml += `<a href="mailto:${rep.email}" class="contact-link email">${escapeHtml(rep.email)}</a>`;
+        }
+        contactHtml += '</div>';
+      }
+
+      let websiteHtml = '';
+      if (rep.campaign_website) {
+        websiteHtml = `<p><a href="${escapeHtml(rep.campaign_website)}" target="_blank" rel="noopener noreferrer" class="campaign-link">Campaign Website →</a></p>`;
+      } else if (rep.official_profile_url) {
+        websiteHtml = `<p><a href="${escapeHtml(rep.official_profile_url)}" target="_blank" rel="noopener noreferrer" class="campaign-link">Official Profile →</a></p>`;
+      }
+
+      const party = rep.party ? `<span class="rep-party party-${rep.party.toLowerCase()}">${escapeHtml(rep.party)}</span>` : '';
+
+      repsHtml += `
+        <div class="district-rep">
+          <div class="rep-header">
+            <h4>${escapeHtml(rep.name)}</h4>
+            ${party}
+          </div>
+          ${voterCountHtml}
+          ${rep.city ? `<p class="rep-location">${escapeHtml(rep.city)}, ${escapeHtml(rep.county || '')}</p>` : ''}
+          ${contactHtml}
+          ${websiteHtml}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="district-context">
+        <h3>District Representative</h3>
+        ${repsHtml}
+      </div>
+    `;
+  };
+
   const render = async () => {
     if (!surveyMeta) {
       container.innerHTML = '<div class="results-error"><h3>Survey not found</h3><p>Could not load survey metadata.</p></div>';
       return;
+    }
+
+    // Fetch district context if a district is selected
+    if (currentGeoType === 'state_house' || currentGeoType === 'state_senate') {
+      try {
+        const ctxResp = await fetch(`/api/results/district-context?geo_type=${encodeURIComponent(currentGeoType)}&geo_key=${encodeURIComponent(currentGeoKey)}`);
+        if (ctxResp.ok) {
+          districtContext = await ctxResp.json();
+        }
+      } catch (e) {
+        // Ignore errors loading district context
+      }
+    } else {
+      districtContext = null;
     }
 
     // Fetch summary data
@@ -208,6 +279,12 @@
       </div>
       ${renderControls()}
     `;
+
+    // Show district context if available
+    const districtHtml = renderDistrictContext();
+    if (districtHtml) {
+      html += districtHtml;
+    }
 
     if (summaryData.suppressed) {
       html += renderSuppressed(summaryData);

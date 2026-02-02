@@ -388,6 +388,10 @@ main {
   box-shadow: 0 10px 24px rgba(26, 26, 26, 0.08);
 }
 
+.support-card {
+  margin-top: 2rem;
+}
+
 .card h2,
 .card h3 {
   margin-top: 0;
@@ -684,4 +688,209 @@ main {
   .site-nav {
     width: 100%;
   }
+}
+
+/* District Context Styles */
+.district-context {
+  background: #f0f4f1;
+  border: 1px solid #d0dcd6;
+  border-radius: 6px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.district-context h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #1a4d3e;
+  font-size: 1.1rem;
+}
+
+.district-rep {
+  background: white;
+  border: 1px solid #e0e8e3;
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.district-rep:last-child {
+  margin-bottom: 0;
+}
+
+.rep-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.rep-header h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1a1a1a;
+  flex: 1;
+}
+
+.rep-party {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rep-party.party-r,
+.rep-party.party-republican {
+  background: #ffd6d6;
+  color: #8b0000;
+}
+
+.rep-party.party-d,
+.rep-party.party-democrat {
+  background: #cce5ff;
+  color: #00008b;
+}
+
+.rep-party.party-i,
+.rep-party.party-independent {
+  background: #f0e6ff;
+  color: #4b0082;
+}
+
+.district-voter-count {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+  color: #2d5a4e;
+  font-weight: 500;
+}
+
+.rep-location {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.rep-contact {
+  display: flex;
+  gap: 1rem;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.contact-link {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  background: #e8f3f0;
+  border-radius: 3px;
+  text-decoration: none;
+  color: #1b4d3e;
+  font-size: 0.9rem;
+  border: 1px solid #d0dcd6;
+  transition: all 0.2s ease;
+}
+
+.contact-link:hover {
+  background: #d0dcd6;
+  border-color: #1b4d3e;
+}
+
+.contact-link.phone::before {
+  content: "📞 ";
+}
+
+.contact-link.email::before {
+  content: "✉️ ";
+}
+
+.district-rep p.campaign-link {
+  margin: 0.75rem 0 0 0;
+}
+
+.district-rep a.campaign-link {
+  color: #1b4d3e;
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid #1b4d3e;
+  transition: all 0.2s ease;
+}
+
+.district-rep a.campaign-link:hover {
+  color: #0f2d24;
+  border-bottom-color: #0f2d24;
+}
+
+/* Donate Page Styles */
+.donate-container {
+  max-width: 700px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+}
+
+.donate-container h2 {
+  font-size: 1.5rem;
+  color: #1a4d3e;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.donate-container ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+  margin: 1.5rem 0;
+  line-height: 1.8;
+}
+
+.donate-container li {
+  margin-bottom: 0.75rem;
+}
+
+.donate-cta {
+  background: #f0f4f1;
+  border: 2px solid #1b4d3e;
+  border-radius: 8px;
+  padding: 2rem;
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.donate-cta h3 {
+  margin-top: 0;
+  color: #1b4d3e;
+  font-size: 1.3rem;
+}
+
+.donate-cta p {
+  margin-bottom: 1.5rem;
+  color: #666;
+}
+
+.donate-cta .button {
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+
+.donate-info {
+  background: #fffaf3;
+  border-left: 4px solid #1b4d3e;
+  padding: 1.5rem;
+  margin-top: 2rem;
+  border-radius: 4px;
+}
+
+.donate-info p {
+  margin: 0.75rem 0;
+  line-height: 1.6;
+}
+
+.donate-info a {
+  color: #1b4d3e;
+  text-decoration: none;
+  border-bottom: 1px solid #1b4d3e;
+}
+
+.donate-info a:hover {
+  color: #0f2d24;
+  border-bottom-color: #0f2d24;
 }

@@ -5098,6 +5098,210 @@ export default {
       }
     }
 
+    if (request.method === 'POST' && url.pathname === '/api/dev/seed-results') {
+      // Local-only endpoint to seed test data across WY districts
+      try {
+        if (!isLocalRequest(url)) {
+          return jsonResponse({ error: 'Not found.' }, { status: 404 });
+        }
+
+        if (!env.DB) {
+          throw new Error('Database binding not available');
+        }
+
+        const body = await parseJsonBody(request);
+        const count = Math.max(20, Math.min(200, body.count || 45));
+
+        // Get the abortion survey
+        const survey = await env.DB.prepare(
+          `SELECT s.id, sv.id as version_id FROM surveys s
+           LEFT JOIN survey_versions sv ON sv.survey_id = s.id AND sv.published_at IS NOT NULL
+           WHERE s.slug = 'abortion' AND s.status = 'active'
+           ORDER BY sv.version DESC LIMIT 1`
+        ).first();
+
+        if (!survey || !survey.version_id) {
+          return jsonResponse({ error: 'Abortion survey not found' }, { status: 404 });
+        }
+
+        // Wyoming districts - use a focused distribution to ensure some districts get 10+ responses
+        const wyHouseDistricts = Array.from({ length: 62 }, (_, i) => i + 1);
+        const wySenateDistricts = Array.from({ length: 31 }, (_, i) => i + 1);
+
+        // Create a focused distribution: some districts get many responses, others get fewer
+        const getDistricts = (idx, total) => {
+          // Create patterns so some districts get more responses
+          const hdIdx = (idx * 17) % 62; // Spreads across house districts
+          const sdIdx = (idx * 11) % 31; // Spreads across senate districts
+          return {
+            house: wyHouseDistricts[hdIdx],
+            senate: wySenateDistricts[sdIdx],
+          };
+        };
+
+        // Survey answer choices for random selection
+        const surveyAnswers = {
+          life_protection_start: [
+            'At conception (when the egg is fertilized).',
+            'At the point of a detectable heartbeat (often around 6 weeks).',
+            'At the point of viability (when a fetus can survive outside the womb, often around 23 to 24 weeks).',
+            'At birth.',
+            'Not sure.',
+          ],
+          overall_policy_preference: [
+            'Abortion should be legal in most situations.',
+            'Abortion should be legal in many situations, but with clear legal limits.',
+            'Abortion should be allowed only in a few situations, with clear exceptions.',
+            'Abortion should be illegal in most situations, with limited exceptions.',
+            'Not sure.',
+          ],
+          general_time_limit_non_emergency: [
+            'No general time limit before birth.',
+            'Up to 24 weeks.',
+            'Up to 12 weeks.',
+            'Earlier than 12 weeks.',
+            'It should not be legal except in medical emergencies or specific exceptions.',
+            'Not sure.',
+          ],
+          exceptions_allowed: [
+            'When the pregnancy poses a life-threatening risk to the pregnant person.',
+            'To prevent a serious risk of major harm to physical health.',
+            'Pregnancy resulting from rape or incest.',
+            'Lethal fetal condition (expected to result in death shortly after birth).',
+            'No exceptions should be allowed.',
+            'Not sure.',
+          ],
+          decision_authority: [
+            'The pregnant person.',
+            'The pregnant person, in consultation with a clinician.',
+            'A clinician, using established medical standards.',
+            'Publicly established legal standards.',
+            'Not sure.',
+          ],
+          guiding_principle: [
+            'Protecting unborn life whenever possible.',
+            'Protecting a pregnant person\'s ability to make medical decisions.',
+            'Limiting government power in personal medical decisions.',
+            'Finding a workable compromise most people can live with.',
+            'Focusing on prevention and support rather than punishment.',
+          ],
+        };
+
+        const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+        let created = 0;
+        const startTime = Date.now();
+
+        for (let i = 0; i < count; i++) {
+          const userId = crypto.randomUUID();
+          const responseId = crypto.randomUUID();
+          const now = nowIso();
+
+          // Distribute across districts in a pattern that ensures some get multiple responses
+          const { house: houseDistrict, senate: senateDistrict } = getDistricts(i, count);
+
+          // Create user with unique email
+          const uniqueEmail = `test_${i}_${crypto.randomUUID().slice(0, 8)}@local`;
+          await env.DB.prepare(
+            `INSERT INTO user (id, email, password_hash, created_at) 
+             VALUES (?, ?, ?, ?)`
+          )
+            .bind(userId, uniqueEmail, 'dummy_hash', now)
+            .run();
+
+          // Create address verification
+          await env.DB.prepare(
+            `INSERT INTO user_address_verification 
+             (user_id, state_fips, state_house_dist, state_senate_dist, addr_lat, addr_lng, verified_at, created_at, updated_at)
+             VALUES (?, '56', ?, ?, 41.1, -104.82, ?, ?, ?)`
+          )
+            .bind(userId, String(houseDistrict).padStart(3, '0'), String(senateDistrict).padStart(3, '0'), now, now, now)
+            .run();
+
+          // Create response
+          const districtPayload = JSON.stringify({
+            stateHouse: houseDistrict,
+            stateSenate: senateDistrict,
+            usHouse: null,
+            sources: [],
+          });
+
+          await env.DB.prepare(
+            `INSERT INTO responses 
+             (id, user_id, survey_id, survey_version_id, version_hash, verified_flag, district, submitted_at, updated_at, edit_count)
+             VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 0)`
+          )
+            .bind(responseId, userId, survey.id, survey.version_id, '', districtPayload, now, now)
+            .run();
+
+          // Create random answers
+          const answers = {};
+          for (const [qName, choices] of Object.entries(surveyAnswers)) {
+            if (qName === 'exceptions_allowed') {
+              // Multi-select: pick 1-4 random exceptions
+              const numExceptions = randomInt(1, 4);
+              const selected = [];
+              const available = [...choices];
+              for (let j = 0; j < numExceptions; j++) {
+                const idx = Math.floor(Math.random() * available.length);
+                selected.push(available[idx]);
+                available.splice(idx, 1);
+              }
+              answers[qName] = selected;
+            } else {
+              // Single select
+              answers[qName] = randomChoice(choices);
+            }
+          }
+
+          // Insert answers
+          for (const [qName, value] of Object.entries(answers)) {
+            await env.DB.prepare(
+              `INSERT INTO response_answers (response_id, question_name, value_json, created_at)
+               VALUES (?, ?, ?, ?)`
+            )
+              .bind(responseId, qName, JSON.stringify(value), now)
+              .run();
+          }
+
+          // Update aggregates
+          try {
+            const geoContexts = [
+              { tier: 1, geo_type: 'all', geo_key: 'ALL' },
+              { tier: 2, geo_type: 'state', geo_key: 'WY' },
+              { tier: 2, geo_type: 'us_house', geo_key: '5600-00' },
+              { tier: 2, geo_type: 'state_house', geo_key: `WY-HD-${String(houseDistrict).padStart(2, '0')}` },
+              { tier: 2, geo_type: 'state_senate', geo_key: `WY-SD-${String(senateDistrict).padStart(2, '0')}` },
+            ];
+
+            const delta = buildAnswersDelta(answers, {});
+            await applyAggregateDelta(env.DB, survey.id, survey.version_id, geoContexts, delta);
+            await updateRollupCounts(env.DB, survey.id, survey.version_id, geoContexts, 1);
+          } catch (aggErr) {
+            console.warn(`[Seeding] Aggregate error for response ${i}:`, aggErr.message);
+          }
+
+          created++;
+        }
+
+        const elapsed = Date.now() - startTime;
+
+        return jsonResponse({
+          ok: true,
+          created,
+          count,
+          survey_id: survey.id,
+          survey_version_id: survey.version_id,
+          elapsed_ms: elapsed,
+          message: `Created ${created} test responses distributed across Wyoming house (1-62) and senate districts (1-31). Use prime number multipliers for even spread.`,
+        });
+      } catch (error) {
+        console.error('[Seeding] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/scope/start') {
       try {
         if (!env.DB) {
@@ -5199,6 +5403,16 @@ export default {
       pathParts.length === 2 &&
       !['take', 'resume', 'complete', 'list'].includes(pathParts[1])
     ) {
+      if (pathParts[1] === 'results') {
+        const page = await fetchAssetText(env, url, '/surveys/results/index.html');
+        if (!page) {
+          return new Response('Not Found', { status: 404 });
+        }
+        return new Response(page, {
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        });
+      }
+
       const slug = decodeURIComponent(pathParts[1]);
       const bodyHtml = `
         <h1 id="surveyjs-title">Survey</h1>
@@ -5733,6 +5947,103 @@ export default {
         tier,
         options,
       });
+    }
+
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'results' && pathParts[2] === 'district-context') {
+      // GET /api/results/district-context?geo_type=state_house&geo_key=WY-HD-01
+      // Returns voter counts and elected representative info for a district
+      const geoType = url.searchParams.get('geo_type');
+      const geoKey = url.searchParams.get('geo_key');
+
+      if (!geoType || !geoKey) {
+        return jsonResponse({ error: 'Missing geo_type or geo_key parameter.' }, { status: 400 });
+      }
+
+      try {
+        const result = {
+          geo_type: geoType,
+          geo_key: geoKey,
+          voter_count: 0,
+          representatives: [],
+        };
+
+        // Get voter count from voters_raw table based on district
+        if (geoType === 'state_house') {
+          // Extract district number from WY-HD-01 format
+          const match = geoKey.match(/WY-HD-(\d+)/);
+          if (match) {
+            const districtNum = match[1];
+            const voterCount = await env.DB.prepare(
+              `SELECT COUNT(*) as count FROM voters_raw WHERE house = ?`
+            ).bind(districtNum).first();
+            result.voter_count = voterCount?.count || 0;
+
+            // Get house representative
+            const rep = await env.DB.prepare(
+              `SELECT name, party, city, county, phone, email, campaign_website, official_profile_url
+               FROM wy_legislators
+               WHERE chamber = 'House' AND district = ?
+               LIMIT 1`
+            ).bind(districtNum).first();
+
+            if (rep) {
+              result.representatives.push({
+                name: rep.name,
+                chamber: 'House',
+                district: districtNum,
+                party: rep.party,
+                city: rep.city,
+                county: rep.county,
+                phone: rep.phone,
+                email: rep.email,
+                campaign_website: rep.campaign_website,
+                official_profile_url: rep.official_profile_url,
+              });
+            }
+          }
+        } else if (geoType === 'state_senate') {
+          // Extract district number from WY-SD-01 format
+          const match = geoKey.match(/WY-SD-(\d+)/);
+          if (match) {
+            const districtNum = match[1];
+            const voterCount = await env.DB.prepare(
+              `SELECT COUNT(*) as count FROM voters_raw WHERE senate = ?`
+            ).bind(districtNum).first();
+            result.voter_count = voterCount?.count || 0;
+
+            // Get senate representative
+            const rep = await env.DB.prepare(
+              `SELECT name, party, city, county, phone, email, campaign_website, official_profile_url
+               FROM wy_legislators
+               WHERE chamber = 'Senate' AND district = ?
+               LIMIT 1`
+            ).bind(districtNum).first();
+
+            if (rep) {
+              result.representatives.push({
+                name: rep.name,
+                chamber: 'Senate',
+                district: districtNum,
+                party: rep.party,
+                city: rep.city,
+                county: rep.county,
+                phone: rep.phone,
+                email: rep.email,
+                campaign_website: rep.campaign_website,
+                official_profile_url: rep.official_profile_url,
+              });
+            }
+          }
+        }
+
+        return jsonResponse({
+          ok: true,
+          ...result,
+        });
+      } catch (error) {
+        console.error('[District Context] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
     }
 
     // Admin endpoint to backfill aggregates from existing responses
