@@ -69,6 +69,58 @@ const renderReceipt = (responseId) => {
   `.trim();
 };
 
+const showThankYouModal = (responseId) => {
+  // Remove existing modal if any
+  const existing = document.getElementById('thank-you-modal');
+  if (existing) {
+    existing.remove();
+  }
+
+  const receiptText = responseId ? `<p class="receipt-id">Receipt ID: <strong>${escapeHtml(responseId)}</strong></p>` : '';
+  
+  const modal = document.createElement('div');
+  modal.id = 'thank-you-modal';
+  modal.className = 'thank-you-modal';
+  modal.innerHTML = `
+    <div class="thank-you-modal__backdrop"></div>
+    <div class="thank-you-modal__content">
+      <h2>Thank You!</h2>
+      <p class="thank-you-message">Your response has been recorded.</p>
+      ${receiptText}
+      <hr class="modal-divider">
+      <p class="support-message"><strong>Support this work!</strong></p>
+      <p class="campaign-message">Support Jimmy Skovgard for Senate in the Wyoming Republican Primary on <strong>August 18, 2026</strong>!</p>
+      <div class="thank-you-actions">
+        <a class="button button--primary pill-button" href="https://skovgard2026.org/volunteer" target="_blank" rel="noopener">Volunteer</a>
+        <a class="button button--secondary pill-button" href="https://skovgard2026.org/donate" target="_blank" rel="noopener">Donate</a>
+      </div>
+      <div class="thank-you-close">
+        <button class="button button--outline" type="button" id="thank-you-close-btn">Continue to Surveys</button>
+      </div>
+    </div>
+  `.trim();
+  
+  document.body.appendChild(modal);
+  document.body.classList.add('no-scroll');
+  
+  // Close handlers
+  const closeBtn = document.getElementById('thank-you-close-btn');
+  const backdrop = modal.querySelector('.thank-you-modal__backdrop');
+  
+  const closeModal = () => {
+    modal.remove();
+    document.body.classList.remove('no-scroll');
+    window.location.href = '/surveys/list/';
+  };
+  
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeModal);
+  }
+  if (backdrop) {
+    backdrop.addEventListener('click', closeModal);
+  }
+};
+
 const buildMeta = (answers = {}) => {
   const meta = {};
   const simpleFields = ['state', 'zip', 'postal_code', 'addr_raw', 'address', 'fn', 'ln'];
@@ -168,7 +220,8 @@ const initSurveyPage = async () => {
         throw new Error('Unable to submit response.');
       }
       container.innerHTML = '';
-      renderReceipt(submitData.responseId);
+      setStatus('');
+      showThankYouModal(submitData.responseId);
       if (submitData.updatedAt) {
         setEditingNotice(`Saved. Last updated ${new Date(submitData.updatedAt).toLocaleString()}.`);
       }

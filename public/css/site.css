@@ -550,6 +550,121 @@ main {
   margin-top: 1rem;
 }
 
+/* Thank You Modal */
+.thank-you-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thank-you-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.thank-you-modal__content {
+  position: relative;
+  background: #fffaf3;
+  padding: 2rem;
+  border-radius: 12px;
+  max-width: 480px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.thank-you-modal__content h2 {
+  margin: 0 0 0.75rem;
+  color: #1b4d3e;
+  font-size: 1.75rem;
+}
+
+.thank-you-message {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.receipt-id {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+.modal-divider {
+  border: none;
+  border-top: 1px solid #d8d2c6;
+  margin: 1.25rem 0;
+}
+
+.support-message {
+  font-size: 1.1rem;
+  color: #1b4d3e;
+  margin-bottom: 0.5rem;
+}
+
+.campaign-message {
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+}
+
+.thank-you-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.pill-button {
+  border-radius: 999px;
+  padding: 0.6rem 1.5rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.button--primary.pill-button {
+  background: #28a745;
+  border-color: #28a745;
+  color: white;
+}
+
+.button--primary.pill-button:hover {
+  background: #218838;
+  border-color: #218838;
+}
+
+.button--secondary.pill-button {
+  background: #1b4d3e;
+  border-color: #1b4d3e;
+  color: white;
+}
+
+.button--secondary.pill-button:hover {
+  background: #0f2d24;
+  border-color: #0f2d24;
+}
+
+.thank-you-close {
+  margin-top: 0.5rem;
+}
+
+.thank-you-close .button--outline {
+  background: transparent;
+  border: 1px solid #999;
+  color: #666;
+  padding: 0.4rem 1rem;
+  font-size: 0.9rem;
+}
+
+.thank-you-close .button--outline:hover {
+  border-color: #666;
+  color: #333;
+}
+
 @media (max-width: 640px) {
   .site-header__inner {
     align-items: flex-start;
