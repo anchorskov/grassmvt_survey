@@ -1,0 +1,194 @@
+<!-- public/surveys/results/index.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Survey Results - Grassroots Movement</title>
+    <link rel="stylesheet" href="/css/site.css" />
+    <style>
+      /* public/surveys/results/index.html - inline styles for results page */
+      .results-header {
+        margin-bottom: 1.5rem;
+      }
+      .results-header h1 {
+        margin-bottom: 0.5rem;
+      }
+      .results-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+        color: var(--color-text-muted, #666);
+      }
+      .results-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        background: var(--color-surface-alt, #f0f0f0);
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+      .results-badge--tier {
+        background: #e0f2fe;
+        color: #0369a1;
+      }
+      .results-badge--geo {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .results-badge--n {
+        background: #d1fae5;
+        color: #065f46;
+      }
+      .results-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background: var(--color-surface-alt, #f8f9fa);
+        border-radius: 8px;
+      }
+      .results-controls .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .results-controls label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--color-text-muted, #666);
+      }
+      .results-controls select {
+        padding: 0.5rem;
+        border: 1px solid var(--color-border, #ddd);
+        border-radius: 4px;
+        font-size: 0.875rem;
+        min-width: 180px;
+      }
+      .results-suppressed {
+        padding: 2rem;
+        text-align: center;
+        background: #fef3c7;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+      }
+      .results-suppressed h3 {
+        margin: 0 0 0.5rem;
+        color: #92400e;
+      }
+      .results-suppressed p {
+        margin: 0;
+        color: #78350f;
+      }
+      .results-question {
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background: var(--color-surface, #fff);
+        border: 1px solid var(--color-border, #ddd);
+        border-radius: 8px;
+      }
+      .results-question h3 {
+        margin: 0 0 1rem;
+        font-size: 1rem;
+      }
+      .results-bar {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.5rem;
+      }
+      .results-bar-label {
+        flex: 0 0 40%;
+        padding-right: 0.75rem;
+        font-size: 0.875rem;
+        word-break: break-word;
+      }
+      .results-bar-track {
+        flex: 1;
+        height: 24px;
+        background: #e5e7eb;
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+      }
+      .results-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+      .results-bar-value {
+        flex: 0 0 auto;
+        padding-left: 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        min-width: 80px;
+        text-align: right;
+      }
+      .voter-panel {
+        margin-top: 2rem;
+        padding: 1rem;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+      }
+      .voter-panel h4 {
+        margin: 0 0 0.5rem;
+        font-size: 0.875rem;
+        color: #166534;
+      }
+      .voter-panel ul {
+        margin: 0;
+        padding-left: 1.25rem;
+        font-size: 0.875rem;
+        color: #15803d;
+      }
+      .voter-panel .note {
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        color: #166534;
+        font-style: italic;
+      }
+      .results-loading {
+        text-align: center;
+        padding: 3rem;
+        color: var(--color-text-muted, #666);
+      }
+      .results-error {
+        padding: 2rem;
+        text-align: center;
+        background: #fef2f2;
+        border-radius: 8px;
+        color: #991b1b;
+      }
+      @media (max-width: 600px) {
+        .results-bar {
+          flex-wrap: wrap;
+        }
+        .results-bar-label {
+          flex: 0 0 100%;
+          padding-right: 0;
+          margin-bottom: 0.25rem;
+        }
+        .results-bar-track {
+          flex: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div data-include="/partials/header.html"></div>
+    <main>
+      <div id="results-container">
+        <div class="results-loading">Loading results...</div>
+      </div>
+    </main>
+    <div data-include="/partials/footer.html"></div>
+    <script src="/js/include-partials.js"></script>
+    <script src="/js/survey-results.js"></script>
+  </body>
+</html>

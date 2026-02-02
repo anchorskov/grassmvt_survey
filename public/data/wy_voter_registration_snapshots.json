@@ -1,0 +1,16 @@
+{
+  "state": "WY",
+  "snapshots": [
+    {
+      "as_of": "2025-08-01",
+      "registered_voters": 274759,
+      "source_label": "Wyoming SOS monthly voter registration stats"
+    },
+    {
+      "as_of": "2025-09-01",
+      "registered_voters": 274714,
+      "source_label": "Wyoming SOS monthly voter registration stats"
+    }
+  ],
+  "note": "Aug 15, 2025 falls between monthly snapshots."
+}

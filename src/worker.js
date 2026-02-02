@@ -3836,6 +3836,177 @@ const renderSurveyForm = ({
   `;
 };
 
+// ============================================================================
+// Aggregate helpers for public results
+// ============================================================================
+
+const MIN_PUBLISH_N = 10;
+
+const buildGeoContextsForResponse = (addressVerification, userVerification) => {
+  // Build list of geo contexts for aggregation
+  // Tier 1: All responses - just statewide aggregate
+  // Tier 2: Verified address - includes district breakdowns
+  const contexts = [];
+
+  // Tier 1 always gets the "all" context
+  contexts.push({ tier: 1, geo_type: 'all', geo_key: 'ALL' });
+
+  // If user has address verification, add Tier 2 contexts
+  if (addressVerification && addressVerification.state_fips) {
+    const stateFips = addressVerification.state_fips;
+    // Wyoming FIPS is 56
+    const stateAbbrev = stateFips === '56' ? 'WY' : `FIPS-${stateFips}`;
+
+    // Tier 2: statewide
+    contexts.push({ tier: 2, geo_type: 'state', geo_key: stateAbbrev });
+
+    // Tier 2: US House (Wyoming is at-large, code 00)
+    contexts.push({ tier: 2, geo_type: 'us_house', geo_key: `${stateFips}00-00` });
+
+    // Tier 2: State House
+    if (addressVerification.state_house_dist) {
+      const hd = String(parseInt(addressVerification.state_house_dist, 10)).padStart(2, '0');
+      contexts.push({ tier: 2, geo_type: 'state_house', geo_key: `${stateAbbrev}-HD-${hd}` });
+    }
+
+    // Tier 2: State Senate
+    if (addressVerification.state_senate_dist) {
+      const sd = String(parseInt(addressVerification.state_senate_dist, 10)).padStart(2, '0');
+      contexts.push({ tier: 2, geo_type: 'state_senate', geo_key: `${stateAbbrev}-SD-${sd}` });
+    }
+  }
+
+  return contexts;
+};
+
+const applyAggregateDelta = async (db, surveyId, surveyVersionId, geoContexts, answersDelta) => {
+  // answersDelta is an object: { questionName: { choiceValue: delta, ... }, ... }
+  // delta can be positive (add) or negative (remove)
+  const now = nowIso();
+
+  for (const ctx of geoContexts) {
+    for (const [questionName, choices] of Object.entries(answersDelta)) {
+      for (const [choiceValue, delta] of Object.entries(choices)) {
+        if (delta === 0) continue;
+
+        // Try to update existing row
+        const updateResult = await db.prepare(
+          `UPDATE response_aggregates
+           SET count = count + ?, updated_at = ?
+           WHERE survey_id = ? AND survey_version_id = ? AND tier = ?
+             AND geo_type = ? AND geo_key = ? AND question_name = ? AND choice_value = ?`
+        )
+          .bind(delta, now, surveyId, surveyVersionId, ctx.tier, ctx.geo_type, ctx.geo_key, questionName, choiceValue)
+          .run();
+
+        // If no row updated, insert new row (only for positive delta)
+        if (updateResult.meta.changes === 0 && delta > 0) {
+          const id = crypto.randomUUID();
+          await db.prepare(
+            `INSERT INTO response_aggregates
+             (id, survey_id, survey_version_id, tier, geo_type, geo_key, question_name, choice_value, count, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+            .bind(id, surveyId, surveyVersionId, ctx.tier, ctx.geo_type, ctx.geo_key, questionName, choiceValue, delta, now)
+            .run();
+        }
+      }
+    }
+  }
+};
+
+const updateRollupCounts = async (db, surveyId, surveyVersionId, geoContexts, deltaN) => {
+  // Update or insert rollup counts for each geo context
+  const now = nowIso();
+
+  for (const ctx of geoContexts) {
+    // Try to update existing row
+    const updateResult = await db.prepare(
+      `UPDATE aggregate_rollups
+       SET response_count = response_count + ?, updated_at = ?
+       WHERE survey_id = ? AND survey_version_id = ? AND tier = ? AND geo_type = ? AND geo_key = ?`
+    )
+      .bind(deltaN, now, surveyId, surveyVersionId, ctx.tier, ctx.geo_type, ctx.geo_key)
+      .run();
+
+    // If no row updated, insert new row (only for positive delta)
+    if (updateResult.meta.changes === 0 && deltaN > 0) {
+      const id = crypto.randomUUID();
+      await db.prepare(
+        `INSERT INTO aggregate_rollups
+         (id, survey_id, survey_version_id, tier, geo_type, geo_key, response_count, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+        .bind(id, surveyId, surveyVersionId, ctx.tier, ctx.geo_type, ctx.geo_key, deltaN, now)
+        .run();
+    }
+  }
+};
+
+const buildAnswersDelta = (newAnswers, oldAnswers = {}) => {
+  // Build delta object for aggregate updates
+  // newAnswers and oldAnswers are { questionName: value, ... }
+  // value can be string or array of strings
+  const delta = {};
+
+  const normalize = (val) => {
+    if (val === null || val === undefined) return [];
+    if (Array.isArray(val)) return val.map(v => String(v));
+    return [String(val)];
+  };
+
+  // All question names from both
+  const allQuestions = new Set([...Object.keys(newAnswers), ...Object.keys(oldAnswers)]);
+
+  for (const qName of allQuestions) {
+    const oldVals = normalize(oldAnswers[qName]);
+    const newVals = normalize(newAnswers[qName]);
+
+    delta[qName] = {};
+
+    // Decrement old values
+    for (const v of oldVals) {
+      delta[qName][v] = (delta[qName][v] || 0) - 1;
+    }
+
+    // Increment new values
+    for (const v of newVals) {
+      delta[qName][v] = (delta[qName][v] || 0) + 1;
+    }
+
+    // Remove zero deltas
+    for (const [k, d] of Object.entries(delta[qName])) {
+      if (d === 0) delete delta[qName][k];
+    }
+
+    // Remove empty question entries
+    if (Object.keys(delta[qName]).length === 0) {
+      delete delta[qName];
+    }
+  }
+
+  return delta;
+};
+
+const getOldAnswersFromResponse = async (db, responseId) => {
+  // Fetch previous answers for a response to compute delta
+  const rows = await db.prepare(
+    `SELECT question_name, value_json FROM response_answers WHERE response_id = ?`
+  )
+    .bind(responseId)
+    .all();
+
+  const answers = {};
+  for (const row of rows.results || []) {
+    try {
+      answers[row.question_name] = JSON.parse(row.value_json);
+    } catch (e) {
+      answers[row.question_name] = row.value_json;
+    }
+  }
+  return answers;
+};
+
 export default {
   async fetch(request, env) {
     // Production environment safety check
@@ -4793,6 +4964,34 @@ export default {
             .run();
         }
 
+        // Update aggregates
+        try {
+          const addressVerification = await getAddressVerification(env.DB, user.id);
+          const userVerification = await env.DB.prepare(
+            `SELECT voter_match_status FROM user_verification WHERE user_id = ?`
+          ).bind(user.id).first();
+
+          const geoContexts = buildGeoContextsForResponse(addressVerification, userVerification);
+
+          if (existing) {
+            // Get old answers to compute delta
+            const oldAnswers = await getOldAnswersFromResponse(env.DB, responseId);
+            const delta = buildAnswersDelta(answers, oldAnswers);
+            if (Object.keys(delta).length > 0) {
+              await applyAggregateDelta(env.DB, version.survey_id, version.version_id, geoContexts, delta);
+            }
+            // No rollup change for edits (same response count)
+          } else {
+            // New response - add all answers
+            const delta = buildAnswersDelta(answers, {});
+            await applyAggregateDelta(env.DB, version.survey_id, version.version_id, geoContexts, delta);
+            await updateRollupCounts(env.DB, version.survey_id, version.version_id, geoContexts, 1);
+          }
+        } catch (aggError) {
+          console.error('[Aggregates] Error updating aggregates:', aggError.message);
+          // Don't fail the response submission if aggregates fail
+        }
+
         return jsonResponse({
           ok: true,
           responseId,
@@ -5299,6 +5498,311 @@ export default {
       return new Response(page, {
         headers: { 'content-type': 'text/html; charset=utf-8' },
       });
+    }
+
+    // ========================================================================
+    // Public Results API - No auth required
+    // ========================================================================
+
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'results' && pathParts[2] === 'meta') {
+      // GET /api/results/meta?slug=<slug>
+      const slug = url.searchParams.get('slug');
+      if (!slug) {
+        return jsonResponse({ error: 'Missing slug parameter.', code: 'MISSING_SLUG' }, { status: 400 });
+      }
+
+      const survey = await env.DB.prepare(
+        `SELECT s.id, s.slug, s.title, s.scope, s.status,
+                sv.id as version_id, sv.version, sv.json_text, sv.published_at
+         FROM surveys s
+         LEFT JOIN survey_versions sv ON sv.survey_id = s.id AND sv.published_at IS NOT NULL
+         WHERE s.slug = ? AND s.status = 'active'
+         ORDER BY sv.version DESC
+         LIMIT 1`
+      ).bind(slug).first();
+
+      if (!survey) {
+        return jsonResponse({ error: 'Survey not found.', code: 'SURVEY_NOT_FOUND' }, { status: 404 });
+      }
+
+      // Get last updated timestamp from aggregates
+      const lastUpdate = await env.DB.prepare(
+        `SELECT MAX(updated_at) as last_updated
+         FROM response_aggregates
+         WHERE survey_id = ?`
+      ).bind(survey.id).first();
+
+      // Parse survey JSON to get questions
+      let questions = [];
+      try {
+        const surveyDef = JSON.parse(survey.json_text || '{}');
+        if (surveyDef.pages) {
+          for (const page of surveyDef.pages) {
+            for (const el of (page.elements || [])) {
+              if (el.name && el.type && el.type !== 'html') {
+                questions.push({
+                  name: el.name,
+                  type: el.type,
+                  title: el.title || el.name,
+                  choices: el.choices || null,
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+
+      return jsonResponse({
+        ok: true,
+        survey_id: survey.id,
+        survey_version_id: survey.version_id,
+        slug: survey.slug,
+        title: survey.title,
+        scope: survey.scope,
+        version: survey.version,
+        published_at: survey.published_at,
+        last_updated: lastUpdate?.last_updated || null,
+        available_tiers: [1, 2],
+        questions,
+      });
+    }
+
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'results' && pathParts[2] === 'summary') {
+      // GET /api/results/summary?slug=<slug>&tier=1&geo_type=all&geo_key=ALL
+      const slug = url.searchParams.get('slug');
+      const tierParam = url.searchParams.get('tier') || '1';
+      const geoType = url.searchParams.get('geo_type') || 'all';
+      const geoKey = url.searchParams.get('geo_key') || 'ALL';
+
+      if (!slug) {
+        return jsonResponse({ error: 'Missing slug parameter.', code: 'MISSING_SLUG' }, { status: 400 });
+      }
+
+      const tier = parseInt(tierParam, 10);
+      if (tier !== 1 && tier !== 2) {
+        return jsonResponse({ error: 'Tier must be 1 or 2.', code: 'INVALID_TIER' }, { status: 400 });
+      }
+
+      const validGeoTypes = ['all', 'state', 'us_house', 'state_house', 'state_senate'];
+      if (!validGeoTypes.includes(geoType)) {
+        return jsonResponse({ error: 'Invalid geo_type.', code: 'INVALID_GEO_TYPE' }, { status: 400 });
+      }
+
+      // Get survey info
+      const survey = await env.DB.prepare(
+        `SELECT s.id, s.slug, s.title,
+                sv.id as version_id, sv.version
+         FROM surveys s
+         LEFT JOIN survey_versions sv ON sv.survey_id = s.id AND sv.published_at IS NOT NULL
+         WHERE s.slug = ? AND s.status = 'active'
+         ORDER BY sv.version DESC
+         LIMIT 1`
+      ).bind(slug).first();
+
+      if (!survey || !survey.version_id) {
+        return jsonResponse({ error: 'Survey not found.', code: 'SURVEY_NOT_FOUND' }, { status: 404 });
+      }
+
+      // Get rollup count for suppression check
+      const rollup = await env.DB.prepare(
+        `SELECT response_count, updated_at
+         FROM aggregate_rollups
+         WHERE survey_id = ? AND survey_version_id = ? AND tier = ? AND geo_type = ? AND geo_key = ?`
+      ).bind(survey.id, survey.version_id, tier, geoType, geoKey).first();
+
+      const n = rollup?.response_count || 0;
+      const suppressed = n < MIN_PUBLISH_N;
+
+      // Build geo label
+      let geoLabel = geoKey;
+      if (geoType === 'all') {
+        geoLabel = 'All Responses';
+      } else if (geoType === 'state') {
+        geoLabel = geoKey === 'WY' ? 'Wyoming' : geoKey;
+      } else if (geoType === 'us_house') {
+        geoLabel = 'US House (At-Large)';
+      } else if (geoType === 'state_house') {
+        geoLabel = geoKey.replace('-HD-', ' House District ').replace('WY', 'Wyoming');
+      } else if (geoType === 'state_senate') {
+        geoLabel = geoKey.replace('-SD-', ' Senate District ').replace('WY', 'Wyoming');
+      }
+
+      if (suppressed) {
+        return jsonResponse({
+          ok: true,
+          tier,
+          geo: { type: geoType, key: geoKey, label: geoLabel },
+          n,
+          suppressed: true,
+          min_publish_n: MIN_PUBLISH_N,
+          updated_at: rollup?.updated_at || null,
+          questions: [],
+        });
+      }
+
+      // Get aggregate data
+      const aggregates = await env.DB.prepare(
+        `SELECT question_name, choice_value, count
+         FROM response_aggregates
+         WHERE survey_id = ? AND survey_version_id = ? AND tier = ? AND geo_type = ? AND geo_key = ?
+         ORDER BY question_name, count DESC`
+      ).bind(survey.id, survey.version_id, tier, geoType, geoKey).all();
+
+      // Group by question
+      const questionMap = new Map();
+      for (const row of (aggregates.results || [])) {
+        if (!questionMap.has(row.question_name)) {
+          questionMap.set(row.question_name, []);
+        }
+        questionMap.get(row.question_name).push({
+          choice_value: row.choice_value,
+          count: row.count,
+        });
+      }
+
+      // Calculate percentages
+      const questions = [];
+      for (const [qName, totals] of questionMap) {
+        const total = totals.reduce((sum, t) => sum + t.count, 0);
+        questions.push({
+          question_name: qName,
+          totals: totals.map(t => ({
+            choice_value: t.choice_value,
+            count: t.count,
+            pct: total > 0 ? Math.round((t.count / total) * 1000) / 10 : 0,
+          })),
+        });
+      }
+
+      return jsonResponse({
+        ok: true,
+        tier,
+        geo: { type: geoType, key: geoKey, label: geoLabel },
+        n,
+        suppressed: false,
+        min_publish_n: MIN_PUBLISH_N,
+        updated_at: rollup?.updated_at || null,
+        survey_version_id: survey.version_id,
+        questions,
+      });
+    }
+
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'results' && pathParts[2] === 'geo-options') {
+      // GET /api/results/geo-options?slug=<slug>&tier=2
+      // Returns available geo options for Tier 2 filtering
+      const slug = url.searchParams.get('slug');
+      const tierParam = url.searchParams.get('tier') || '2';
+
+      if (!slug) {
+        return jsonResponse({ error: 'Missing slug parameter.', code: 'MISSING_SLUG' }, { status: 400 });
+      }
+
+      const tier = parseInt(tierParam, 10);
+
+      const survey = await env.DB.prepare(
+        `SELECT s.id, sv.id as version_id
+         FROM surveys s
+         LEFT JOIN survey_versions sv ON sv.survey_id = s.id AND sv.published_at IS NOT NULL
+         WHERE s.slug = ? AND s.status = 'active'
+         ORDER BY sv.version DESC
+         LIMIT 1`
+      ).bind(slug).first();
+
+      if (!survey || !survey.version_id) {
+        return jsonResponse({ error: 'Survey not found.', code: 'SURVEY_NOT_FOUND' }, { status: 404 });
+      }
+
+      // Get distinct geo combinations with sufficient responses
+      const geoOptions = await env.DB.prepare(
+        `SELECT geo_type, geo_key, response_count
+         FROM aggregate_rollups
+         WHERE survey_id = ? AND survey_version_id = ? AND tier = ? AND response_count >= ?
+         ORDER BY geo_type, geo_key`
+      ).bind(survey.id, survey.version_id, tier, MIN_PUBLISH_N).all();
+
+      const options = (geoOptions.results || []).map(row => ({
+        geo_type: row.geo_type,
+        geo_key: row.geo_key,
+        response_count: row.response_count,
+      }));
+
+      return jsonResponse({
+        ok: true,
+        tier,
+        options,
+      });
+    }
+
+    // Admin endpoint to backfill aggregates from existing responses
+    if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'backfill-aggregates') {
+      // Only allow from localhost or with proper auth
+      if (!isLocalRequest(url)) {
+        // Check for admin session
+        const user = await getSessionUser(request, env);
+        if (!user || user.email !== 'anchorskov@gmail.com') {
+          return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+        }
+      }
+
+      try {
+        // Get all responses
+        const responses = await env.DB.prepare(
+          `SELECT r.id, r.survey_id, r.survey_version_id, r.user_id
+           FROM responses r`
+        ).all();
+
+        let processed = 0;
+        let errors = [];
+
+        for (const resp of (responses.results || [])) {
+          try {
+            // Get user's address verification
+            const addressVerification = await getAddressVerification(env.DB, resp.user_id);
+            const userVerification = await env.DB.prepare(
+              `SELECT voter_match_status FROM user_verification WHERE user_id = ?`
+            ).bind(resp.user_id).first();
+
+            // Get response answers
+            const answersRows = await env.DB.prepare(
+              `SELECT question_name, value_json FROM response_answers WHERE response_id = ?`
+            ).bind(resp.id).all();
+
+            const answers = {};
+            for (const row of (answersRows.results || [])) {
+              try {
+                answers[row.question_name] = JSON.parse(row.value_json);
+              } catch (e) {
+                answers[row.question_name] = row.value_json;
+              }
+            }
+
+            // Build geo contexts
+            const geoContexts = buildGeoContextsForResponse(addressVerification, userVerification);
+
+            // Build delta (all new)
+            const delta = buildAnswersDelta(answers, {});
+
+            // Apply aggregates
+            await applyAggregateDelta(env.DB, resp.survey_id, resp.survey_version_id, geoContexts, delta);
+            await updateRollupCounts(env.DB, resp.survey_id, resp.survey_version_id, geoContexts, 1);
+
+            processed++;
+          } catch (e) {
+            errors.push({ response_id: resp.id, error: e.message });
+          }
+        }
+
+        return jsonResponse({
+          ok: true,
+          processed,
+          total: responses.results?.length || 0,
+          errors,
+        });
+      } catch (error) {
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
     }
 
     // Serve static assets from /public

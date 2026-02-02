@@ -160,6 +160,17 @@ main {
   padding: 0.6rem 1.2rem;
 }
 
+.button--secondary {
+  background: var(--color-surface-alt, #e5e7eb);
+  color: var(--color-text, #1f2937);
+  border-radius: 10px;
+  padding: 0.6rem 1.2rem;
+}
+
+.button--secondary:hover {
+  background: var(--color-border, #d1d5db);
+}
+
 .button--small {
   border-radius: 8px;
   padding: 0.45rem 0.9rem;

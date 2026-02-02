@@ -118,6 +118,7 @@
         const title = escapeHtml(survey.title || 'Survey');
         const scopeLabel = survey.scope === 'wy' ? 'Wyoming' : 'General';
         const link = survey.href || `/surveys/${encodeURIComponent(survey.slug)}`;
+        const resultsLink = `/surveys/results/?slug=${encodeURIComponent(survey.slug)}`;
         const hasResponse = !!survey.response;
         const submittedAt = survey.response?.submittedAt
           ? new Date(survey.response.submittedAt).toLocaleString()
@@ -143,6 +144,7 @@
             <span class="card__status status-active">${scopeLabel}</span>
             <div class="card__actions">
               <a class="button button--small" href="${link}">${buttonLabel}</a>
+              <a class="button button--small button--secondary" href="${resultsLink}">View Results</a>
             </div>
           </article>
         `;
