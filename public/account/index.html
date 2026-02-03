@@ -36,6 +36,36 @@
         <h2>Registered passkeys</h2>
         <ul id="passkey-list" class="passkey-list"></ul>
       </section>
+
+      <section id="admin-panel" class="survey-form is-hidden" aria-live="polite">
+        <h2>Admin Tools</h2>
+        <p class="helper-text">Issue verified voter upgrade links to bypass regular verification.</p>
+        
+        <div class="form-row">
+          <label for="admin-target-email">Target user email</label>
+          <input id="admin-target-email" name="admin-target-email" type="email" placeholder="user@example.com" required />
+        </div>
+        <div class="form-row">
+          <label for="admin-notes">Notes (optional)</label>
+          <input id="admin-notes" name="admin-notes" type="text" maxlength="200" placeholder="Reason for bypass" />
+        </div>
+        <div class="form-row">
+          <label for="admin-expires">Expires in minutes (default: 60)</label>
+          <input id="admin-expires" name="admin-expires" type="number" min="5" max="1440" value="60" />
+        </div>
+        <button class="button button--primary" type="button" id="admin-issue-link">
+          Issue verify-voter link
+        </button>
+        <p class="form-error is-hidden" id="admin-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="admin-success" role="status"></p>
+        <div id="admin-link-result" class="is-hidden" style="margin-top: 1rem;">
+          <label>Verification link (copy and send to user):</label>
+          <input id="admin-link-output" type="text" readonly style="width: 100%; font-family: monospace;" />
+          <button class="button button--secondary" type="button" id="admin-copy-link" style="margin-top: 0.5rem;">
+            Copy link
+          </button>
+        </div>
+      </section>
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>

@@ -1,0 +1,32 @@
+<!-- public/verify-voter/index.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Verified Voter Upgrade | Grassroots Movement</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <div data-include="/partials/header.html"></div>
+    <main>
+      <h1>Verified voter upgrade</h1>
+      <p class="helper-text">
+        This link expires quickly. You must be signed in as the intended account to finish the upgrade.
+      </p>
+
+      <section id="verify-voter-status" class="survey-form" aria-live="polite">
+        <p id="verify-voter-message" class="helper-text"></p>
+        <p id="verify-voter-expiry" class="helper-text"></p>
+        <p class="form-error is-hidden" id="verify-voter-error" role="alert"></p>
+        <p class="survey-success is-hidden" id="verify-voter-success" role="status"></p>
+        <button class="button button--primary" type="button" id="verify-voter-passkey">
+          Use passkey to complete verification
+        </button>
+      </section>
+    </main>
+    <div data-include="/partials/footer.html"></div>
+    <script src="/js/include-partials.js"></script>
+    <script src="/js/verify-voter.js"></script>
+  </body>
+</html>

@@ -1,0 +1,166 @@
+// surveys_abortion_v2.jsonc
+// slug: abortion
+// version: v2 | 2026-02-01
+// title: Abortion Policy Survey: Finding Common Ground
+// source: Abortion Survey Draft revision (1) 2-1-2026.pdf
+{
+  "title": "Abortion Policy Survey: Finding Common Ground",
+  "description": "The purpose of this survey is to aggregate our voices as a community on the divisive issue of abortion. This is not meant to shame anyone. People hold these views for sincere reasons, often rooted in compassion, justice, and lived experience. Please answer as thoughtfully and honestly as you can.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p><p style='margin-top:1rem;'><a href='https://skovgard2026.org' target='_blank' rel='noopener noreferrer'>Support Jimmy Skovgard for Senate</a></p>",
+  "showQuestionNumbers": "on",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "pages": [
+    {
+      "name": "main",
+      "elements": [
+        {
+          "type": "html",
+          "name": "purpose_block",
+          "html": "<h3>Survey Purpose</h3><p>The purpose of this survey is to aggregate our voices as a community on the divisive issue of abortion. This is not meant to shame anyone. People hold these views for sincere reasons, often rooted in compassion, justice, and lived experience. Please answer as thoughtfully and honestly as you can.</p><p>Getting involved and discussing divisive topics face to face is part of civic responsibility. Register to vote, keep your registration current, and make your voice count in our surveys and in the next election.</p>"
+        },
+        {
+          "type": "html",
+          "name": "s1_header",
+          "html": "<h3>Section 1: The foundation of life</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "life_protection_start",
+          "title": "Which of these points represents the stage where the law should begin protecting a developing life?",
+          "choices": [
+            "At conception (when the egg is fertilized)",
+            "At the point of detectable heartbeat or cardiac activity (around 6 weeks)",
+            "At the point of viability (when a fetus can survive outside the womb)",
+            "At birth",
+            "Not sure"
+          ],
+          "showCommentArea": true,
+          "commentPlaceholder": "Optional comment (if you want): What led you to choose that point?"
+        },
+        {
+          "type": "html",
+          "name": "s2_header",
+          "html": "<h3>Section 2: Overall policy preference</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "overall_policy_preference",
+          "title": "Thinking about what the law should be, which statement is closest to your view?",
+          "choices": [
+            "The law should generally allow abortion, leaving decisions mostly to the individual and clinician",
+            "The law should allow abortion in many situations, with defined legal limits",
+            "The law should allow abortion only in a few situations, with clear exceptions",
+            "The law should generally prohibit abortion, with narrow exceptions",
+            "Not sure"
+          ],
+          "showCommentArea": true,
+          "commentPlaceholder": "Optional comment: What principle or experience matters most to you here?"
+        },
+        {
+          "type": "html",
+          "name": "s3_header",
+          "html": "<h3>Section 3: Timing and thresholds</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "general_time_limit_non_emergency",
+          "title": "In general, what should the law allow regarding abortion timing?",
+          "choices": [
+            "Allow up to 12 weeks",
+            "Allow up to 24 weeks",
+            "No fixed time limit, allowed based on medical judgment and circumstances",
+            "There should be a general limit earlier than 12 weeks",
+            "Abortion should be allowed only in specific, narrow exceptions",
+            "Not sure"
+          ],
+          "showCommentArea": true,
+          "commentPlaceholder": "Optional comment: If you chose a time limit, what is the main reason for that limit?"
+        },
+        {
+          "type": "html",
+          "name": "s4_header",
+          "html": "<h3>Section 4: Specific exceptions</h3>"
+        },
+        {
+          "type": "checkbox",
+          "name": "exceptions_allowed",
+          "title": "If abortion is restricted, which reasons should qualify as a legal exception? (Select all that apply)",
+          "choices": [
+            "When the pregnancy poses a life-threatening risk to the pregnant person",
+            "To prevent a serious risk of major physical harm to the pregnant person",
+            "Pregnancy resulting from rape or incest",
+            "Lethal fetal condition (expected to result in death shortly after birth)",
+            "Severe fetal anomaly expected to cause profound suffering (even if death is not certain shortly after birth)",
+            "Serious risk to mental health as diagnosed by a licensed clinician",
+            "The law should not provide exceptions for any reason",
+            "Prefer not to answer"
+          ],
+          "showCommentArea": true,
+          "commentPlaceholder": "Optional comment: Any other exceptions we should consider."
+        },
+        {
+          "type": "html",
+          "name": "s5_header",
+          "html": "<h3>Section 5: Who decides</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "decision_authority",
+          "title": "In a specific case, who should have the primary authority to decide whether an abortion is allowed under the law?",
+          "choices": [
+            "The pregnant person",
+            "The pregnant person, in consultation with a clinician",
+            "A clinician, using established medical standards",
+            "State or federal laws with clear rules",
+            "Not sure"
+          ],
+          "showCommentArea": true,
+          "commentPlaceholder": "Optional comment: What is the best safeguard against unfair or inconsistent outcomes?"
+        },
+        {
+          "type": "html",
+          "name": "s6_header",
+          "html": "<h3>Section 6: Values and principles</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "guiding_principle",
+          "title": "Which principle matters most to you on this issue?",
+          "choices": [
+            "Protecting unborn life whenever possible",
+            "Respecting the medical privacy and autonomy of the pregnant person",
+            "Having clear, enforceable laws that treat everyone consistently",
+            "Finding a workable compromise most people can live with",
+            "Focusing on prevention and support (healthcare, education, resources)"
+          ],
+          "showCommentArea": true,
+          "commentPlaceholder": "Optional comment: What would a fair outcome look like, even for people who disagree?"
+        },
+        {
+          "type": "html",
+          "name": "cg_header",
+          "html": "<h3>Optional common ground</h3>"
+        },
+        {
+          "type": "checkbox",
+          "name": "common_ground_outcomes",
+          "title": "Which outcomes matter most to you? (Select up to 2)",
+          "choices": [
+            "Fewer unintended pregnancies",
+            "Fewer abortions",
+            "Fewer maternal deaths",
+            "Better support for children after birth",
+            "Stronger support for families (healthcare, childcare, stability)",
+            "Protecting personal freedom",
+            "Clear and consistent rules"
+          ],
+          "maxSelectedChoices": 2,
+          "showCommentArea": true,
+          "commentPlaceholder": "Optional comment: What is one practical step that would move us toward the outcomes you chose?"
+        }
+      ]
+    }
+  ]
+}

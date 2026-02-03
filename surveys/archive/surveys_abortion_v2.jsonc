@@ -1,10 +1,10 @@
 // surveys_abortion_v2.jsonc
 // slug: abortion
-// version: 2026-02-01
-// source: Abortion Survey Draft v 2-1-2026.pdf
-// notes: Neutral, minimal dependencies, matches survey_flow.txt
+// version: v2 | 2026-02-01
+// title: Abortion Policy Survey: Finding Common Ground
+// notes: Neutral, minimal branching, optional comment boxes. No em dashes.
 {
-  "title": "Abortion Survey Draft v 2-1-2026",
+  "title": "Abortion Policy Survey: Finding Common Ground",
   "description": "This survey asks about views on abortion law and policy. It is for research and will be reported in aggregate.",
   "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
   "showQuestionNumbers": "on",

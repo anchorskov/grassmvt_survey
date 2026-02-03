@@ -1,3 +1,4 @@
+<!-- README.md -->
 # Grassmvt Survey Static Site
 
 A no-build static site intended for deployment from `/public` to Cloudflare Pages.
@@ -37,6 +38,26 @@ npm run dev:worker
 ```bash
 npm run build:surveyjs
 ```
+
+## Verified voter upgrade
+
+Run the new migration and ensure `HASH_SALT` is configured. Assign the admin role by inserting into `user_roles` for the admin account.
+
+Admin issue flow:
+
+```bash
+node scripts/admin_issue_verify_voter_link.mjs --email someone@example.com --notes "phone verified" --expires 30 --session "<session-id>"
+```
+
+You can also pass a full cookie header with `--cookie "session=..."`. For local testing, set `VERIFY_VOTER_BASE_URL` to override the default `http://localhost:8787`.
+
+User flow:
+
+1. Admin issues a link.
+2. User visits `/verify-voter?token=...` and signs in.
+3. User completes passkey verification to finish the upgrade.
+
+If email sending is not configured, the issue endpoint returns the link so it can be sent manually.
 
 This writes `public/js/surveyjs-bundle.js` and `public/css/surveyjs.css`.
 

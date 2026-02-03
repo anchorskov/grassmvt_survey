@@ -32,6 +32,10 @@ const AUTH_LOG_PATHS = new Set([
 ]);
 const GEO_UNKNOWN = 'XX';
 const GEO_TEST = 'T1';
+const localRateLimiters = {
+  issueVerifyVoter: new Map(),
+  verifyVoterAttempt: new Map(),
+};
 
 const truncateValue = (value, maxLength) => {
   if (!value) {
@@ -314,6 +318,44 @@ const normalizeZip = (value) => {
     return `${digits.slice(0, 5)}-${digits.slice(5)}`;
   }
   return '';
+};
+
+// Map of common first name variants (key -> list of variants to try)
+const FIRST_NAME_VARIANTS = {
+  'jim': ['jim', 'james'],
+  'bob': ['bob', 'robert'],
+  'tom': ['tom', 'thomas'],
+  'bill': ['bill', 'william', 'will'],
+  'dick': ['dick', 'richard'],
+  'ben': ['ben', 'benjamin'],
+  'ted': ['ted', 'theodore', 'edward'],
+  'sam': ['sam', 'samuel'],
+  'dan': ['dan', 'daniel'],
+  'rob': ['rob', 'robert'],
+  'ed': ['ed', 'edward', 'edmund'],
+  'liz': ['liz', 'elizabeth'],
+  'alex': ['alex', 'alexander', 'alexandra'],
+  'chris': ['chris', 'christopher', 'christine'],
+  'pat': ['pat', 'patrick', 'patricia'],
+  'andy': ['andy', 'andrew'],
+  'meg': ['meg', 'margaret'],
+};
+
+// Generate variants for a given first name
+const getFirstNameVariants = (firstName) => {
+  const normalized = firstName.toLowerCase().trim();
+  const variants = new Set([normalized]); // Always include original
+  
+  // Check if this is a known variant
+  for (const [key, values] of Object.entries(FIRST_NAME_VARIANTS)) {
+    if (values.includes(normalized)) {
+      // Add all variants for this group
+      values.forEach(v => variants.add(v));
+      break;
+    }
+  }
+  
+  return Array.from(variants);
 };
 
 const haversineMeters = (lat1, lon1, lat2, lon2) => {
@@ -708,6 +750,97 @@ const writeAuditEvent = async (env, request, { userId = null, eventType, metadat
     .run();
 };
 
+const writeAuditLog = async (env, request, { actorUserId, action, targetUserId = null, metadata = null }) => {
+  if (!env.DB) {
+    return;
+  }
+  const hasTable = await tableExists(env.DB, 'audit_log');
+  if (!hasTable) {
+    return;
+  }
+  const ip =
+    request.headers.get('cf-connecting-ip') ||
+    request.headers.get('x-forwarded-for') ||
+    '';
+  const userAgent = request.headers.get('user-agent') || '';
+  const metadataJson = metadata ? JSON.stringify(metadata) : null;
+  await env.DB.prepare(
+    `INSERT INTO audit_log
+       (id, actor_user_id, action, target_user_id, created_at, ip, user_agent, metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      crypto.randomUUID(),
+      actorUserId,
+      action,
+      targetUserId,
+      nowIso(),
+      ip || null,
+      userAgent || null,
+      metadataJson
+    )
+    .run();
+};
+
+const checkLocalRateLimit = (map, key, limit, windowMs) => {
+  if (!key) {
+    return { limited: false, count: 0 };
+  }
+  const now = Date.now();
+  const existing = map.get(key);
+  if (!existing || now - existing.windowStart > windowMs) {
+    map.set(key, { windowStart: now, count: 1 });
+    return { limited: false, count: 1 };
+  }
+  existing.count += 1;
+  map.set(key, existing);
+  return { limited: existing.count > limit, count: existing.count };
+};
+
+const checkVerifyVoterIssueRateLimit = async (env, actorUserId) => {
+  if (env.DB && (await tableExists(env.DB, 'audit_log'))) {
+    const result = await env.DB.prepare(
+      `SELECT COUNT(*) as count
+       FROM audit_log
+       WHERE action = 'verify_voter_token_issued'
+         AND actor_user_id = ?
+         AND datetime(created_at) >= datetime('now', ?)`
+    )
+      .bind(actorUserId, '-60 minutes')
+      .first();
+    const count = Number(result?.count || 0);
+    return { limited: count >= VERIFY_VOTER_ISSUE_LIMIT_PER_HOUR, count };
+  }
+  return checkLocalRateLimit(
+    localRateLimiters.issueVerifyVoter,
+    actorUserId,
+    VERIFY_VOTER_ISSUE_LIMIT_PER_HOUR,
+    60 * 60 * 1000
+  );
+};
+
+const checkVerifyVoterAttemptRateLimit = async (env, tokenId) => {
+  if (env.DB && (await tableExists(env.DB, 'audit_log'))) {
+    const result = await env.DB.prepare(
+      `SELECT COUNT(*) as count
+       FROM audit_log
+       WHERE action = 'verify_voter_attempt'
+         AND json_extract(metadata_json, '$.token_id') = ?
+         AND datetime(created_at) >= datetime('now', ?)`
+    )
+      .bind(tokenId, '-1 minutes')
+      .first();
+    const count = Number(result?.count || 0);
+    return { limited: count >= VERIFY_VOTER_ATTEMPT_LIMIT_PER_MINUTE, count };
+  }
+  return checkLocalRateLimit(
+    localRateLimiters.verifyVoterAttempt,
+    tokenId,
+    VERIFY_VOTER_ATTEMPT_LIMIT_PER_MINUTE,
+    60 * 1000
+  );
+};
+
 // Debug logging utilities for auth troubleshooting
 // Gated by X-Debug-Auth header matching DEBUG_AUTH_SECRET
 const shouldDebugAuth = (env, request) => {
@@ -736,14 +869,27 @@ const isLocalEnv = (env) => (env.ENVIRONMENT || '').toLowerCase() === 'local';
 let turnstileConfigLogged = false;
 
 const shouldBypassEmailVerification = (env) => {
-  if (!isLocalEnv(env)) {
-    return false;
-  }
   const bypassSetting = (env.EMAIL_VERIFICATION_BYPASS || '').toLowerCase();
+  if (bypassSetting === 'true') {
+    return true;
+  }
   if (bypassSetting === 'false') {
     return false;
   }
-  return true;
+  // Default: bypass only in local environment
+  return isLocalEnv(env);
+};
+
+const shouldBypassAddressVerification = (env) => {
+  const bypassSetting = (env.ADDRESS_VERIFICATION_BYPASS || '').toLowerCase();
+  if (bypassSetting === 'true') {
+    return true;
+  }
+  if (bypassSetting === 'false') {
+    return false;
+  }
+  // Default: bypass only in local environment
+  return isLocalEnv(env);
 };
 
 const enforceTurnstileBypassPolicy = (env) => {
@@ -1143,6 +1289,11 @@ const checkEmailVerificationRateLimit = async (env, { emailHash, ipHash }) => {
 
 const EMAIL_VERIFICATION_TTL_MINUTES = 30;
 const VERIFICATION_TOKEN_LENGTH = 32;
+const VERIFY_VOTER_TOKEN_TTL_MINUTES = 30;
+const VERIFY_VOTER_TOKEN_BYTES = 32;
+const VERIFY_VOTER_STEPUP_TTL_MINUTES = 10;
+const VERIFY_VOTER_ISSUE_LIMIT_PER_HOUR = 20;
+const VERIFY_VOTER_ATTEMPT_LIMIT_PER_MINUTE = 6;
 
 // Hash a verification token using SHA-256 (same pattern as password reset)
 const hashEmailVerificationToken = async (salt, token) => sha256Hex(`${salt}:${token}`);
@@ -1272,6 +1423,187 @@ const sendPhoneVerificationEmail = async (env, { to, verifyUrl, replyTo }) => {
   return sendEmail(env, { to, subject, text, html, replyTo });
 };
 
+const sendVerifyVoterEmail = async (env, { to, verifyUrl, replyTo }) => {
+  const subject = 'Complete your verified voter upgrade';
+  const text = `Use this link to finish your verified voter upgrade: ${verifyUrl}`;
+  const html = `Use this link to finish your verified voter upgrade: <a href="${escapeHtml(verifyUrl)}">Verify voter status</a>.`;
+  return sendEmail(env, { to, subject, text, html, replyTo });
+};
+
+// ============================================================================
+// VERIFIED VOTER TOKEN HELPERS
+// ============================================================================
+
+const hashVerifyVoterToken = async (salt, token) => sha256Hex(`${salt}:${token}`);
+
+const generateVerifyVoterToken = () => {
+  const bytes = new Uint8Array(VERIFY_VOTER_TOKEN_BYTES);
+  crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes);
+};
+
+const createVerifyVoterToken = async (env, { targetUserId, targetEmail, issuedByUserId, notes, expiresMinutes }) => {
+  if (!env.DB) {
+    return null;
+  }
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[VerifyVoter] HASH_SALT not configured');
+    return null;
+  }
+  const rawToken = generateVerifyVoterToken();
+  const tokenHash = await hashVerifyVoterToken(salt, rawToken);
+  const issuedAt = nowIso();
+  const expiresAt = addMinutesIso(expiresMinutes || VERIFY_VOTER_TOKEN_TTL_MINUTES);
+  const tokenId = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO voter_verify_tokens
+       (id, token_hash, target_user_id, target_email, issued_by_user_id, issued_at, expires_at, used_at, used_by_user_id, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`
+  )
+    .bind(tokenId, tokenHash, targetUserId || null, targetEmail || null, issuedByUserId, issuedAt, expiresAt, notes || null)
+    .run();
+  return { rawToken, tokenId, expiresAt };
+};
+
+const getVerifyVoterTokenRecord = async (env, rawToken) => {
+  if (!env.DB) {
+    return null;
+  }
+  const salt = getHashSalt(env);
+  if (!salt || !rawToken) {
+    return null;
+  }
+  const tokenHash = await hashVerifyVoterToken(salt, rawToken);
+  const row = await env.DB.prepare(
+    `SELECT id, token_hash, target_user_id, target_email, issued_by_user_id, issued_at, expires_at, used_at, used_by_user_id, notes
+     FROM voter_verify_tokens
+     WHERE token_hash = ?
+     LIMIT 1`
+  )
+    .bind(tokenHash)
+    .first();
+  return row || null;
+};
+
+const doesVerifyVoterTokenMatchUser = (tokenRow, user) => {
+  if (!tokenRow || !user) {
+    return false;
+  }
+  if (tokenRow.target_user_id && tokenRow.target_user_id === user.id) {
+    return true;
+  }
+  const normalizedEmail = normalizeEmail(user.email || '');
+  if (tokenRow.target_email && normalizedEmail && tokenRow.target_email === normalizedEmail) {
+    return true;
+  }
+  return false;
+};
+
+const cleanupExpiredVerifyVoterTokens = async (env) => {
+  if (!env.DB) {
+    return;
+  }
+  await env.DB.prepare(
+    `DELETE FROM voter_verify_tokens
+     WHERE expires_at <= ?`
+  )
+    .bind(nowIso())
+    .run();
+};
+
+// ============================================================================
+// PASSKEY STEP-UP HELPERS
+// ============================================================================
+
+const getSessionIdFromRequest = (request) => getCookieValue(request, 'session');
+
+const cleanupExpiredStepupSessions = async (env) => {
+  if (!env.DB) {
+    return;
+  }
+  if (!(await tableExists(env.DB, 'passkey_stepup_sessions'))) {
+    return;
+  }
+  await env.DB.prepare(
+    `DELETE FROM passkey_stepup_sessions
+     WHERE expires_at <= ?`
+  )
+    .bind(nowIso())
+    .run();
+};
+
+const requirePasskeyStepup = async (env, request, userId) => {
+  if (!env.DB) {
+    return { response: jsonResponse({ ok: false, code: 'DB_UNAVAILABLE' }, { status: 500 }) };
+  }
+  const sessionId = getSessionIdFromRequest(request);
+  if (!sessionId) {
+    return { response: jsonResponse({ ok: false, code: 'SESSION_REQUIRED' }, { status: 401 }) };
+  }
+  if (!(await tableExists(env.DB, 'passkey_stepup_sessions'))) {
+    return { response: jsonResponse({ ok: false, code: 'STEPUP_NOT_READY' }, { status: 503 }) };
+  }
+  const record = await env.DB.prepare(
+    `SELECT id, expires_at
+     FROM passkey_stepup_sessions
+     WHERE user_id = ? AND session_id = ?
+     ORDER BY verified_at DESC
+     LIMIT 1`
+  )
+    .bind(userId, sessionId)
+    .first();
+  if (!record) {
+    return {
+      response: jsonResponse(
+        { ok: false, code: 'PASSKEY_STEPUP_REQUIRED', message: 'Passkey step-up required.' },
+        { status: 403 }
+      ),
+    };
+  }
+  const expiresAtMs = parseIsoMs(record.expires_at) || 0;
+  if (expiresAtMs <= Date.now()) {
+    await env.DB.prepare('DELETE FROM passkey_stepup_sessions WHERE id = ?')
+      .bind(record.id)
+      .run();
+    return {
+      response: jsonResponse(
+        { ok: false, code: 'PASSKEY_STEPUP_EXPIRED', message: 'Passkey step-up expired.' },
+        { status: 403 }
+      ),
+    };
+  }
+  return { sessionId, stepupId: record.id };
+};
+
+const consumePasskeyStepup = async (env, stepupId) => {
+  if (!env.DB || !stepupId) {
+    return;
+  }
+  await env.DB.prepare('DELETE FROM passkey_stepup_sessions WHERE id = ?')
+    .bind(stepupId)
+    .run();
+};
+
+const userHasRole = async (env, userId, role) => {
+  if (!env.DB || !userId || !role) {
+    return false;
+  }
+  const hasTable = await tableExists(env.DB, 'user_roles');
+  if (!hasTable) {
+    return false;
+  }
+  const row = await env.DB.prepare(
+    `SELECT user_id
+     FROM user_roles
+     WHERE user_id = ? AND role = ?
+     LIMIT 1`
+  )
+    .bind(userId, role)
+    .first();
+  return !!row;
+};
+
 const initializeLucia = (env) => {
   const adapter = new D1Adapter(env.DB, { user: 'user', session: 'session' });
   const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
@@ -1308,6 +1640,11 @@ const initializeLucia = (env) => {
       email: attributes.email,
       email_verified_at: attributes.email_verified_at,
       account_status: attributes.account_status,
+      is_verified_voter: attributes.is_verified_voter,
+      verified_at: attributes.verified_at,
+      verification_method: attributes.verification_method,
+      verified_scope: attributes.verified_scope,
+      verified_district: attributes.verified_district,
     }),
     sessionCookie: {
       name: 'session',
@@ -2819,6 +3156,237 @@ const handlePasskeyLoginVerify = async (request, env) => {
   return jsonResponse({ ok: true }, { headers });
 };
 
+const handlePasskeyStepupBegin = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
+  }
+  const passkeyGuard = await requirePasskeyTables(env);
+  if (passkeyGuard) {
+    return passkeyGuard;
+  }
+  await cleanupExpiredWebauthnChallenges(env);
+  await cleanupExpiredStepupSessions(env);
+
+  const { user } = auth;
+  const rpID = getWebAuthnRpId(request, env);
+
+  const credentialsResult = await env.DB.prepare(
+    `SELECT credential_id, transports_json
+     FROM passkey_credentials
+     WHERE user_id = ?`
+  )
+    .bind(user.id)
+    .all();
+  const allowCredentials = (credentialsResult.results || []).map((row) => {
+    let transports = undefined;
+    if (row.transports_json) {
+      try {
+        transports = JSON.parse(row.transports_json);
+      } catch (error) {
+        transports = undefined;
+      }
+    }
+    return {
+      id: row.credential_id,
+      type: 'public-key',
+      transports,
+    };
+  });
+
+  if (!allowCredentials.length) {
+    return jsonResponse({ ok: false, code: 'NO_PASSKEYS', message: 'No passkeys registered.' }, { status: 400 });
+  }
+
+  const options = await generateAuthenticationOptions({
+    rpID,
+    allowCredentials,
+    userVerification: 'required',
+    timeout: 60000,
+  });
+
+  const challengeId = crypto.randomUUID();
+  const createdAt = nowIso();
+  const expiresAt = addMinutesIso(WEBAUTHN_CHALLENGE_TTL_MINUTES);
+  const signals = await getRequestSignals(request, env);
+  await env.DB.prepare(
+    `INSERT INTO webauthn_challenges
+       (id, kind, user_id, challenge, created_at, expires_at, used_at, request_ip_hash, request_ua_hash)
+     VALUES (?, 'stepup', ?, ?, ?, ?, NULL, ?, ?)`
+  )
+    .bind(
+      challengeId,
+      user.id,
+      options.challenge,
+      createdAt,
+      expiresAt,
+      signals.ipHash || null,
+      signals.userAgentHash || null
+    )
+    .run();
+
+  await writeAuditEvent(env, request, {
+    userId: user.id,
+    eventType: 'passkey_stepup_options_issued',
+  });
+
+  return jsonResponse({ ok: true, options, challengeId, expiresAt });
+};
+
+const handlePasskeyStepupFinish = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
+  }
+  const passkeyGuard = await requirePasskeyTables(env);
+  if (passkeyGuard) {
+    return passkeyGuard;
+  }
+
+  const body = await parseJsonBody(request);
+  const assertionResponse = body.assertionResponse;
+  const challengeId = body.challengeId;
+  if (!assertionResponse || !challengeId) {
+    return jsonResponse({ ok: false, code: 'MISSING_ASSERTION', message: 'Missing passkey assertion.' }, { status: 400 });
+  }
+
+  const challengeRecord = await env.DB.prepare(
+    `SELECT id, user_id, challenge, created_at, expires_at, used_at
+     FROM webauthn_challenges
+     WHERE id = ? AND kind = 'stepup'
+     LIMIT 1`
+  )
+    .bind(challengeId)
+    .first();
+  if (!challengeRecord) {
+    return jsonResponse({ ok: false, code: 'CHALLENGE_NOT_FOUND' }, { status: 400 });
+  }
+  if (challengeRecord.used_at) {
+    return jsonResponse({ ok: false, code: 'CHALLENGE_USED' }, { status: 400 });
+  }
+  if (parseIsoMs(challengeRecord.expires_at) <= Date.now()) {
+    return jsonResponse({ ok: false, code: 'CHALLENGE_EXPIRED' }, { status: 400 });
+  }
+  if (challengeRecord.user_id !== auth.user.id) {
+    return jsonResponse({ ok: false, code: 'CHALLENGE_USER_MISMATCH' }, { status: 403 });
+  }
+
+  const credentialId = assertionResponse?.id || assertionResponse?.rawId || '';
+  if (!credentialId) {
+    return jsonResponse({ ok: false, code: 'MISSING_CREDENTIAL_ID' }, { status: 400 });
+  }
+  const credential = await env.DB.prepare(
+    `SELECT id, user_id, credential_id, public_key, counter
+     FROM passkey_credentials
+     WHERE credential_id = ?`
+  )
+    .bind(credentialId)
+    .first();
+  if (!credential) {
+    await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+      .bind(nowIso(), challengeRecord.id)
+      .run();
+    return jsonResponse({ ok: false, code: 'UNKNOWN_CREDENTIAL' }, { status: 400 });
+  }
+  if (credential.user_id !== auth.user.id) {
+    return jsonResponse({ ok: false, code: 'CREDENTIAL_USER_MISMATCH' }, { status: 403 });
+  }
+
+  const rpID = getWebAuthnRpId(request, env);
+  const expectedOrigin = getWebAuthnExpectedOrigin(request);
+
+  let credentialIDBuffer;
+  let credentialPublicKeyBuffer;
+  try {
+    credentialIDBuffer = isoBase64URL.toBuffer(credential.credential_id);
+    credentialPublicKeyBuffer = isoBase64URL.toBuffer(credential.public_key);
+  } catch (error) {
+    return jsonResponse({ ok: false, code: 'BUFFER_CONVERSION_ERROR' }, { status: 400 });
+  }
+
+  let verification;
+  try {
+    verification = await verifyAuthenticationResponse({
+      response: assertionResponse,
+      expectedChallenge: challengeRecord.challenge,
+      expectedOrigin,
+      expectedRPID: rpID,
+      credential: {
+        id: credentialIDBuffer,
+        publicKey: credentialPublicKeyBuffer,
+        counter: Number(credential.counter || 0),
+      },
+      requireUserVerification: true,
+    });
+  } catch (error) {
+    await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+      .bind(nowIso(), challengeRecord.id)
+      .run();
+    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 400 });
+  }
+
+  if (!verification.verified || !verification.authenticationInfo) {
+    await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+      .bind(nowIso(), challengeRecord.id)
+      .run();
+    return jsonResponse({ ok: false, code: 'VERIFICATION_FAILED' }, { status: 400 });
+  }
+
+  const newCounter = verification.authenticationInfo.newCounter || 0;
+  await env.DB.prepare(
+    `UPDATE passkey_credentials
+     SET counter = ?, last_used_at = ?
+     WHERE id = ?`
+  )
+    .bind(newCounter, nowIso(), credential.id)
+    .run();
+
+  await env.DB.prepare('UPDATE webauthn_challenges SET used_at = ? WHERE id = ?')
+    .bind(nowIso(), challengeRecord.id)
+    .run();
+
+  const sessionId = getSessionIdFromRequest(request);
+  if (!sessionId) {
+    return jsonResponse({ ok: false, code: 'SESSION_REQUIRED' }, { status: 401 });
+  }
+  const stepupId = crypto.randomUUID();
+  const verifiedAt = nowIso();
+  const expiresAt = addMinutesIso(VERIFY_VOTER_STEPUP_TTL_MINUTES);
+  await env.DB.prepare(
+    `INSERT INTO passkey_stepup_sessions
+       (id, user_id, session_id, verified_at, expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, session_id) DO UPDATE SET
+       id = excluded.id,
+       verified_at = excluded.verified_at,
+       expires_at = excluded.expires_at,
+       created_at = excluded.created_at`
+  )
+    .bind(stepupId, auth.user.id, sessionId, verifiedAt, expiresAt, verifiedAt)
+    .run();
+
+  await writeAuditEvent(env, request, {
+    userId: auth.user.id,
+    eventType: 'passkey_stepup_completed',
+  });
+
+  return jsonResponse({ ok: true, expiresAt });
+};
+
 const handlePasskeyList = async (request, env) => {
   if (!env.DB) {
     return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
@@ -2887,6 +3455,250 @@ const handlePasskeyRemove = async (request, env) => {
     metadata: { passkey_id: id },
   });
   return jsonResponse({ ok: true });
+};
+
+const handleAdminVerifyVoterIssue = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
+  }
+  const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+  if (!isAdmin) {
+    return jsonResponse({ error: 'Forbidden.', code: 'FORBIDDEN' }, { status: 403 });
+  }
+
+  const body = await parseJsonBody(request);
+  const targetEmail = normalizeEmail(body.target_email || '');
+  const notes = body.notes ? body.notes.toString().trim() : '';
+  const rawExpires = Number(body.expires_minutes || '');
+  const expiresMinutes =
+    Number.isFinite(rawExpires) && rawExpires > 0
+      ? rawExpires
+      : VERIFY_VOTER_TOKEN_TTL_MINUTES;
+
+  if (!targetEmail || !isValidEmail(targetEmail)) {
+    return jsonResponse({ error: 'Invalid email.', code: 'INVALID_EMAIL' }, { status: 400 });
+  }
+
+  const rateLimit = await checkVerifyVoterIssueRateLimit(env, auth.user.id);
+  if (rateLimit.limited) {
+    return jsonResponse({ error: 'Rate limit exceeded.', code: 'RATE_LIMITED' }, { status: 429 });
+  }
+
+  const targetUser = await env.DB.prepare(
+    `SELECT id, email
+     FROM user
+     WHERE email = ?
+     LIMIT 1`
+  )
+    .bind(targetEmail)
+    .first();
+  if (!targetUser) {
+    return jsonResponse({ error: 'User not found.', code: 'USER_NOT_FOUND' }, { status: 404 });
+  }
+
+  await cleanupExpiredVerifyVoterTokens(env);
+  const tokenResult = await createVerifyVoterToken(env, {
+    targetUserId: targetUser.id,
+    targetEmail,
+    issuedByUserId: auth.user.id,
+    notes,
+    expiresMinutes,
+  });
+  if (!tokenResult) {
+    return jsonResponse({ error: 'Unable to issue token.', code: 'TOKEN_CREATE_FAILED' }, { status: 500 });
+  }
+
+  const tokenPrefix = tokenResult.rawToken.slice(0, 6);
+  const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
+  const verifyUrl = new URL('/verify-voter', baseUrl);
+  verifyUrl.searchParams.set('token', tokenResult.rawToken);
+
+  const emailResult = await sendVerifyVoterEmail(env, {
+    to: targetEmail,
+    verifyUrl: verifyUrl.toString(),
+    replyTo: env.EMAIL_REPLY_TO || undefined,
+  });
+
+  const emailSent = !!emailResult.ok && !emailResult.stubbed;
+  const responsePayload = {
+    ok: true,
+    status: emailSent ? 'EMAIL_SENT' : 'EMAIL_NOT_CONFIGURED',
+    expiresAt: tokenResult.expiresAt,
+    tokenPrefix,
+  };
+  if (!emailSent) {
+    responsePayload.link = verifyUrl.toString();
+    console.log('[VerifyVoter] Manual link ready:', `${verifyUrl.origin}${verifyUrl.pathname}?token=${tokenPrefix}...`);
+  }
+
+  await writeAuditLog(env, request, {
+    actorUserId: auth.user.id,
+    action: 'verify_voter_token_issued',
+    targetUserId: targetUser.id,
+    metadata: {
+      token_id: tokenResult.tokenId,
+      token_prefix: tokenPrefix,
+      expires_at: tokenResult.expiresAt,
+      email_sent: emailSent,
+    },
+  });
+
+  return jsonResponse(responsePayload);
+};
+
+const handleVerifyVoterStatus = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
+  }
+  const url = new URL(request.url);
+  const token = (url.searchParams.get('token') || '').trim();
+  if (!token) {
+    return jsonResponse({ ok: false, code: 'MISSING_TOKEN' }, { status: 400 });
+  }
+
+  await cleanupExpiredVerifyVoterTokens(env);
+  const tokenRow = await getVerifyVoterTokenRecord(env, token);
+  if (!tokenRow) {
+    return jsonResponse({
+      ok: true,
+      valid: false,
+      account_match: false,
+      expired: false,
+      used: false,
+      reason: 'TOKEN_NOT_FOUND',
+    });
+  }
+
+  const expired = parseIsoMs(tokenRow.expires_at) <= Date.now();
+  const used = !!tokenRow.used_at;
+  const tokenMatchesUser = doesVerifyVoterTokenMatchUser(tokenRow, auth.user);
+  const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+  const accountMatch = tokenMatchesUser || isAdmin;
+  const valid = !expired && !used;
+
+  return jsonResponse({
+    ok: true,
+    valid,
+    account_match: accountMatch,
+    expired,
+    used,
+    expires_at: tokenRow.expires_at,
+    admin_bypass: !tokenMatchesUser && isAdmin,
+  });
+};
+
+const handleVerifyVoterComplete = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
+  }
+  const body = await parseJsonBody(request);
+  const token = body.token ? body.token.toString().trim() : '';
+  if (!token) {
+    return jsonResponse({ ok: false, code: 'MISSING_TOKEN' }, { status: 400 });
+  }
+
+  await cleanupExpiredVerifyVoterTokens(env);
+  const tokenRow = await getVerifyVoterTokenRecord(env, token);
+  if (!tokenRow) {
+    return jsonResponse({ ok: false, code: 'TOKEN_NOT_FOUND' }, { status: 400 });
+  }
+
+  const rateLimit = await checkVerifyVoterAttemptRateLimit(env, tokenRow.id);
+  if (rateLimit.limited) {
+    return jsonResponse({ ok: false, code: 'RATE_LIMITED' }, { status: 429 });
+  }
+
+  await writeAuditLog(env, request, {
+    actorUserId: auth.user.id,
+    action: 'verify_voter_attempt',
+    targetUserId: tokenRow.target_user_id || null,
+    metadata: { token_id: tokenRow.id },
+  });
+
+  const expired = parseIsoMs(tokenRow.expires_at) <= Date.now();
+  if (expired) {
+    return jsonResponse({ ok: false, code: 'TOKEN_EXPIRED' }, { status: 400 });
+  }
+  if (tokenRow.used_at) {
+    return jsonResponse({ ok: false, code: 'TOKEN_USED' }, { status: 400 });
+  }
+
+  // Check if current user is admin (can verify on behalf of target user)
+  const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+  const tokenMatchesUser = doesVerifyVoterTokenMatchUser(tokenRow, auth.user);
+
+  if (!tokenMatchesUser && !isAdmin) {
+    return jsonResponse({ ok: false, code: 'ACCOUNT_MISMATCH' }, { status: 403 });
+  }
+
+  // Determine whose account to verify: for admins with mismatched token, verify the target user
+  let userIdToVerify = auth.user.id;
+  let verificationMethod = 'admin_link_passkey';
+  if (!tokenMatchesUser && isAdmin && tokenRow.target_user_id) {
+    userIdToVerify = tokenRow.target_user_id;
+    verificationMethod = 'admin_bypass'; // Admin verified on behalf of user
+  }
+
+  const stepup = await requirePasskeyStepup(env, request, auth.user.id);
+  if (stepup.response) {
+    return stepup.response;
+  }
+
+  const verifiedAt = nowIso();
+  await env.DB.prepare(
+    `UPDATE user
+     SET is_verified_voter = 1,
+         verified_at = ?,
+         verification_method = ?,
+         verified_scope = ?
+     WHERE id = ?`
+  )
+    .bind(verifiedAt, verificationMethod, 'wyoming', userIdToVerify)
+    .run();
+
+  await env.DB.prepare(
+    `UPDATE voter_verify_tokens
+     SET used_at = ?, used_by_user_id = ?
+     WHERE id = ?`
+  )
+    .bind(verifiedAt, auth.user.id, tokenRow.id)
+    .run();
+
+  await consumePasskeyStepup(env, stepup.stepupId);
+
+  await writeAuditLog(env, request, {
+    actorUserId: auth.user.id,
+    action: 'verify_voter_completed',
+    targetUserId: userIdToVerify,
+    metadata: {
+      token_id: tokenRow.id,
+      verification_method: verificationMethod,
+      verified_scope: 'wyoming',
+      admin_bypass: !tokenMatchesUser && isAdmin,
+    },
+  });
+
+  return jsonResponse({ ok: true, verified_at: verifiedAt });
 };
 
 const handleAuthLogout = async (request, env) => {
@@ -3225,6 +4037,7 @@ const handleAuthMe = async (request, env) => {
     .first();
   const addressVerification = await getAddressVerification(env.DB, user.id);
   const addressVerified = !!addressVerification?.verified_at;
+  const isAdmin = await userHasRole(env, user.id, 'admin');
 
   if (isDebug) {
     logAuthDebug(request, 'GET /api/auth/me', 'response_ready', {
@@ -3239,6 +4052,7 @@ const handleAuthMe = async (request, env) => {
     user: {
       id: user.id,
       email: user.email || null,
+      is_admin: isAdmin,
       profile: {
         state: profile?.state || null,
         wy_house_district: profile?.wy_house_district || null,
@@ -3247,6 +4061,13 @@ const handleAuthMe = async (request, env) => {
       verification: {
         voter_match_status: verification?.voter_match_status || null,
         residence_confidence: verification?.residence_confidence || null,
+      },
+      verified_voter: {
+        is_verified_voter: Number(user.is_verified_voter || 0) === 1,
+        verified_at: user.verified_at || null,
+        verification_method: user.verification_method || null,
+        verified_scope: user.verified_scope || null,
+        verified_district: user.verified_district || null,
       },
       address_verified: addressVerified,
       address_verification: {
@@ -4113,6 +4934,30 @@ export default {
       }
     }
 
+    if (pathParts[0] === 'api' && pathParts[1] === 'passkey' && pathParts[2] === 'stepup') {
+      if (request.method === 'POST' && pathParts[3] === 'begin') {
+        return handlePasskeyStepupBegin(request, env);
+      }
+      if (request.method === 'POST' && pathParts[3] === 'finish') {
+        return handlePasskeyStepupFinish(request, env);
+      }
+    }
+
+    if (pathParts[0] === 'api' && pathParts[1] === 'verify-voter') {
+      if (request.method === 'GET' && pathParts[2] === 'status') {
+        return handleVerifyVoterStatus(request, env);
+      }
+      if (request.method === 'POST' && pathParts[2] === 'complete') {
+        return handleVerifyVoterComplete(request, env);
+      }
+    }
+
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'verify-voter' && pathParts[3] === 'issue') {
+      if (request.method === 'POST') {
+        return handleAdminVerifyVoterIssue(request, env);
+      }
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/surveys/list') {
       try {
         if (!env.DB) {
@@ -4121,7 +4966,7 @@ export default {
         const sessionResult = await getSessionUser(request, env);
         const user = sessionResult.status === 'valid' ? sessionResult.user : null;
         const userId = user ? user.id : '';
-        if (userId) {
+        if (userId && !shouldBypassAddressVerification(env)) {
           const addressVerification = await getAddressVerification(env.DB, userId);
           if (!addressVerification?.verified_at) {
             return jsonResponse(
@@ -4523,6 +5368,7 @@ export default {
       const fnKey = firstName.toLowerCase().trim();
       const lnKey = lastName.toLowerCase().trim();
       const cityKey = city.toLowerCase().trim();
+      const firstNameVariants = getFirstNameVariants(fnKey);
       
       // Extract house number from street address (first numeric sequence)
       const houseNumMatch = street1.match(/^(\d+)/);
@@ -4547,60 +5393,101 @@ export default {
       let match = null;
       let matchConfidence = 'low';
 
-      // Strategy 1: Try exact name + house number + city match (high confidence)
+      // Helper function to check house/street match
+      const checkHouseStreetMatch = (storedAddr, houseNum, streetNorm) => {
+        const storedHouseMatch = (storedAddr || '').match(/^(\d+)/);
+        const storedHouseNum = storedHouseMatch ? storedHouseMatch[1] : null;
+        
+        if (storedHouseNum !== houseNum) {
+          return false;
+        }
+        
+        const storedStreetNorm = (storedAddr || '')
+          .toLowerCase()
+          .replace(/^\d+\s*[a-z]?\s*/i, '')
+          .replace(/[\s.,#-]+/g, '')
+          .replace(/street$/i, 'st')
+          .replace(/avenue$/i, 'ave')
+          .replace(/drive$/i, 'dr')
+          .replace(/road$/i, 'rd')
+          .replace(/boulevard$/i, 'blvd')
+          .replace(/lane$/i, 'ln')
+          .replace(/court$/i, 'ct')
+          .replace(/circle$/i, 'cir')
+          .replace(/place$/i, 'pl');
+
+        return storedStreetNorm === streetNorm ||
+          storedStreetNorm.includes(streetNorm.replace(/\s/g, '')) ||
+          streetNorm.includes(storedStreetNorm.replace(/\s/g, ''));
+      };
+
+      // Strategy 1: Try exact name + house number + city match (high confidence) with first name variants
       if (houseNum) {
-        const candidates = await env.WY_VOTERS_DB.prepare(
-          `SELECT voter_id, house, senate, addr1, zip
-           FROM voters_addr_norm
-           WHERE lower(fn) = ?
-             AND lower(ln) = ?
-             AND lower(city) = ?
-           LIMIT 50`
-        )
-          .bind(fnKey, lnKey, cityKey)
-          .all();
+        for (const fnVariant of firstNameVariants) {
+          if (match) break;
+          
+          const candidates = await env.WY_VOTERS_DB.prepare(
+            `SELECT voter_id, house, senate, addr1, zip
+             FROM voters_addr_norm
+             WHERE lower(fn) = ?
+               AND lower(ln) = ?
+               AND lower(city) = ?
+             LIMIT 50`
+          )
+            .bind(fnVariant, lnKey, cityKey)
+            .all();
 
-        if (candidates.results && candidates.results.length > 0) {
-          for (const row of candidates.results) {
-            // Extract house number from stored address
-            const storedHouseMatch = (row.addr1 || '').match(/^(\d+)/);
-            const storedHouseNum = storedHouseMatch ? storedHouseMatch[1] : null;
-            
-            // Normalize stored street
-            const storedStreetNorm = (row.addr1 || '')
-              .toLowerCase()
-              .replace(/^\d+\s*[a-z]?\s*/i, '')
-              .replace(/[\s.,#-]+/g, '')
-              .replace(/street$/i, 'st')
-              .replace(/avenue$/i, 'ave')
-              .replace(/drive$/i, 'dr')
-              .replace(/road$/i, 'rd')
-              .replace(/boulevard$/i, 'blvd')
-              .replace(/lane$/i, 'ln')
-              .replace(/court$/i, 'ct')
-              .replace(/circle$/i, 'cir')
-              .replace(/place$/i, 'pl');
-
-            // House number must match exactly
-            if (storedHouseNum === houseNum) {
-              // Check if street names are similar enough
-              // Either exact match or one contains the other (handles "7th" vs "7 th")
-              const streetMatch = storedStreetNorm === streetNorm ||
-                storedStreetNorm.includes(streetNorm.replace(/\s/g, '')) ||
-                streetNorm.includes(storedStreetNorm.replace(/\s/g, ''));
-              
-              if (streetMatch) {
+          if (candidates.results && candidates.results.length > 0) {
+            for (const row of candidates.results) {
+              if (checkHouseStreetMatch(row.addr1, houseNum, streetNorm)) {
                 match = row;
                 matchConfidence = 'high';
                 break;
               }
             }
+            
+            // Strategy 2: If no exact house match, check if name + city has only one result (medium confidence)
+            if (!match && candidates.results.length === 1) {
+              match = candidates.results[0];
+              matchConfidence = 'medium';
+            }
           }
+        }
+      }
+
+      // Strategy 3: Fallback - if no city match, try name + zipcode (medium confidence)
+      if (!match) {
+        for (const fnVariant of firstNameVariants) {
+          if (match) break;
           
-          // Strategy 2: If no exact house match, check if name + city has only one result (medium confidence)
-          if (!match && candidates.results.length === 1) {
-            match = candidates.results[0];
-            matchConfidence = 'medium';
+          const candidates = await env.WY_VOTERS_DB.prepare(
+            `SELECT voter_id, house, senate, addr1, zip
+             FROM voters_addr_norm
+             WHERE lower(fn) = ?
+               AND lower(ln) = ?
+               AND zip = ?
+             LIMIT 50`
+          )
+            .bind(fnVariant, lnKey, zip)
+            .all();
+
+          if (candidates.results && candidates.results.length > 0) {
+            // Check for house/street match with high confidence
+            if (houseNum) {
+              for (const row of candidates.results) {
+                if (checkHouseStreetMatch(row.addr1, houseNum, streetNorm)) {
+                  match = row;
+                  matchConfidence = 'high';
+                  break;
+                }
+              }
+            }
+            
+            // If still no match and only one candidate, accept with medium confidence
+            if (!match && candidates.results.length === 1) {
+              match = candidates.results[0];
+              matchConfidence = 'medium';
+            }
           }
         }
       }
@@ -4837,6 +5724,19 @@ export default {
           return auth.response;
         }
         const { user } = auth;
+        const userRecord = await env.DB.prepare(
+          `SELECT is_verified_voter
+           FROM user
+           WHERE id = ?
+           LIMIT 1`
+        )
+          .bind(user.id)
+          .first();
+        const isVerifiedVoter = Number(userRecord?.is_verified_voter || 0) === 1;
+        const wantsVerifiedSubmission =
+          meta.verified_voter === true ||
+          meta.verified_flag === true ||
+          Number(meta.verified_flag || 0) === 1;
 
         const version = await env.DB.prepare(
           `SELECT s.id AS survey_id, v.id AS version_id, v.json_hash AS json_hash
@@ -4886,7 +5786,7 @@ export default {
             : districtMeta;
 
         const existing = await env.DB.prepare(
-          `SELECT id, submitted_at, updated_at, edit_count
+          `SELECT id, submitted_at, updated_at, edit_count, verified_flag
            FROM responses
            WHERE user_id = ? AND survey_version_id = ?
            LIMIT 1`
@@ -4899,12 +5799,24 @@ export default {
         let submittedAt = existing?.submitted_at || now;
         let updatedAt = now;
         let editCount = existing?.edit_count || 0;
+        let verifiedFlag = existing?.verified_flag || 0;
+        let stepupGate = null;
+        if (wantsVerifiedSubmission) {
+          if (!isVerifiedVoter) {
+            return jsonResponse({ error: 'Verified voter required.', code: 'VERIFIED_VOTER_REQUIRED' }, { status: 403 });
+          }
+          stepupGate = await requirePasskeyStepup(env, request, user.id);
+          if (stepupGate.response) {
+            return stepupGate.response;
+          }
+          verifiedFlag = 1;
+        }
 
         if (!existing) {
           await env.DB.prepare(
             `INSERT INTO responses
              (id, user_id, survey_id, survey_version_id, version_hash, verified_flag, district, ip_hash, user_hash, submitted_at, updated_at, edit_count)
-             VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0)`
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
           )
             .bind(
               responseId,
@@ -4912,6 +5824,7 @@ export default {
               version.survey_id,
               version.version_id,
               version.json_hash,
+              verifiedFlag,
               districtPayload,
               ipHash,
               userHash,
@@ -4933,10 +5846,10 @@ export default {
           editCount += 1;
           await env.DB.prepare(
             `UPDATE responses
-             SET updated_at = ?, edit_count = ?
+             SET updated_at = ?, edit_count = ?, verified_flag = ?
              WHERE id = ?`
           )
-            .bind(updatedAt, editCount, responseId)
+            .bind(updatedAt, editCount, verifiedFlag, responseId)
             .run();
           await env.DB.prepare(
             `DELETE FROM response_answers WHERE response_id = ?`
@@ -4948,6 +5861,10 @@ export default {
             eventType: 'response_updated',
             metadata: { survey_version_id: version.version_id, response_id: responseId },
           });
+        }
+
+        if (stepupGate?.stepupId) {
+          await consumePasskeyStepup(env, stepupGate.stepupId);
         }
 
         const entries = Object.entries(answers);

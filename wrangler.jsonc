@@ -42,6 +42,46 @@
     }
   ],
   "env": {
+    "preview": {
+      "vars": {
+        "ENVIRONMENT": "preview",
+        "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+        "EMAIL_FROM": "Grassroots Movement <verify@grassrootsmvt.org>",
+        "EMAIL_REPLY_TO": "support@grassrootsmvt.org",
+        "SUPPORT_EMAIL_TO": "anchorskov@gmail.com",
+        "APP_BASE_URL": "https://grassmvtsurvey-preview.anchorskov.workers.dev",
+        "OAUTH_REDIRECT_BASE": "",
+        "GOOGLE_CLIENT_ID": "",
+        "GOOGLE_CLIENT_SECRET": "",
+        "GOOGLE_REDIRECT_URI": "",
+        "WEBAUTHN_RP_ID": "grassmvtsurvey-preview.anchorskov.workers.dev",
+        "EMAIL_VERIFICATION_BYPASS": "true",
+        "ADDRESS_VERIFICATION_BYPASS": "true"
+      },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "logs": { "invocation_logs": true }
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "wy_preview",
+          "database_id": "de78cb41-176d-40e8-bd3b-e053e347ac3f",
+          "migrations_dir": "db/migrations"
+        },
+        {
+          "binding": "WY_VOTERS_DB",
+          "database_name": "wy_preview",
+          "database_id": "de78cb41-176d-40e8-bd3b-e053e347ac3f"
+        },
+        {
+          "binding": "SIBIDRIFT_DB",
+          "database_name": "sibidrift.db",
+          "database_id": "aeedccf4-14bb-48f8-91c0-a9023c9f153c"
+        }
+      ]
+    },
     "production": {
       "vars": {
         "ENVIRONMENT": "production",

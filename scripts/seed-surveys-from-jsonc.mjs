@@ -10,7 +10,7 @@ const rootDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '.
 const surveySources = {
   'abortion-v2': {
     slug: 'abortion',
-    file: 'surveys_abortion_v2.jsonc',
+    file: 'surveys/surveys_abortion_v2.jsonc',
   },
 };
 
@@ -188,6 +188,8 @@ const runWrangler = ({ dbName, local, sqlFile }) => {
   ];
   if (local) {
     args.push('--local');
+  } else {
+    args.push('--remote');
   }
   const result = spawnSync('npx', ['wrangler', ...args], { stdio: 'inherit' });
   if (result.status !== 0) {

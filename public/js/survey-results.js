@@ -26,6 +26,7 @@
   let geoOptions = [];
   let voterSnapshots = null;
   let districtContext = null;
+  let userAuth = null; // Store user auth info for verified district display
 
   const escapeHtml = (str) => {
     if (!str) return '';
@@ -239,6 +240,36 @@
     `;
   };
 
+  // Render user's own district info panel when logged in and verified
+  const renderUserDistrictPanel = () => {
+    if (!userAuth || !userAuth.authenticated || !userAuth.user) return '';
+    const av = userAuth.user.address_verification;
+    if (!av || !av.verified_at) return '';
+
+    const houseDist = av.state_house_dist;
+    const senateDist = av.state_senate_dist;
+    if (!houseDist && !senateDist) return '';
+
+    let linksHtml = '<p class="user-district-links">View results for your district: ';
+    const links = [];
+    if (houseDist) {
+      const houseKey = `WY-HD-${String(houseDist).padStart(2, '0')}`;
+      links.push(`<a href="#" class="user-district-link" data-geo-type="state_house" data-geo-key="${houseKey}">House District ${houseDist}</a>`);
+    }
+    if (senateDist) {
+      const senateKey = `WY-SD-${String(senateDist).padStart(2, '0')}`;
+      links.push(`<a href="#" class="user-district-link" data-geo-type="state_senate" data-geo-key="${senateKey}">Senate District ${senateDist}</a>`);
+    }
+    linksHtml += links.join(' | ') + '</p>';
+
+    return `
+      <div class="user-district-panel">
+        <h4>Your Verified Districts</h4>
+        ${linksHtml}
+      </div>
+    `;
+  };
+
   const render = async () => {
     if (!surveyMeta) {
       container.innerHTML = '<div class="results-error"><h3>Survey not found</h3><p>Could not load survey metadata.</p></div>';
@@ -279,6 +310,12 @@
       </div>
       ${renderControls()}
     `;
+
+    // Show user's district panel if logged in and verified
+    const userDistrictHtml = renderUserDistrictPanel();
+    if (userDistrictHtml) {
+      html += userDistrictHtml;
+    }
 
     // Show district context if available
     const districtHtml = renderDistrictContext();
@@ -333,6 +370,22 @@
         render();
       });
     }
+
+    // Attach click handlers for user district links
+    const userDistrictLinks = container.querySelectorAll('.user-district-link');
+    userDistrictLinks.forEach(link => {
+      link.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const geoType = link.dataset.geoType;
+        const geoKey = link.dataset.geoKey;
+        // Switch to tier 2 and select the user's district
+        currentTier = 2;
+        await loadGeoOptions();
+        currentGeoType = geoType;
+        currentGeoKey = geoKey;
+        render();
+      });
+    });
   };
 
   const loadGeoOptions = async () => {
@@ -354,6 +407,17 @@
     }
   };
 
+  const loadUserAuth = async () => {
+    try {
+      const resp = await fetch('/api/auth/me', { credentials: 'include' });
+      if (resp.ok) {
+        userAuth = await resp.json();
+      }
+    } catch (e) {
+      // Ignore errors loading user auth
+    }
+  };
+
   const init = async () => {
     try {
       // Load survey metadata
@@ -367,8 +431,11 @@
 
       surveyMeta = metaData;
 
-      // Load voter registration data
-      await loadVoterSnapshots();
+      // Load voter registration data and user auth in parallel
+      await Promise.all([
+        loadVoterSnapshots(),
+        loadUserAuth(),
+      ]);
 
       // Initial render
       await render();
