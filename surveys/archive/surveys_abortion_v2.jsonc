@@ -1,0 +1,102 @@
+// surveys_abortion_v2.jsonc
+// slug: abortion
+// version: v2 | 2026-02-01
+// title: Abortion Policy Survey: Finding Common Ground
+// notes: Neutral, minimal branching, optional comment boxes. No em dashes.
+{
+  "title": "Abortion Policy Survey: Finding Common Ground",
+  "description": "This survey asks about views on abortion law and policy. It is for research and will be reported in aggregate.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "pages": [
+    {
+      "name": "p1",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "life_protection_start",
+          "title": "Which point best matches when the law should begin protecting a developing life?",
+          "choices": [
+            "At conception (when the egg is fertilized).",
+            "At the point of a detectable heartbeat (often around 6 weeks).",
+            "At the point of viability (when a fetus can survive outside the womb, often around 23 to 24 weeks).",
+            "At birth.",
+            "Not sure."
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "overall_policy_preference",
+          "title": "Thinking about what the law should be, which statement is closest to your view?",
+          "choices": [
+            "Abortion should be legal in most situations.",
+            "Abortion should be legal in many situations, but with clear legal limits.",
+            "Abortion should be allowed only in a few situations, with clear exceptions.",
+            "Abortion should be illegal in most situations, with limited exceptions.",
+            "Not sure."
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "general_time_limit_non_emergency",
+          "title": "Up to what point, if any, should abortion be legal in situations other than medical emergencies?",
+          "choices": [
+            "No general time limit before birth.",
+            "Up to 24 weeks.",
+            "Up to 12 weeks.",
+            "Earlier than 12 weeks.",
+            "It should not be legal except in medical emergencies or specific exceptions.",
+            "Not sure."
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "exceptions_allowed",
+          "title": "Which exceptions, if any, should the law include? (Select all that apply)",
+          "choices": [
+            "When the pregnancy poses a life-threatening risk to the pregnant person.",
+            "To prevent a serious risk of major harm to physical health.",
+            "Pregnancy resulting from rape or incest.",
+            "Lethal fetal condition (expected to result in death shortly after birth).",
+            "No exceptions should be allowed.",
+            "Not sure."
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "decision_authority",
+          "title": "Who should have the primary authority to decide in a specific situation?",
+          "choices": [
+            "The pregnant person.",
+            "The pregnant person, in consultation with a clinician.",
+            "A clinician, using established medical standards.",
+            "Publicly established legal standards.",
+            "Not sure."
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "guiding_principle",
+          "title": "Which principle matters most to you on this issue?",
+          "choices": [
+            "Protecting unborn life whenever possible.",
+            "Protecting a pregnant person's ability to make medical decisions.",
+            "Limiting government power in personal medical decisions.",
+            "Finding a workable compromise most people can live with.",
+            "Focusing on prevention and support rather than punishment."
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "leader_comment",
+          "title": "In your own words, what do you want leaders to understand about this issue?",
+          "isRequired": false,
+          "maxLength": 800
+        }
+      ]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+// public/data/surveys.json
 [
   {
     "id": "wy-priorities",
@@ -42,9 +43,17 @@
   {
     "id": "wy-abortion-policy",
     "scope": "wy",
-    "title": "Abortion Policy Survey",
-    "description": "Share your perspective on abortion policy approaches in Wyoming.",
+    "title": "Abortion Policy Survey: Finding Common Ground",
+    "description": "The purpose of this survey is to aggregate our voices as a community on the divisive issue of abortion.",
     "status": "active",
-    "href": "/surveys/take/abortion-policy"
+    "href": "/surveys/take/abortion"
+  },
+  {
+    "id": "wy-public-school-funding-2026",
+    "scope": "wy",
+    "title": "Wyoming Public School Funding Priorities Survey 2026",
+    "description": "Share your priorities for the 2026 school finance update.",
+    "status": "active",
+    "href": "/surveys/take/wy-public-school-funding-2026"
   }
 ]

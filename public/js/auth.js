@@ -241,13 +241,6 @@
     }
   };
 
-  const logDebug = (message) => {
-    // Only log in debug environments
-    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      console.log('[Auth Debug]', message);
-    }
-  };
-
   const loadWebAuthnBrowser = async () => {
     if (window.__webauthnBrowser) {
       return window.__webauthnBrowser;

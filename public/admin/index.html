@@ -1,0 +1,43 @@
+<!-- public/admin/index.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin | Grassroots Movement</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <div data-include="/partials/header.html"></div>
+    <main>
+      <h1>Admin tools</h1>
+      <p class="helper-text">
+        Issue verified voter links for specific accounts.
+      </p>
+      <div class="survey-form">
+        <h2>Verified voter link</h2>
+        <form id="admin-verify-voter-form">
+          <div class="form-row">
+            <label for="admin-verify-email">Target email</label>
+            <input id="admin-verify-email" name="admin-verify-email" type="email" required />
+          </div>
+          <div class="form-row">
+            <label for="admin-verify-notes">Notes (optional)</label>
+            <input id="admin-verify-notes" name="admin-verify-notes" type="text" maxlength="200" />
+          </div>
+          <div class="form-row">
+            <label for="admin-verify-expires">Expires in minutes (optional)</label>
+            <input id="admin-verify-expires" name="admin-verify-expires" type="number" min="1" placeholder="30" />
+          </div>
+          <button class="button button--primary" type="submit">Issue link</button>
+          <p class="form-error is-hidden" id="admin-verify-error" role="alert"></p>
+          <p class="survey-success is-hidden" id="admin-verify-success" role="status"></p>
+          <p class="helper-text is-hidden" id="admin-verify-link"></p>
+        </form>
+      </div>
+    </main>
+    <div data-include="/partials/footer.html"></div>
+    <script src="/js/include-partials.js"></script>
+    <script src="/js/admin-verify-voter.js"></script>
+  </body>
+</html>

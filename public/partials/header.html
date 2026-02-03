@@ -7,6 +7,7 @@
       <button class="site-nav__link site-nav__button" type="button" data-auth-open id="auth-open">
         Account
       </button>
+      <a class="site-nav__link is-hidden" href="/admin/" id="admin-link">Admin</a>
       <span class="auth-badge is-hidden" id="auth-badge">Signed in</span>
       <button
         class="site-nav__link site-nav__button is-hidden"
@@ -53,10 +54,15 @@
       const bar = document.getElementById('user-info-bar');
       const emailEl = document.getElementById('user-info-email');
       const districtsEl = document.getElementById('user-info-districts');
+      const adminLink = document.getElementById('admin-link');
       if (!bar || !emailEl || !districtsEl) return;
 
       const user = data.user;
       const addr = user.address_verification || {};
+
+      if (adminLink && user.is_admin) {
+        adminLink.classList.remove('is-hidden');
+      }
       
       // Only show if address verified
       if (!user.address_verified) return;
@@ -75,6 +81,7 @@
       
       districtsEl.textContent = parts.join(' • ');
       bar.classList.remove('is-hidden');
+
     } catch (e) {
       // silently fail
     }

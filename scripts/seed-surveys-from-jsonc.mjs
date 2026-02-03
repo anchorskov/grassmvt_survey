@@ -1,3 +1,4 @@
+// scripts/seed-surveys-from-jsonc.mjs
 /* scripts/seed-surveys-from-jsonc.mjs */
 import fs from 'fs';
 import path from 'path';
@@ -10,7 +11,11 @@ const rootDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '.
 const surveySources = {
   'abortion-v2': {
     slug: 'abortion',
-    file: 'surveys_abortion_v2.jsonc',
+    file: 'surveys/surveys_abortion_v2.jsonc',
+  },
+  'wy-public-school-funding-2026-v2': {
+    slug: 'wy-public-school-funding-2026',
+    file: 'surveys/surveys_wy_public_school_funding_2026_v2.jsonc',
   },
 };
 
@@ -128,25 +133,33 @@ const loadSurvey = (source) => {
   const jsoncText = fs.readFileSync(filePath, 'utf8');
   const stripped = stripJsonc(jsoncText);
   const parsed = JSON.parse(stripped);
+  const meta = parsed.x_meta || {};
+  const flowType = meta.flow === 'sectioned' || meta.sectionExitEnabled ? 'sectioned' : 'standard';
+  const flowMeta = Object.keys(meta).length ? JSON.stringify(meta) : null;
   const jsonText = stableStringify(parsed);
   const jsonHash = sha256Hex(jsonText);
   return {
     slug: source.slug,
     title: parsed.title || source.slug,
+    flowType,
+    flowMeta,
     jsonText,
     jsonHash,
   };
 };
 
-const buildSql = ({ slug, title, version, jsonText, jsonHash, publish, changelog }) => {
+const buildSql = ({ slug, title, version, flowType, flowMeta, jsonText, jsonHash, publish, changelog }) => {
   const publishedAt = publish ? "datetime('now')" : 'NULL';
+  const flowMetaValue = flowMeta ? `'${flowMeta.replace(/'/g, "''")}'` : 'NULL';
   return `
 -- Seed survey ${slug} version ${version}
-INSERT OR IGNORE INTO surveys (slug, scope, title, status, created_at)
-VALUES ('${slug.replace(/'/g, "''")}', 'public', '${title.replace(/'/g, "''")}', 'active', datetime('now'));
+INSERT OR IGNORE INTO surveys (slug, scope, title, status, flow_type, flow_meta, created_at)
+VALUES ('${slug.replace(/'/g, "''")}', 'public', '${title.replace(/'/g, "''")}', 'active', '${flowType}', ${flowMetaValue}, datetime('now'));
 
 UPDATE surveys
-SET title = '${title.replace(/'/g, "''")}'
+SET title = '${title.replace(/'/g, "''")}',
+    flow_type = '${flowType}',
+    flow_meta = ${flowMetaValue}
 WHERE slug = '${slug.replace(/'/g, "''")}';
 
 INSERT INTO survey_versions (
@@ -176,7 +189,7 @@ ON CONFLICT(survey_id, version) DO UPDATE SET
 `;
 };
 
-const runWrangler = ({ dbName, local, sqlFile }) => {
+const runWrangler = ({ dbName, local, sqlFile, envName }) => {
   const args = [
     'd1',
     'execute',
@@ -186,8 +199,13 @@ const runWrangler = ({ dbName, local, sqlFile }) => {
     '--config',
     'wrangler.jsonc',
   ];
+  if (envName) {
+    args.push('--env', envName);
+  }
   if (local) {
     args.push('--local');
+  } else {
+    args.push('--remote');
   }
   const result = spawnSync('npx', ['wrangler', ...args], { stdio: 'inherit' });
   if (result.status !== 0) {
@@ -203,8 +221,8 @@ const main = () => {
   const publish = args.publish !== 'false';
   const changelog = args.changelog || 'Seeded from JSONC source';
 
-  if (!['local', 'prod'].includes(dbTarget)) {
-    throw new Error('Invalid --db, use local or prod');
+  if (!['local', 'preview', 'prod'].includes(dbTarget)) {
+    throw new Error('Invalid --db, use local, preview, or prod');
   }
   if (!Number.isInteger(version) || version < 1) {
     throw new Error('Invalid --version, must be a positive integer');
@@ -219,7 +237,8 @@ const main = () => {
     throw new Error('Invalid --slug, use abortion, survey-process, security, or all');
   }
 
-  const dbName = dbTarget === 'local' ? 'wy_local' : 'wy';
+  const dbName = dbTarget === 'local' ? 'wy_local' : dbTarget === 'preview' ? 'wy_preview' : 'wy';
+  const envName = dbTarget === 'preview' ? 'preview' : dbTarget === 'prod' ? 'production' : '';
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'survey-seed-'));
   const sqlFile = path.join(tempDir, `seed-surveys-${Date.now()}.sql`);
 
@@ -231,6 +250,8 @@ const main = () => {
       slug: survey.slug,
       title: survey.title,
       version,
+      flowType: survey.flowType,
+      flowMeta: survey.flowMeta,
       jsonText: survey.jsonText,
       jsonHash: survey.jsonHash,
       publish,
@@ -242,7 +263,7 @@ const main = () => {
   });
 
   fs.writeFileSync(sqlFile, sql);
-  runWrangler({ dbName, local: dbTarget === 'local', sqlFile });
+  runWrangler({ dbName, local: dbTarget === 'local', sqlFile, envName });
   fs.rmSync(sqlFile, { force: true });
 };
 

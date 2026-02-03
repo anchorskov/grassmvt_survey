@@ -1,0 +1,292 @@
+// surveys/surveys_wy_public_school_funding_2026_v2.jsonc
+{
+  "title": "Wyoming Public School Funding Priorities Survey 2026",
+  "description": "This survey gathers public perspective on specific policy choices in the 2026 school finance update.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys"
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_purpose",
+          "html": "<h3>Introduction</h3><p><strong>Purpose:</strong> This survey gathers public perspective on specific policy choices in the 2026 school finance update.</p><p><strong>Context (as of January 2026):</strong> After a 2025 district court ruling on school funding, the Legislature’s Select Committee on School Finance Recalibration advanced a draft bill for the 2026 Budget Session. The draft raises the funding model’s average teacher salary to $70,560 (projected district-paid average about $70,812) and includes changes such as adjusting staffing ratios and moving school employees onto the state health insurance plan. The state is appealing the 2025 ruling to the Wyoming Supreme Court, and the Supreme Court is considering the appeal.</p><p><strong>How we will report results:</strong> We will publish results in aggregate and publish the exact question wording and response options alongside the results.</p>"
+        },
+        {
+          "type": "comment",
+          "name": "intro_comment",
+          "title": "Optional comment"
+        }
+      ]
+    },
+    {
+      "name": "section_0",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s0_header",
+          "html": "<h3>Section 0: Quick context</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q0_familiarity",
+          "title": "How familiar are you with Wyoming’s school finance update?",
+          "choices": [
+            "Very familiar",
+            "Somewhat familiar",
+            "Not very familiar",
+            "Not familiar",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q0_role",
+          "title": "Which best describes you? (Pick one)",
+          "choices": [
+            "Parent or guardian of a current student",
+            "Educator or school staff",
+            "Student",
+            "Community member without a student in school",
+            "Prefer not to answer"
+          ],
+          "hasOther": true,
+          "otherText": "Other (write-in)"
+        },
+        {
+          "type": "comment",
+          "name": "q0_comment",
+          "title": "Optional comment"
+        }
+      ]
+    },
+    {
+      "name": "section_1",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s1_header",
+          "html": "<h3>Section 1: Staffing and compensation priorities</h3><p>What this means: This section asks what we prioritize if the budget does not cover every goal at once.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q1_tradeoff",
+          "title": "If a trade-off is required to maintain a balanced budget, which priority is closest to your view?",
+          "choices": [
+            "Prioritize reaching the projected average salary (about $70,812), even if it increases class-size ratios in middle and high schools",
+            "Prioritize keeping smaller class sizes and more support staff, even if salary increases remain below the projected target (about $70,812)",
+            "Fund both the projected salary target (about $70,812) and current staffing ratios, even if it requires new revenue or budget reallocations",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q1_comment",
+          "title": "Optional comment"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q2_recruitment",
+          "title": "Which approach should the state funding model prioritize to address teacher shortages?",
+          "choices": [
+            "Set a high statewide minimum starting salary for new teachers (example: $60,000)",
+            "Focus on the statewide average target (projected about $70,812), allowing districts to set starting pay",
+            "Do both, a minimum starting salary and an average target",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q2_comment",
+          "title": "Optional comment"
+        }
+      ]
+    },
+    {
+      "name": "section_2",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s2_header",
+          "html": "<h3>Section 2: Student supports and timing</h3><p>What this means: This section asks when we should fund counselors, school safety staffing, and school technology.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q3_timing_supports",
+          "title": "The bill defers ongoing state funding for elementary counselors and school resource officers (SROs) for further study during the 2026 interim. Which approach do you support?",
+          "choices": [
+            "Study first: Continue current approaches for one more year, complete the study, then set an ongoing state-funded standard",
+            "Fund now: Add ongoing state funding in the 2026 budget so districts can hire or contract for these roles starting next school year",
+            "Partial phase-in: Provide partial statewide funding in 2026 with a clear plan for full funding after the study",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q3_comment",
+          "title": "Optional comment"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q4_technology_funding",
+          "title": "The proposal sets technology funding at $250 per student, while consultants suggest $450 is needed for full 1:1 device replacement and cybersecurity. How do you view the $250 rate?",
+          "choices": [
+            "Sufficient: It encourages districts to find efficiencies and manage replacements within this level",
+            "Inadequate: It will likely shift costs to districts or families through other funds or fees",
+            "Uncertain: I would need to see my local district’s actual technology expenses",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q4_comment",
+          "title": "Optional comment"
+        }
+      ]
+    },
+    {
+      "name": "section_3",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s3_header",
+          "html": "<h3>Section 3: Funding level choices</h3><p>What this means: This section asks whether the state should fund the expert cost estimate, the committee proposal, or a mix.</p><p><strong>Funding gap snapshot:</strong> Consultants (Picus Odden &amp; Associates) estimated an evidence-based cost of education at about $1.91 billion. The committee proposal totals about $1.81 billion.</p><p><strong>Key differences often discussed:</strong></p><ul><li>Substitute pay: $261/day vs $185/day</li><li>Technology: $450/student vs $250/student</li><li>Mental health staffing: 1 counselor per school vs deferred for further study</li><li>Middle and high school ratio: 21:1 vs 25:1</li></ul>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q5_funding_difference",
+          "title": "Which statement best aligns with your view?",
+          "choices": [
+            "Fund the committee proposal (about $1.81B) and accept trade-offs in areas like substitutes, technology, and staffing ratios",
+            "Fund the full expert estimate (about $1.91B) to support the evidence-based rates and staffing assumptions",
+            "Mix: Fund priority staffing items now (example: substitute pay and mental health staffing), and phase in technology and staffing ratio changes later",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q5_comment",
+          "title": "Optional comment"
+        }
+      ]
+    },
+    {
+      "name": "section_4",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s4_header",
+          "html": "<h3>Section 4: Local control and constitutional standards</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q6_health_insurance",
+          "title": "The bill proposes moving all school employees onto the state health insurance plan. Which view is closest to your view?",
+          "choices": [
+            "Support: Stronger buying power and more consistent benefits statewide",
+            "Oppose: It shifts benefit decisions from districts to the state, and districts lose flexibility to tailor benefits to local needs",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q6_comment",
+          "title": "Optional comment"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q7_constitutional_floor",
+          "title": "When determining the minimum level of funding required under the Wyoming Constitution, which should carry the most weight?",
+          "choices": [
+            "The Legislature, based on state revenue, taxpayer capacity, and competing public needs",
+            "Independent experts, based on the cost of meeting educational standards",
+            "Courts, based on the constitutional floor as interpreted in case law",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q7_comment",
+          "title": "Optional comment"
+        }
+      ]
+    },
+    {
+      "name": "section_5",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s5_header",
+          "html": "<h3>Section 5: Enrollment decline glide path</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q8_glide_path",
+          "title": "Wyoming school funding is closely tied to enrollment. When enrollment drops, funding usually drops too. A glide path limits how fast funding can decline, for example no more than 5% per year, even if enrollment falls faster. This gives time to adjust staffing and programs. The trade-off is that funding declines more slowly for a period of time. Do you support this approach?",
+          "choices": [
+            "Yes, stability for students and staff is worth the temporary cost of a slower funding reduction",
+            "No, funding should follow enrollment changes right away",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q8_comment",
+          "title": "Optional comment"
+        }
+      ]
+    },
+    {
+      "name": "section_6",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s6_header",
+          "html": "<h3>Section 6: Funding approaches</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q9_funding_sources",
+          "title": "If the state determines more funding is necessary to meet the expert cost estimate, how should it be sourced?",
+          "choices": [
+            "Reprioritize within the existing state budget",
+            "Use reserves, such as the Rainy Day fund or education savings accounts",
+            "Reduce overhead first, example: consolidate district administration before seeking new revenue",
+            "Consider new or adjusted tax structures",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q9_comment",
+          "title": "Optional comment"
+        },
+        {
+          "type": "html",
+          "name": "mini_glossary",
+          "html": "<h4>Mini-glossary (optional)</h4><ul><li><strong>Recalibration:</strong> A legislative update to the school funding model.</li><li><strong>Expert cost estimate:</strong> The consultant evidence-based calculation of what the model would fund.</li><li><strong>Ongoing state funding:</strong> A continuing budget line item, not a one-time grant.</li><li><strong>Enrollment glide path:</strong> A rule that slows how fast funding drops when enrollment falls.</li><li><strong>Constitutional floor:</strong> The minimum level of funding courts interpret as required.</li></ul>"
+        }
+      ]
+    }
+  ]
+}

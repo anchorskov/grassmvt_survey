@@ -42,6 +42,7 @@
   const badgeEl = document.getElementById('auth-badge');
   const quickLogoutButton = document.getElementById('auth-quick-logout');
   const openButton = document.getElementById('auth-open');
+  const getAdminLink = () => document.getElementById('admin-link');
 
   const state = {
     authenticated: false,
@@ -187,6 +188,10 @@
     if (authNote) {
       authNote.classList.toggle('is-hidden', isLoggedIn);
     }
+    const adminLink = getAdminLink();
+    if (adminLink) {
+      adminLink.classList.toggle('is-hidden', true);
+    }
   };
 
   const fetchAuthState = async () => {
@@ -202,6 +207,10 @@
       const data = await response.json();
       if (data.authenticated) {
         setLoggedInState(true, data.user?.email || '');
+        const adminLink = getAdminLink();
+        if (adminLink) {
+          adminLink.classList.toggle('is-hidden', !data.user?.is_admin);
+        }
         state.addressVerified = !!data.user?.address_verified;
         if (consumePostVerifyFlag()) {
           AuthModals.closeAll();

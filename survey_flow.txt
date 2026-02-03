@@ -12,6 +12,25 @@ Example:
 - surveys_abortion_v1.jsonc
 - surveys_survey_process_v1.jsonc
 
+Multi-part survey metadata
+Use a top-level metadata object that SurveyJS ignores:
+
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys"
+  }
+
+Database storage for discovery
+If available, store the metadata in surveys:
+- surveys.flow_type TEXT DEFAULT 'standard'
+- surveys.flow_meta TEXT (JSON string)
+
+Seed script reads x_meta and sets:
+- flow_type = 'sectioned' when x_meta.flow == 'sectioned' or sectionExitEnabled == true
+- flow_meta = JSON string of x_meta
+
 Working process
 1) Build the SurveyJS bundle
    - npm run build:surveyjs

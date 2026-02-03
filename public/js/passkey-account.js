@@ -224,5 +224,132 @@
     });
   }
 
+  // Admin Panel Logic
+  const adminPanel = document.getElementById('admin-panel');
+  const adminIssueBtn = document.getElementById('admin-issue-link');
+  const adminEmailInput = document.getElementById('admin-target-email');
+  const adminNotesInput = document.getElementById('admin-notes');
+  const adminExpiresInput = document.getElementById('admin-expires');
+  const adminErrorEl = document.getElementById('admin-error');
+  const adminSuccessEl = document.getElementById('admin-success');
+  const adminLinkResult = document.getElementById('admin-link-result');
+  const adminLinkOutput = document.getElementById('admin-link-output');
+  const adminCopyBtn = document.getElementById('admin-copy-link');
+
+  const showAdminError = (message) => {
+    if (!adminErrorEl) return;
+    if (!message) {
+      adminErrorEl.textContent = '';
+      adminErrorEl.classList.add('is-hidden');
+      return;
+    }
+    adminErrorEl.textContent = message;
+    adminErrorEl.classList.remove('is-hidden');
+    if (adminSuccessEl) adminSuccessEl.classList.add('is-hidden');
+    if (adminLinkResult) adminLinkResult.classList.add('is-hidden');
+  };
+
+  const showAdminSuccess = (message) => {
+    if (!adminSuccessEl) return;
+    if (!message) {
+      adminSuccessEl.textContent = '';
+      adminSuccessEl.classList.add('is-hidden');
+      return;
+    }
+    adminSuccessEl.textContent = message;
+    adminSuccessEl.classList.remove('is-hidden');
+    if (adminErrorEl) adminErrorEl.classList.add('is-hidden');
+  };
+
+  const checkAdminRole = async () => {
+    if (!adminPanel) return;
+    try {
+      const response = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.authenticated && data.user && data.user.is_admin) {
+        adminPanel.classList.remove('is-hidden');
+      }
+    } catch (e) {
+      // Ignore
+    }
+  };
+
+  if (adminIssueBtn) {
+    adminIssueBtn.addEventListener('click', async () => {
+      showAdminError('');
+      showAdminSuccess('');
+      if (adminLinkResult) adminLinkResult.classList.add('is-hidden');
+
+      const email = (adminEmailInput?.value || '').trim();
+      const notes = (adminNotesInput?.value || '').trim();
+      const expires = parseInt(adminExpiresInput?.value || '60', 10);
+
+      if (!email) {
+        showAdminError('Please enter a target email.');
+        return;
+      }
+
+      adminIssueBtn.disabled = true;
+      adminIssueBtn.textContent = 'Issuing...';
+
+      try {
+        const response = await fetch('/api/admin/verify-voter/issue', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            target_email: email,
+            notes: notes || undefined,
+            expires_minutes: expires,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) {
+          showAdminError(data.error || data.message || 'Failed to issue link.');
+          return;
+        }
+        if (data.status === 'EMAIL_SENT') {
+          showAdminSuccess('Verification email sent to ' + email);
+        } else if (data.link) {
+          showAdminSuccess('Link generated (email not configured). Copy and send manually:');
+          if (adminLinkOutput) adminLinkOutput.value = data.link;
+          if (adminLinkResult) adminLinkResult.classList.remove('is-hidden');
+        } else {
+          showAdminSuccess('Link issued successfully.');
+        }
+        if (adminEmailInput) adminEmailInput.value = '';
+        if (adminNotesInput) adminNotesInput.value = '';
+      } catch (error) {
+        showAdminError('Request failed. Please try again.');
+      } finally {
+        adminIssueBtn.disabled = false;
+        adminIssueBtn.textContent = 'Issue verify-voter link';
+      }
+    });
+  }
+
+  if (adminCopyBtn && adminLinkOutput) {
+    adminCopyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(adminLinkOutput.value);
+        adminCopyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          adminCopyBtn.textContent = 'Copy link';
+        }, 2000);
+      } catch (e) {
+        adminLinkOutput.select();
+        document.execCommand('copy');
+        adminCopyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          adminCopyBtn.textContent = 'Copy link';
+        }, 2000);
+      }
+    });
+  }
+
+  // Check admin role after init
+  checkAdminRole();
+
   init();
 })();
