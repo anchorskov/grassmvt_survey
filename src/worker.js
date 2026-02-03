@@ -4028,6 +4028,7 @@ const handleAuthMe = async (request, env) => {
   )
     .bind(user.id)
     .first();
+  const isAdmin = await userHasRole(env, user.id, 'admin');
   const verification = await env.DB.prepare(
     `SELECT voter_match_status, residence_confidence
      FROM user_verification
@@ -4037,7 +4038,6 @@ const handleAuthMe = async (request, env) => {
     .first();
   const addressVerification = await getAddressVerification(env.DB, user.id);
   const addressVerified = !!addressVerification?.verified_at;
-  const isAdmin = await userHasRole(env, user.id, 'admin');
 
   if (isDebug) {
     logAuthDebug(request, 'GET /api/auth/me', 'response_ready', {
@@ -4052,7 +4052,7 @@ const handleAuthMe = async (request, env) => {
     user: {
       id: user.id,
       email: user.email || null,
-      is_admin: isAdmin,
+      is_admin: !!isAdmin,
       profile: {
         state: profile?.state || null,
         wy_house_district: profile?.wy_house_district || null,
@@ -4980,6 +4980,8 @@ export default {
                   s.title,
                   s.scope,
                   s.status,
+                  s.flow_type,
+                  s.flow_meta,
                   v.id AS version_id,
                   v.json_hash,
                   v.json_text,
@@ -5004,11 +5006,19 @@ export default {
 
         const payload = (result.results || []).map((row) => {
           let description = '';
+          let flowMeta = null;
           try {
             const parsed = JSON.parse(row.json_text || '{}');
             description = parsed.description || '';
           } catch (error) {
             description = '';
+          }
+          if (row.flow_meta) {
+            try {
+              flowMeta = JSON.parse(row.flow_meta);
+            } catch (error) {
+              flowMeta = null;
+            }
           }
           return {
             slug: row.slug,
@@ -5016,6 +5026,10 @@ export default {
             scope: row.scope,
             status: row.status,
             description,
+            flow: {
+              type: row.flow_type || 'standard',
+              meta: flowMeta,
+            },
             versionId: row.version_id,
             versionHash: row.json_hash,
             response: row.submitted_at

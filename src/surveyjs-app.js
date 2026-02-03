@@ -1,3 +1,4 @@
+// src/surveyjs-app.js
 /* src/surveyjs-app.js */
 import { Model } from 'survey-core';
 import { renderSurvey } from 'survey-js-ui';
@@ -121,6 +122,59 @@ const showThankYouModal = (responseId) => {
   }
 };
 
+const buildSectionControls = (survey, meta, container) => {
+  const existing = container.querySelector('.survey-section-controls');
+  if (existing) {
+    existing.remove();
+  }
+
+  const controls = document.createElement('div');
+  controls.className = 'survey-actions survey-section-controls';
+
+  const labelText = meta.sectionExitLabel || 'End of section';
+  const label = document.createElement('div');
+  label.className = 'helper-text';
+  label.textContent = labelText;
+  controls.appendChild(label);
+
+  const continueButton = document.createElement('button');
+  continueButton.type = 'button';
+  continueButton.className = 'button button--primary';
+  continueButton.textContent = survey.isLastPage ? 'Submit and finish' : 'Continue to next section';
+  continueButton.addEventListener('click', () => {
+    if (survey.isLastPage) {
+      survey.doCurrentPageComplete(true);
+      return;
+    }
+    survey.doCurrentPageComplete(false);
+  });
+
+  const saveButton = document.createElement('button');
+  saveButton.type = 'button';
+  saveButton.className = 'button button--secondary';
+  saveButton.textContent = 'Save my answers now and finish';
+  saveButton.addEventListener('click', () => {
+    survey.doCurrentPageComplete(true);
+  });
+
+  const exitButton = document.createElement('button');
+  exitButton.type = 'button';
+  exitButton.className = 'button button--small button--outline';
+  exitButton.textContent = 'Exit without saving';
+  exitButton.addEventListener('click', () => {
+    const exitUrl = meta.exitUrl || '/surveys';
+    window.location.assign(exitUrl);
+  });
+
+  controls.appendChild(continueButton);
+  if (!survey.isLastPage) {
+    controls.appendChild(saveButton);
+  }
+  controls.appendChild(exitButton);
+
+  container.appendChild(controls);
+};
+
 const buildMeta = (answers = {}) => {
   const meta = {};
   const simpleFields = ['state', 'zip', 'postal_code', 'addr_raw', 'address', 'fn', 'ln'];
@@ -163,6 +217,13 @@ const initSurveyPage = async () => {
     const model = new Model(data.surveyJson);
     let editingMeta = null;
 
+    const surveyMeta = data.surveyJson?.x_meta || {};
+    const enableSectionControls =
+      surveyMeta.sectionExitEnabled === true || surveyMeta.flow === 'sectioned';
+    if (enableSectionControls) {
+      model.showNavigationButtons = 'none';
+    }
+
     try {
       const mineResponse = await fetch(
         `/api/responses/mine?surveyVersionId=${encodeURIComponent(data.versionId)}`,
@@ -197,6 +258,14 @@ const initSurveyPage = async () => {
         return text.startsWith(filter);
       });
     });
+    if (enableSectionControls) {
+      model.onAfterRenderPage.add((sender, options) => {
+        if (!options || !options.htmlElement) {
+          return;
+        }
+        buildSectionControls(sender, surveyMeta, options.htmlElement);
+      });
+    }
     model.onComplete.add(async (sender) => {
       setStatus('Submitting response...');
       const payload = {

@@ -1,4 +1,19 @@
 // scripts/admin_issue_verify_voter_link.mjs
+//
+// Usage:
+//   # Set the environment (preview or production) and run:
+//   VERIFY_VOTER_BASE_URL=https://grassmvtsurvey-preview.anchorskov.workers.dev \
+//     node scripts/admin_issue_verify_voter_link.mjs --email user@example.com --session <session-id>
+//
+//   - Replace user@example.com with the user's email (account must exist)
+//   - Use your admin session id for --session (or use --cookie "session=..." if preferred)
+//   - For production, set VERIFY_VOTER_BASE_URL to the production URL
+//   - Optional: --notes "reason or context" --expires <minutes>
+//
+// Example:
+//   VERIFY_VOTER_BASE_URL=https://grassmvtsurvey-preview.anchorskov.workers.dev \
+//     node scripts/admin_issue_verify_voter_link.mjs --email pamela@pamelafaganhutchins.com --session abcd1234
+
 import process from 'node:process';
 
 const parseArgs = (argv) => {

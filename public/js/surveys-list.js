@@ -1,3 +1,4 @@
+// public/js/surveys-list.js
 /* public/js/surveys-list.js */
 (() => {
   const grid = document.getElementById('survey-grid');
@@ -32,6 +33,76 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+
+  const stripJsonc = (input) => {
+    let output = '';
+    let inString = false;
+    let stringChar = '';
+    let escaping = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+
+    for (let i = 0; i < input.length; i += 1) {
+      const char = input[i];
+      const nextChar = input[i + 1];
+
+      if (inLineComment) {
+        if (char === '\n') {
+          inLineComment = false;
+          output += char;
+        }
+        continue;
+      }
+
+      if (inBlockComment) {
+        if (char === '*' && nextChar === '/') {
+          inBlockComment = false;
+          i += 1;
+        }
+        continue;
+      }
+
+      if (inString) {
+        output += char;
+        if (escaping) {
+          escaping = false;
+          continue;
+        }
+        if (char === '\\\\') {
+          escaping = true;
+          continue;
+        }
+        if (char === stringChar) {
+          inString = false;
+          stringChar = '';
+        }
+        continue;
+      }
+
+      if (char === '"' || char === "'") {
+        inString = true;
+        stringChar = char;
+        output += char;
+        continue;
+      }
+
+      if (char === '/' && nextChar === '/') {
+        inLineComment = true;
+        i += 1;
+        continue;
+      }
+
+      if (char === '/' && nextChar === '*') {
+        inBlockComment = true;
+        i += 1;
+        continue;
+      }
+
+      output += char;
+    }
+
+    return output;
+  };
 
   const renderError = () => {
     grid.innerHTML = '<p class="card">Surveys are unavailable right now.</p>';
@@ -160,7 +231,8 @@
       if (!response.ok) {
         return [];
       }
-      const data = await response.json();
+      const rawText = await response.text();
+      const data = JSON.parse(stripJsonc(rawText));
       if (!Array.isArray(data)) {
         return [];
       }
