@@ -766,11 +766,10 @@ const writeAuditLog = async (env, request, { actorUserId, action, targetUserId =
   const metadataJson = metadata ? JSON.stringify(metadata) : null;
   await env.DB.prepare(
     `INSERT INTO audit_log
-       (id, actor_user_id, action, target_user_id, created_at, ip, user_agent, metadata_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+       (actor_user_id, action, target_user_id, created_at, ip, user_agent, metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
-      crypto.randomUUID(),
       actorUserId,
       action,
       targetUserId,
