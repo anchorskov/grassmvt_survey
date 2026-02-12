@@ -35,6 +35,23 @@
           <p class="helper-text is-hidden" id="admin-verify-link"></p>
         </form>
       </div>
+      <div class="survey-form" style="margin-top: 1.5rem;">
+        <h2>Users list</h2>
+        <div class="form-row">
+          <label for="admin-users-filter">Filter</label>
+          <select id="admin-users-filter" name="admin-users-filter">
+            <option value="verified" selected>Verified</option>
+            <option value="unverified">Unverified</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+        <button class="button button--secondary" type="button" id="admin-users-refresh">
+          Load users
+        </button>
+        <p class="form-error is-hidden" id="admin-users-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="admin-users-meta"></p>
+        <div id="admin-users-results" style="margin-top: 1rem;"></div>
+      </div>
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>

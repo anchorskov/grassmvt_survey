@@ -95,4 +95,128 @@
       showError(error.message || 'Unable to issue link.');
     }
   });
+
+  const usersBtn = document.getElementById('admin-users-refresh');
+  const usersFilter = document.getElementById('admin-users-filter');
+  const usersErrorEl = document.getElementById('admin-users-error');
+  const usersMetaEl = document.getElementById('admin-users-meta');
+  const usersResultsEl = document.getElementById('admin-users-results');
+
+  const showUsersError = (message) => {
+    if (!usersErrorEl) return;
+    if (!message) {
+      usersErrorEl.textContent = '';
+      usersErrorEl.classList.add('is-hidden');
+      return;
+    }
+    usersErrorEl.textContent = message;
+    usersErrorEl.classList.remove('is-hidden');
+  };
+
+  const showUsersMeta = (message) => {
+    if (!usersMetaEl) return;
+    if (!message) {
+      usersMetaEl.textContent = '';
+      usersMetaEl.classList.add('is-hidden');
+      return;
+    }
+    usersMetaEl.textContent = message;
+    usersMetaEl.classList.remove('is-hidden');
+  };
+
+  const clearUsersResults = () => {
+    if (usersResultsEl) {
+      usersResultsEl.textContent = '';
+    }
+  };
+
+  const renderUsersTable = (users) => {
+    if (!usersResultsEl) return;
+    clearUsersResults();
+    if (!Array.isArray(users) || users.length === 0) {
+      usersResultsEl.textContent = 'No users found.';
+      return;
+    }
+    const table = document.createElement('table');
+    table.className = 'survey-table';
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    const headers = [
+      'Email',
+      'Account Status',
+      'Verified',
+      'Verification Method',
+      'Verified Scope',
+      'Email Verified At',
+      'Verified At',
+      'Wy Voter ID',
+      'Voter Match Status',
+      'Residence Confidence',
+      'House Dist',
+      'Senate Dist',
+      'State FIPS',
+    ];
+    headers.forEach((label) => {
+      const th = document.createElement('th');
+      th.textContent = label;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    users.forEach((user) => {
+      const row = document.createElement('tr');
+      const cells = [
+        user.email || '',
+        user.account_status || '',
+        user.is_verified_voter ? 'Yes' : 'No',
+        user.verification_method || '',
+        user.verified_scope || '',
+        user.email_verified_at || '',
+        user.verified_at || '',
+        user.wy_voter_id || '',
+        user.voter_match_status || '',
+        user.residence_confidence || '',
+        user.state_house_dist || '',
+        user.state_senate_dist || '',
+        user.state_fips || '',
+      ];
+      cells.forEach((value) => {
+        const td = document.createElement('td');
+        td.textContent = value;
+        row.appendChild(td);
+      });
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    usersResultsEl.appendChild(table);
+  };
+
+  if (usersBtn) {
+    usersBtn.addEventListener('click', async () => {
+      showUsersError('');
+      showUsersMeta('');
+      clearUsersResults();
+      usersBtn.disabled = true;
+      usersBtn.textContent = 'Loading...';
+      const status = (usersFilter?.value || 'verified').trim();
+      try {
+        const response = await fetch(`/api/admin/users?status=${encodeURIComponent(status)}`, {
+          credentials: 'include',
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) {
+          showUsersError(data.error || data.message || 'Unable to load users.');
+          return;
+        }
+        showUsersMeta(`Showing ${data.count || 0} users (${data.status || status}).`);
+        renderUsersTable(data.users || []);
+      } catch (error) {
+        showUsersError(error.message || 'Unable to load users.');
+      } finally {
+        usersBtn.disabled = false;
+        usersBtn.textContent = 'Load users';
+      }
+    });
+  }
 })();

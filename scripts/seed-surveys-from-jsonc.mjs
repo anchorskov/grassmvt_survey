@@ -17,6 +17,10 @@ const surveySources = {
     slug: 'wy-public-school-funding-2026',
     file: 'surveys/surveys_wy_public_school_funding_2026_v2.jsonc',
   },
+  'wy-household-economic-outlook-v1': {
+    slug: 'wy-household-economic-outlook',
+    file: 'surveys/surveys_wy_household_economic_outlook_v1.jsonc',
+  },
 };
 
 const parseArgs = (argv) => {
@@ -234,7 +238,7 @@ const main = () => {
       : [surveySources[slugArg]].filter(Boolean);
 
   if (!targets.length) {
-    throw new Error('Invalid --slug, use abortion, survey-process, security, or all');
+    throw new Error(`Invalid --slug, use one of: ${Object.keys(surveySources).join(', ')}, or all`);
   }
 
   const dbName = dbTarget === 'local' ? 'wy_local' : dbTarget === 'preview' ? 'wy_preview' : 'wy';

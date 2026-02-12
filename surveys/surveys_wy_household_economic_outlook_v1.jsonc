@@ -1,0 +1,330 @@
+// surveys_wy_household_economic_outlook_v1.jsonc
+// slug: wy-household-economic-outlook
+// version: v1 | 2026-02-12
+// title: Wyoming Household Economic Outlook
+{
+  "title": "Wyoming Household Economic Outlook",
+  "description": "We want to hear from Wyoming households on how the economy is functioning for you, what pressures you feel most, and what practical solutions you support.",
+  "completedHtml": "<p>Thank you for sharing your voice. Your input will help shape economic conversations that reflect what truly matters to us all.</p><p style='margin-top:1rem;'>Reminder: If you would like to receive updates or speak with Jimmy Skovgard about these issues, please email <a href='mailto:jimmy@grassrootsmvt.org'>jimmy@grassrootsmvt.org</a>.</p>",
+  "showQuestionNumbers": "on",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys"
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_purpose",
+          "html": "<h3>Purpose</h3><p>We want to hear from Wyoming households on how the economy is functioning for you, what pressures you feel most, and what practical solutions you support. This survey is designed to gather honest feedback and foster a shared understanding of our state's needs.</p><p>We will publish the results with full question wording and answer choices to ensure transparency.</p><h3>Instructions</h3><p>Please answer as honestly as you can. Your answers are completely anonymous. To protect your privacy, this form does not collect names or contact details.</p><p>If you would like to discuss these issues further or have Jimmy contact you personally, please email <a href='mailto:jimmy@grassrootsmvt.org'>jimmy@grassrootsmvt.org</a> and he will respond as time allows.</p><p>Some questions include \"Prefer not to answer\" to maintain a respectful process.</p>"
+        }
+      ]
+    },
+    {
+      "name": "section_1",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s1_header",
+          "html": "<h3>Section 1: Your Economic Reality</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "economy_daily_life_now",
+          "title": "How would you describe the economy in your daily life right now?",
+          "choices": [
+            "Working very well",
+            "Working well",
+            "Working okay",
+            "Not working well",
+            "Not working at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "most_difficult_costs",
+          "title": "Which costs are currently most difficult for your household to manage? (Pick up to 3)",
+          "choices": [
+            "Housing (Rent/Mortgage)",
+            "Groceries",
+            "Gas or transportation",
+            "Utilities (Power, Water, Heat)",
+            "Childcare",
+            "Health care costs",
+            "Debt payments (Credit cards, loans)",
+            "Taxes",
+            "Insurance (Auto, home, health)",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 3,
+          "hasOther": true,
+          "otherText": "Other (please specify)"
+        },
+        {
+          "type": "radiogroup",
+          "name": "income_vs_prices",
+          "title": "Compared to the price of goods and services, your household income is:",
+          "choices": [
+            "Rising faster than prices",
+            "Keeping pace with prices",
+            "Falling slightly behind prices",
+            "Falling significantly behind prices",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "actions_due_to_rising_costs",
+          "title": "In the past 12 months, have you taken any of the following actions because of rising costs? (Check all that apply)",
+          "choices": [
+            "Used savings to cover basic living expenses",
+            "Increased credit card balances or debt",
+            "Delayed or skipped medical/dental care",
+            "Increased work hours or took a second job",
+            "Delayed a major purchase (Vehicle, appliance, home repair)",
+            "Changed housing or relocation plans",
+            "None of the above",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_2",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s2_header",
+          "html": "<h3>Section 2: Priorities and Policy Tradeoffs</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "top_priority_two_years",
+          "title": "Which of the following should be the top priority for the next two years? (Pick one)",
+          "choices": [
+            "Reducing the cost of living",
+            "Increasing household wages",
+            "Expanding the supply of housing",
+            "Attracting and retaining local jobs",
+            "Reducing government debt and deficits",
+            "Ensuring the stability of retirement benefits",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "primary_relief_approach",
+          "title": "If you had to choose one primary approach to provide relief, which is best?",
+          "choices": [
+            "Broad-based tax cuts",
+            "Assistance targeted to households under financial strain",
+            "Broad-based cuts to government spending",
+            "Spending cuts targeted to specific non-essential programs",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "lower_prices_or_growth",
+          "title": "Which is more important for Wyoming right now?",
+          "choices": [
+            "Prioritizing lower prices, even if it results in slower economic growth",
+            "Prioritizing economic growth, even if prices remain high",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_3",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s3_header",
+          "html": "<h3>Section 3: Competition, Costs, and Fairness</h3>"
+        },
+        {
+          "type": "checkbox",
+          "name": "cost_of_goods_priority",
+          "title": "To address the cost of goods and services, what should be the priority? (Pick up to 2)",
+          "choices": [
+            "Increasing oversight of market competition and pricing practices",
+            "Reducing barriers for small businesses and new competitors",
+            "Removing regulations that add to the cost of production",
+            "Requiring all-in transparent pricing (eliminating undisclosed fees)",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 2,
+          "hasOther": true,
+          "otherText": "Other (please specify)"
+        },
+        {
+          "type": "radiogroup",
+          "name": "trade_and_manufacturing_focus",
+          "title": "On trade and manufacturing, which focus do you prefer?",
+          "choices": [
+            "Expanding free trade to keep consumer prices lower",
+            "Protecting domestic industries even if it increases the cost of goods",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "primary_cause_large_price_increases",
+          "title": "When large companies significantly raise prices, what do you believe is the primary cause?",
+          "choices": [
+            "Increased costs of materials, labor, and logistics",
+            "A desire to increase profit margins and market share",
+            "A combination of both factors",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_4",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s4_header",
+          "html": "<h3>Section 4: Work, Skills, and Local Opportunity</h3>"
+        },
+        {
+          "type": "checkbox",
+          "name": "best_ways_strengthen_jobs_wages",
+          "title": "What are the most effective ways to strengthen Wyoming's jobs and wages? (Pick up to 3)",
+          "choices": [
+            "Expanding skilled trades and apprenticeship programs",
+            "Investing in energy and natural resources",
+            "Growing manufacturing and value-added production",
+            "Increasing support and resources for small businesses",
+            "Funding infrastructure projects",
+            "Improving tech infrastructure and remote-work access",
+            "Strengthening agriculture and water resilience",
+            "Investing in the tourism and outdoor economy",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 3,
+          "hasOther": true,
+          "otherText": "Other (please specify)"
+        },
+        {
+          "type": "radiogroup",
+          "name": "major_employer_expansion_policy",
+          "title": "When a major employer considers expanding in the state, what should the policy be?",
+          "choices": [
+            "Offer financial incentives to secure the jobs",
+            "Offer incentives only if the company meets specific wage and retention standards",
+            "Avoid incentives and allow the market to decide",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "most_effective_housing_cost_approach",
+          "title": "Which approach would most effectively address housing costs? (Pick up to 2)",
+          "choices": [
+            "Streamlining permits to increase the total housing supply",
+            "Revising local zoning rules to allow more diverse housing types",
+            "Providing direct financial assistance for first-time homebuyers",
+            "Increasing the availability of rental options",
+            "Investing in the infrastructure (sewer, roads) necessary for new builds",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 2,
+          "hasOther": true,
+          "otherText": "Other (please specify)"
+        }
+      ]
+    },
+    {
+      "name": "section_5",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s5_header",
+          "html": "<h3>Section 5: Debt, Deficit, and Retirement Security</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "debt_and_deficit_view",
+          "title": "How do you view the current federal debt and deficit?",
+          "choices": [
+            "A primary threat to the country's future stability",
+            "A serious concern, but not the most urgent issue",
+            "A concern that is often overstated",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "deficit_reduction_approaches",
+          "title": "If action is taken to reduce deficits, which approaches do you support? (Pick up to 2)",
+          "choices": [
+            "Reducing spending across all government programs",
+            "Reducing spending for specific, identified programs",
+            "Increasing revenue by closing specific tax loopholes",
+            "Increasing revenue through broader tax changes",
+            "Prioritizing the protection of Social Security and Medicare benefits",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 2
+        },
+        {
+          "type": "radiogroup",
+          "name": "retirement_security_focus",
+          "title": "Regarding retirement security, which focus do you support?",
+          "choices": [
+            "Maintaining current benefit levels and retirement ages without changes",
+            "Making modest adjustments now to ensure long-term solvency",
+            "Implementing significant reforms to the structure of the system",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_6",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s6_header",
+          "html": "<h3>Section 6: Final Thoughts and Demographics</h3>"
+        },
+        {
+          "type": "comment",
+          "name": "community_economy_signal",
+          "title": "In your own words, what is the clearest sign that the economy is or is not working for your community? (Optional)"
+        },
+        {
+          "type": "comment",
+          "name": "one_specific_change_for_household",
+          "title": "What one specific change would help your household most right now? (Optional)"
+        },
+        {
+          "type": "radiogroup",
+          "name": "age_group",
+          "title": "Which age group are you in?",
+          "choices": [
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

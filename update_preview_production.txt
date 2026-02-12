@@ -1,0 +1,67 @@
+Update Flow: Preview and Production
+Date: 2026-02-12
+Project: grassmvtsurvey
+
+Purpose
+- Capture the exact flow used to update preview and production Worker deployments and D1 schema state.
+
+Prerequisites
+- Wrangler authenticated (`wrangler whoami`).
+- Correct config file: `wrangler.jsonc`.
+- Repo has intended code/content changes.
+
+1) Deploy preview Worker + assets
+Command:
+- `npx wrangler deploy --name grassmvtsurvey-preview --env preview --config wrangler.jsonc`
+
+Result captured:
+- Deployed URL: `https://grassmvtsurvey-preview.anchorskov.workers.dev`
+- Version ID: `17ff1a2f-97d6-4cb2-a0a1-e120032a1f2b`
+
+2) Deploy production Worker + assets
+Command:
+- `bash deploy_prod.sh`
+
+Result captured:
+- Deployed URL: `https://grassmvtsurvey-production.anchorskov.workers.dev`
+- Version ID: `08210ece-bb57-4d6a-b2db-3dbbefdd245a`
+
+3) Verify content update on both environments
+Command:
+- `curl -sL https://grassmvtsurvey-preview.anchorskov.workers.dev/credits/`
+- `curl -sL https://grassmvtsurvey-production.anchorskov.workers.dev/credits/`
+
+Check:
+- Confirm line exists:
+  `We thank the teams, maintainers, and contributors whose work powers this project.`
+
+4) Check pending D1 migrations (remote)
+Commands:
+- `npx wrangler d1 migrations list wy_preview --remote --env preview --config wrangler.jsonc`
+- `npx wrangler d1 migrations list wy --remote --env production --config wrangler.jsonc`
+
+Initial status seen:
+- Preview pending: `0023`, `0024`, `0025`, `0026`
+- Production pending: `0025`, `0026`
+
+5) Apply D1 migrations (remote)
+Commands:
+- `npx wrangler d1 migrations apply wy_preview --remote --env preview --config wrangler.jsonc`
+- `npx wrangler d1 migrations apply wy --remote --env production --config wrangler.jsonc`
+
+Apply results:
+- Preview applied: `0023_add_audit_target_user_id.sql`, `0024_recreate_audit_log_text_id.sql`, `0025_create_sms_optins.sql`, `0026_create_volunteers.sql`
+- Production applied: `0025_create_sms_optins.sql`, `0026_create_volunteers.sql`
+
+6) Re-verify migration completion
+Commands:
+- `npx wrangler d1 migrations list wy_preview --remote --env preview --config wrangler.jsonc`
+- `npx wrangler d1 migrations list wy --remote --env production --config wrangler.jsonc`
+
+Final status:
+- Preview: `No migrations to apply`
+- Production: `No migrations to apply`
+
+Notes
+- Survey-only updates do not require new schema migrations.
+- Run migration apply only when migration files changed or pending migrations exist.

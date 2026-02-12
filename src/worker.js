@@ -758,6 +758,7 @@ const writeAuditLog = async (env, request, { actorUserId, action, targetUserId =
   if (!hasTable) {
     return;
   }
+  const auditId = crypto.randomUUID();
   const ip =
     request.headers.get('cf-connecting-ip') ||
     request.headers.get('x-forwarded-for') ||
@@ -766,10 +767,11 @@ const writeAuditLog = async (env, request, { actorUserId, action, targetUserId =
   const metadataJson = metadata ? JSON.stringify(metadata) : null;
   await env.DB.prepare(
     `INSERT INTO audit_log
-       (actor_user_id, action, target_user_id, created_at, ip, user_agent, metadata_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+       (id, actor_user_id, action, target_user_id, created_at, ip, user_agent, metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
+      auditId,
       actorUserId,
       action,
       targetUserId,
@@ -3553,6 +3555,67 @@ const handleAdminVerifyVoterIssue = async (request, env) => {
   return jsonResponse(responsePayload);
 };
 
+const handleAdminUsersList = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ error: originError }, { status: 403 });
+  }
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return auth.response;
+  }
+  const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+  if (!isAdmin) {
+    return jsonResponse({ error: 'Forbidden.', code: 'FORBIDDEN' }, { status: 403 });
+  }
+
+  const url = new URL(request.url);
+  const status = (url.searchParams.get('status') || 'verified').toLowerCase();
+  const limitRaw = Number(url.searchParams.get('limit') || '');
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 200) : 100;
+  let whereClause = '';
+  if (status === 'verified') {
+    whereClause = 'WHERE u.is_verified_voter = 1';
+  } else if (status === 'unverified') {
+    whereClause = 'WHERE (u.is_verified_voter IS NULL OR u.is_verified_voter = 0)';
+  }
+
+  const result = await env.DB.prepare(
+    `SELECT u.id,
+            u.email,
+            u.email_verified_at,
+            u.account_status,
+            u.is_verified_voter,
+            u.verified_at,
+            u.verification_method,
+            u.verified_scope,
+            uv.wy_voter_id,
+            uv.voter_match_status,
+            uv.residence_confidence,
+            uav.state_fips,
+            uav.state_house_dist,
+            uav.state_senate_dist
+     FROM user u
+     LEFT JOIN user_verification uv ON uv.user_id = u.id
+     LEFT JOIN user_address_verification uav ON uav.user_id = u.id
+     ${whereClause}
+     ORDER BY u.created_at DESC
+     LIMIT ?`
+  )
+    .bind(limit)
+    .all();
+
+  return jsonResponse({
+    ok: true,
+    status,
+    count: result.results?.length || 0,
+    users: result.results || [],
+  });
+};
+
 const handleVerifyVoterStatus = async (request, env) => {
   if (!env.DB) {
     return jsonResponse({ error: 'Database binding not available.' }, { status: 500 });
@@ -4956,6 +5019,11 @@ export default {
         return handleAdminVerifyVoterIssue(request, env);
       }
     }
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'users') {
+      if (request.method === 'GET') {
+        return handleAdminUsersList(request, env);
+      }
+    }
 
     if (request.method === 'GET' && url.pathname === '/api/surveys/list') {
       try {
@@ -6229,6 +6297,70 @@ export default {
       } catch (error) {
         console.error('[Seeding] Error:', error.message);
         return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // Admin: list users (email, status and related verification fields)
+    if (request.method === 'GET' && url.pathname === '/api/admin/users') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) {
+          return auth.response;
+        }
+        const { user } = auth;
+        const isAdmin = await userHasRole(env, user.id, 'admin');
+        if (!isAdmin) {
+          return jsonResponse({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        const params = new URL(request.url).searchParams;
+        const status = (params.get('status') || 'verified').trim();
+
+        const binds = [];
+        let where = '';
+        if (status === 'verified') {
+          where = `WHERE user.is_verified_voter = 1 OR user.account_status = ?`;
+          binds.push('active');
+        } else if (status === 'pending') {
+          where = `WHERE user.account_status = ?`;
+          binds.push('pending');
+        } else if (status === 'suspended') {
+          where = `WHERE user.account_status = ?`;
+          binds.push('suspended');
+        }
+
+        const sql = `
+          SELECT user.id, user.email, user.email_verified_at, user.account_status, user.is_verified_voter,
+                 uv.verified_at as verified_at, uv.wy_voter_id,
+                 up.wy_house_district as state_house_dist, up.state_senate_dist, uav.state_fips
+          FROM user
+          LEFT JOIN user_verification uv ON uv.user_id = user.id
+          LEFT JOIN user_profile up ON up.user_id = user.id
+          LEFT JOIN user_address_verification uav ON uav.user_id = user.id
+          ${where}
+          ORDER BY user.created_at DESC
+          LIMIT 500
+        `;
+
+        const result = await env.DB.prepare(sql).bind(...binds).all();
+        const rows = result.results || [];
+        const users = rows.map((r) => ({
+          id: r.id,
+          email: r.email || null,
+          email_verified_at: r.email_verified_at || null,
+          account_status: r.account_status || null,
+          is_verified_voter: Number(r.is_verified_voter || 0) === 1,
+          verified_at: r.verified_at || null,
+          wy_voter_id: r.wy_voter_id || null,
+          state_house_dist: r.state_house_dist || null,
+          state_senate_dist: r.state_senate_dist || null,
+          state_fips: r.state_fips || null,
+        }));
+
+        return jsonResponse({ ok: true, status, count: users.length, users });
+      } catch (error) {
+        console.error('[Admin] /api/admin/users error:', error?.message || error);
+        return jsonResponse({ error: error?.message || 'Internal error' }, { status: 500 });
       }
     }
 

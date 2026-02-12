@@ -55,5 +55,13 @@
     "description": "Share your priorities for the 2026 school finance update.",
     "status": "active",
     "href": "/surveys/take/wy-public-school-funding-2026"
+  },
+  {
+    "id": "wy-household-economic-outlook",
+    "scope": "wy",
+    "title": "Wyoming Household Economic Outlook",
+    "description": "Tell us how the economy is functioning for your household and which solutions you support.",
+    "status": "active",
+    "href": "/surveys/take/wy-household-economic-outlook"
   }
 ]
