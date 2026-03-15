@@ -266,6 +266,10 @@
     const openTarget = event.target.closest('[data-auth-open]');
     if (openTarget) {
       event.preventDefault();
+      if (openTarget.id === 'auth-open' && state.authenticated) {
+        window.location.href = '/account/';
+        return;
+      }
       const target = openTarget.getAttribute('data-auth-open');
       AuthModals.open(target || 'login');
       return;

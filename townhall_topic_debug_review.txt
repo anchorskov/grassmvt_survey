@@ -1,0 +1,239 @@
+townhall_topic_debug_review.txt
+
+Files inspected
+- /home/anchor/projects/grassmvt_survey/public/townhall/topic.html
+- /home/anchor/projects/grassmvt_survey/public/townhall/townhall-topic.js
+- /home/anchor/projects/grassmvt_survey/public/townhall/townhall.js
+- /home/anchor/projects/grassmvt_survey/public/css/site.css
+- /home/anchor/projects/grassmvt_survey/src/worker.js
+- /home/anchor/projects/grassmvt_survey/db/migrations/0027_create_townhall_tables.sql
+- /home/anchor/projects/grassmvt_survey/db/migrations/0028_link_townhall_topics_to_surveys.sql
+- /home/anchor/projects/grassmvt_survey/scripts/backfill-townhall-topics.mjs
+
+Tables and fields inspected
+- surveys
+  - id
+  - slug
+  - title
+- townhall_topics
+  - id
+  - survey_id
+  - survey_slug
+  - slug
+  - title
+  - status
+- townhall_statements
+- townhall_receipts
+
+Local D1 row check
+- Survey slug `abortion` exists in `surveys`
+- Matching `townhall_topics` row exists locally
+- Local row values:
+  - survey id: `11`
+  - survey slug: `abortion`
+  - topic id: `acfbd379-9aa5-4657-a96b-caa967a6ccf8`
+  - topic slug: `abortion`
+  - status: `active`
+
+Topic page logic flow
+- The page reads the slug from the query string in `/home/anchor/projects/grassmvt_survey/public/townhall/townhall-topic.js`.
+- It fetches `/api/townhall/topic/<slug>`.
+- The fallback "Town Hall not enabled yet" path is triggered only when one of these is true:
+  - response status is `404`
+  - payload `ok` is not `true`
+  - payload does not include `data.topic`
+- If a topic is returned, the page sets the title from `topic.title`, hides the missing panel, and loads statements and receipts.
+
+Exact issue found
+- The local data and backend lookup for `abortion` are correct.
+- The root cause is a UI-layer CSS bug in `/home/anchor/projects/grassmvt_survey/public/css/site.css`.
+- `.is-hidden { display: none; }` was declared before `.card { display: block; }`.
+- Both selectors have the same specificity.
+- For elements like `<section class="card is-hidden" id="topic-missing">`, the later `.card` rule won and re-displayed the element.
+- Result: the page could correctly resolve the topic title while the "Town Hall not enabled yet" card still remained visible.
+
+Classification
+- Primary issue: UI bug
+- Data issue: not present locally for `abortion`
+- API issue: not indicated by the local code path or local D1 row
+- Linkage model: `townhall_topics.survey_id` is the durable link, with `survey_slug` and `slug` retained for lookup and compatibility
+
+Root-cause fix
+- Make the shared hidden utility win consistently by changing:
+  - `.is-hidden { display: none; }`
+  - to `.is-hidden { display: none !important; }`
+
+Recommended follow-up
+- Keep using the existing topic backfill flow for older surveys if a future survey truly has no `townhall_topics` row.
+- If this is also being checked in production, verify the same `abortion` topic row exists remotely before assuming parity with local.
+
+Town Hall submit/display logic flow
+- Files inspected for submit/display flow:
+  - /home/anchor/projects/grassmvt_survey/public/townhall/topic/index.html
+  - /home/anchor/projects/grassmvt_survey/public/townhall/townhall-topic.js
+  - /home/anchor/projects/grassmvt_survey/src/worker.js
+- Submit path:
+  - The compose form in `/home/anchor/projects/grassmvt_survey/public/townhall/topic/index.html` posts through `handleComposeSubmit()` in `/home/anchor/projects/grassmvt_survey/public/townhall/townhall-topic.js`.
+  - The payload includes `body`, `tags`, and `sources`.
+  - The backend route is `POST /api/townhall/topic/<slug>/statements` in `/home/anchor/projects/grassmvt_survey/src/worker.js`.
+- Save path:
+  - The backend normalizes tags and source URLs, validates length and duplicates, then inserts into `townhall_statements`.
+  - Local D1 confirms the test statement was saved for topic `abortion`.
+  - Local saved values:
+    - body preview: `testeee`
+    - tags_json: `["test"]`
+    - sources_json: `["https://testing.com/"]`
+    - status: `pending`
+    - created_at: `2026-03-15T21:28:42.402Z`
+- List/display path:
+  - The page loads statements with `GET /api/townhall/topic/<slug>/statements`.
+  - `/home/anchor/projects/grassmvt_survey/src/worker.js` only lists statements whose status is `published` or `approved`.
+  - First-time or not-yet-reviewed statements stay hidden from the public feed by design.
+- Why the page still said "No statements yet":
+  - The submit succeeded, but the saved row had status `pending`.
+  - The compose page still showed a public-feed empty state, which made the successful submission look like a failure.
+- Why the page still said "No evidence or sources published yet":
+  - The right-side box was rendering topic-level `townhall_receipts`, not the sources attached to the newly submitted statement.
+  - A saved statement source in `townhall_statements.sources_json` did not populate that topic-level box.
+- Classification:
+  - Save logic: working locally
+  - Review-state filtering: working as coded
+  - Display logic / page design: misleading
+- UX fix implemented:
+  - The page now labels the feed as `Published Statements`.
+  - The default empty state now says `No published statements yet.`
+  - After a pending submission, the page now shows:
+    - `Your statement was submitted for review. Published statements appear here after review.`
+- The right-side published `Evidence & Sources` box was removed from this compose page to avoid implying that a freshly submitted statement source should appear there immediately.
+
+Town Hall moderation gate
+- Files inspected:
+  - /home/anchor/projects/grassmvt_survey/public/townhall/topic/index.html
+  - /home/anchor/projects/grassmvt_survey/public/townhall/townhall-topic.js
+  - /home/anchor/projects/grassmvt_survey/src/worker.js
+  - /home/anchor/projects/grassmvt_survey/src/lib/townhall-moderation.js
+  - /home/anchor/projects/grassmvt_survey/db/migrations/0027_create_townhall_tables.sql
+  - /home/anchor/projects/grassmvt_survey/db/migrations/0029_add_statement_sources_json.sql
+- Moderation insertion point:
+  - `POST /api/townhall/topic/<slug>/statements` in `/home/anchor/projects/grassmvt_survey/src/worker.js`
+  - the moderation check now runs after body/source validation and before `townhallCreateStatement()`
+- Schema changes:
+  - new migration `/home/anchor/projects/grassmvt_survey/db/migrations/0030_add_townhall_statement_moderation_fields.sql`
+  - added columns on `townhall_statements`:
+    - `moderation_status`
+    - `moderation_provider`
+    - `moderation_flags_json`
+    - `moderation_reason`
+- Provider chosen:
+  - built-in heuristic moderation in `/home/anchor/projects/grassmvt_survey/src/lib/townhall-moderation.js`
+  - provider is env-driven and centralized so it can be swapped later
+  - default config currently uses:
+    - provider: `heuristic`
+    - revise score: `2`
+    - block score: `4`
+- Outcome logic:
+  - `pass`: save the statement and store moderation metadata
+  - `revise`: reject and ask the user to revise the wording
+  - `block`: reject for abusive or prohibited language
+  - the first version uses a lightweight heuristic for threats, slurs, personal attacks, profanity, shouting, and aggressive punctuation
+- User-facing messages:
+  - revise:
+    - `Your statement was not posted. Please revise the wording and try again. Keep it civil and avoid personal attacks or abusive language.`
+  - block:
+    - `Your statement could not be submitted because it appears to contain abusive or prohibited language.`
+- Rate-limit note:
+  - a simple submit limit now applies before save
+  - current default: `5` statement submissions per user per `10` minutes
+- Logging behavior:
+  - blocked or revise decisions are logged without storing the rejected text body
+  - logged fields include topic slug, user id, flags, score, and text length
+- Config/env vars:
+  - `TOWNHALL_MODERATION_ENABLED`
+  - `TOWNHALL_MODERATION_PROVIDER`
+  - `TOWNHALL_MODERATION_REVISE_SCORE`
+  - `TOWNHALL_MODERATION_BLOCK_SCORE`
+  - `TOWNHALL_SUBMIT_LIMIT_PER_10_MIN`
+- Follow-up:
+  - if a real moderation API is added later, it should plug into `/home/anchor/projects/grassmvt_survey/src/lib/townhall-moderation.js` and keep the same three-outcome contract
+
+Town Hall statement quality gate
+- Files changed:
+  - /home/anchor/projects/grassmvt_survey/src/lib/townhall-moderation.js
+  - /home/anchor/projects/grassmvt_survey/src/worker.js
+  - /home/anchor/projects/grassmvt_survey/public/townhall/townhall-topic.js
+- Flow order:
+  - frontend quality validation
+  - backend quality validation
+  - moderation
+  - save
+- Quality rules now require:
+  - at least 40 characters
+  - at least 6 words
+  - letters and spaces
+  - not URL-only
+  - not repeated-character filler
+  - not obvious filler-only or very low-variety repeated words
+- User-facing quality message:
+  - `Please add a complete thought, not just a few words. Aim for at least one clear sentence.`
+
+Town Hall internal user tracking
+- Identity source:
+  - trusted identity is derived from the authenticated Lucia session in `/home/anchor/projects/grassmvt_survey/src/worker.js`
+  - Town Hall write routes use `requireTownhallAuth()` and then read `auth.user.id`
+- Account creation:
+  - the internal user ID is created when the account is created in the auth flow
+  - Town Hall does not accept a browser-supplied user id for posting or reacting
+- Stored identity fields:
+  - statements and replies:
+    - `townhall_statements.user_id`
+  - reactions:
+    - explicit `townhall_reactions.user_id`
+    - legacy `actor_key` remains for compatibility during transition
+  - reports:
+    - explicit `townhall_reports.user_id`
+    - legacy `actor_key` remains for compatibility during transition
+- Privacy model:
+  - internal `user.id` is stored for moderation, rate limits, duplicate prevention, and abuse controls
+  - public Town Hall pages do not expose user ids, names, or emails
+- Schema change:
+  - `/home/anchor/projects/grassmvt_survey/db/migrations/0032_add_townhall_user_tracking_columns.sql`
+  - adds:
+    - `townhall_reactions.user_id`
+    - `townhall_reports.user_id`
+  - backfills both from the legacy `actor_key` values, which were already being populated with authenticated user ids
+- Repeatable pattern:
+  - new public interaction features should use explicit internal `user_id` columns where possible
+  - backend must derive identity from session state, not from an untrusted browser field
+
+Published statements refresh and tag sync
+- Files changed:
+  - /home/anchor/projects/grassmvt_survey/public/townhall/townhall-topic.js
+- Current publish workflow:
+  - `/home/anchor/projects/grassmvt_survey/src/worker.js` currently saves passing Town Hall statements with `status = 'published'`
+  - that means a clean statement is expected to become visible in `Published Statements` immediately after a successful post
+  - the older `submitted for review` assumption is no longer the default behavior for successful statement posts
+- Old bug behavior:
+  - initial page load used the fetched published dataset in `state.loadedStatements`
+  - post-submit success bypassed that shared dataset and manually prepended a single card into the feed
+  - because `state.loadedStatements` was not refreshed, the tag chips, `All` filter, and active tag state could remain stale
+  - a newly published statement with a new tag could appear in the feed while the tag browser still omitted that tag
+- Canonical refresh path:
+  - added `refreshPublishedStatements()` in `/home/anchor/projects/grassmvt_survey/public/townhall/townhall-topic.js`
+  - both initial page load and successful publish now use the same flow:
+    - fetch the latest published statements
+    - replace the full loaded dataset
+    - rebuild the available tag chips from that dataset
+    - reapply the active tag if it still exists
+    - fall back to `All` if the active tag no longer exists
+- How tags are rebuilt:
+  - chips are generated from `state.loadedStatements`
+  - tags are normalized by trimming whitespace, removing leading `#`, and lowercasing
+  - displayed labels still show the `#` prefix
+- How `All` now works:
+  - `All` always renders from the full current `state.loadedStatements` dataset
+  - it is no longer dependent on a stale prefiltered subset from the old post-submit shortcut path
+- Current user-facing behavior:
+  - if the backend returns `pending`, the page still shows:
+    - `Your statement was submitted for review. Published statements appear here after review.`
+  - if the backend returns `published`, the page now refreshes the published discussion area and shows:
+    - `Statement posted. Published statements and tags have been updated.`

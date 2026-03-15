@@ -62,6 +62,39 @@ Final status:
 - Preview: `No migrations to apply`
 - Production: `No migrations to apply`
 
+7) Seed new survey content to preview and production (D1 data update)
+Target survey:
+- slug: `wy-household-economic-outlook`
+- source key: `wy-household-economic-outlook-v1`
+- version: `1`
+
+Seed preview command:
+- `node scripts/seed-surveys-from-jsonc.mjs --db=preview --slug=wy-household-economic-outlook-v1 --version=1 --publish=true --changelog="Add Wyoming Household Economic Outlook v1"`
+
+Seed production command:
+- `node scripts/seed-surveys-from-jsonc.mjs --db=prod --slug=wy-household-economic-outlook-v1 --version=1 --publish=true --changelog="Add Wyoming Household Economic Outlook v1"`
+
+Verification query (preview):
+- `npx wrangler d1 execute wy_preview --remote --env preview --config wrangler.jsonc --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash, v.published_at FROM survey_versions v JOIN surveys s ON s.id = v.survey_id WHERE s.slug = 'wy-household-economic-outlook' ORDER BY v.version DESC LIMIT 2"`
+
+Verification query (production):
+- `npx wrangler d1 execute wy --remote --env production --config wrangler.jsonc --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash, v.published_at FROM survey_versions v JOIN surveys s ON s.id = v.survey_id WHERE s.slug = 'wy-household-economic-outlook' ORDER BY v.version DESC LIMIT 2"`
+
+Verified result:
+- Preview row present:
+  - `slug`: `wy-household-economic-outlook`
+  - `version`: `1`
+  - `json_len`: `9333`
+  - `json_hash`: `a35d77b35c041311fcf985eda989d3410d866180b5ff1c4f73624c4bd3c7694f`
+  - `published_at`: `2026-02-12 13:44:50`
+- Production row present:
+  - `slug`: `wy-household-economic-outlook`
+  - `version`: `1`
+  - `json_len`: `9333`
+  - `json_hash`: `a35d77b35c041311fcf985eda989d3410d866180b5ff1c4f73624c4bd3c7694f`
+  - `published_at`: `2026-02-12 13:44:59`
+
 Notes
 - Survey-only updates do not require new schema migrations.
 - Run migration apply only when migration files changed or pending migrations exist.
+- After deployments, always seed new survey JSONC content to preview and production D1 if a new survey slug/version was added.

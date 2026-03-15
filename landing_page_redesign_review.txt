@@ -1,0 +1,163 @@
+landing_page_redesign_review.txt
+
+Files inspected
+- /home/anchor/projects/grassmvt_survey/public/index.html
+- /home/anchor/projects/grassmvt_survey/public/css/site.css
+- /home/anchor/projects/grassmvt_survey/public/js/auth-shared.js
+- /home/anchor/projects/grassmvt_survey/public/js/include-partials.js
+- /home/anchor/projects/grassmvt_survey/public/js/surveys-list.js
+- /home/anchor/projects/grassmvt_survey/public/partials/header.html
+- /home/anchor/projects/grassmvt_survey/public/partials/footer.html
+- /home/anchor/projects/grassmvt_survey/public/partials/support-skovgard.html
+- /home/anchor/projects/grassmvt_survey/src/worker.js
+
+Current landing page render path
+- `/` is served from the static file `/home/anchor/projects/grassmvt_survey/public/index.html`.
+- Shared header and footer markup are injected by `/home/anchor/projects/grassmvt_survey/public/js/include-partials.js`.
+- The auth scripts loaded after partial injection are:
+  - `/js/auth-shared.js`
+  - `/js/login-modal.js`
+  - `/js/signup-modal.js`
+  - `/js/password-reset-modal.js`
+
+Current button and link actions before redesign
+- Homepage primary actions pointed to:
+  - `/surveys/list/`
+  - `/surveys/results/`
+- Trust links pointed to:
+  - `/security/`
+  - `/bias/`
+  - `/open-source/`
+  - `https://volunteers.grassrootsmvt.org/`
+- Account creation and sign-in were available in the nav and footer modals, but not clearly surfaced in the body of the homepage.
+
+Current signed-in state handling
+- Shared auth state is managed in `/home/anchor/projects/grassmvt_survey/public/js/auth-shared.js`.
+- Initial auth state is fetched from `/api/auth/me`.
+- The header updates signed-in badges and account behavior, but the old homepage had no dedicated signed-in panel or resume module.
+
+Current login and account creation entry points
+- Header account control in `/home/anchor/projects/grassmvt_survey/public/partials/header.html`
+- Footer auth modals in `/home/anchor/projects/grassmvt_survey/public/partials/footer.html`
+- Full-page auth routes:
+  - `/auth/login/`
+  - `/auth/signup/`
+  - `/account/`
+
+Likely CSS and JS controlling the landing layout
+- Layout and homepage styles:
+  - `/home/anchor/projects/grassmvt_survey/public/css/site.css`
+- Partial loading:
+  - `/home/anchor/projects/grassmvt_survey/public/js/include-partials.js`
+- Shared auth state:
+  - `/home/anchor/projects/grassmvt_survey/public/js/auth-shared.js`
+- Survey list and per-user response metadata:
+  - `/home/anchor/projects/grassmvt_survey/public/js/surveys-list.js`
+  - `/home/anchor/projects/grassmvt_survey/src/worker.js`
+
+Current image assets or asset folders for Wyoming historical art cards
+- Optimized homepage art outputs:
+  - `/home/anchor/projects/grassmvt_survey/public/assets/cards/survey.webp`
+  - `/home/anchor/projects/grassmvt_survey/public/assets/cards/townhall.webp`
+  - `/home/anchor/projects/grassmvt_survey/public/assets/cards/continue.webp`
+  - `/home/anchor/projects/grassmvt_survey/public/assets/cards/account.webp`
+- Conversion script:
+  - `/home/anchor/projects/grassmvt_survey/scripts/optimize-card-art.py`
+- Source images used for conversion:
+  - `/mnt/c/Users/ancho/OneDrive/Documents/grassrootsmvt_assets/survey.png`
+  - `/mnt/c/Users/ancho/OneDrive/Documents/grassrootsmvt_assets/townhall.png`
+  - `/mnt/c/Users/ancho/OneDrive/Documents/grassrootsmvt_assets/continue.png`
+  - `/mnt/c/Users/ancho/OneDrive/Documents/grassrootsmvt_assets/account.png`
+
+Files changed
+- /home/anchor/projects/grassmvt_survey/public/index.html
+- /home/anchor/projects/grassmvt_survey/public/css/site.css
+- /home/anchor/projects/grassmvt_survey/public/js/homepage.js
+- /home/anchor/projects/grassmvt_survey/public/assets/cards/survey.webp
+- /home/anchor/projects/grassmvt_survey/public/assets/cards/townhall.webp
+- /home/anchor/projects/grassmvt_survey/public/assets/cards/continue.webp
+- /home/anchor/projects/grassmvt_survey/public/assets/cards/account.webp
+- /home/anchor/projects/grassmvt_survey/scripts/optimize-card-art.py
+
+Assets added or referenced
+- Added WebP card art in `/home/anchor/projects/grassmvt_survey/public/assets/cards/`
+- Referenced those assets only from page-scoped landing card styles in `/home/anchor/projects/grassmvt_survey/public/css/site.css`
+
+Signed-in resume implementation
+- Partially implemented.
+- The homepage now uses existing auth state from `/api/auth/me`.
+- For signed-in users:
+  - if address verification is incomplete, the continue panel points to `/account/location/`
+  - if verified and survey response history exists in `/api/surveys/list`, the continue card points to the most recently updated active survey
+  - if no response history exists, the continue card falls back to `/surveys/list/`
+
+Data-model and API gaps found
+- No dedicated homepage endpoint exists for:
+  - last viewed Town Hall topic
+  - draft Town Hall statement
+  - latest receipt
+  - true cross-product last activity
+- `/api/surveys/list` is the only existing safe per-user source that already exposes useful resume metadata for the homepage.
+- Because of that, the new continue module is survey-based rather than a broader activity timeline.
+
+Follow-up recommendations
+- Add a small last-activity API if the product needs resume behavior across surveys, Town Hall, and receipts.
+- Consider exposing latest receipt metadata for signed-in users if receipt history should be a homepage return path.
+- If the landing art changes again, continue using the conversion script so homepage card backgrounds stay lightweight.
+
+Refinement pass
+
+Exact files changed
+- /home/anchor/projects/grassmvt_survey/public/index.html
+- /home/anchor/projects/grassmvt_survey/public/css/site.css
+- /home/anchor/projects/grassmvt_survey/public/js/homepage.js
+
+Asset paths used
+- /home/anchor/projects/grassmvt_survey/public/assets/cards/survey.webp
+- /home/anchor/projects/grassmvt_survey/public/assets/cards/townhall.webp
+- /home/anchor/projects/grassmvt_survey/public/assets/cards/continue.webp
+- /home/anchor/projects/grassmvt_survey/public/assets/cards/account.webp
+
+Layout decisions made
+- Kept the existing hero, account panel, action cards, and trust/support structure.
+- Reduced overall card height and internal spacing so primary actions appear sooner.
+- Increased the text measure inside cards so headings and body copy wrap more naturally.
+- Reduced art dominance by shrinking image coverage to a narrower right-side area and lowering opacity.
+- Made the account panel feel more unified by using a single readable content surface with a subtler integrated art strip.
+- Added a small `How it works` label above the process pills and reduced their visual emphasis so they read as supporting context rather than primary actions.
+- Trimmed a few body-copy lines to reduce visual density without changing meaning or links.
+
+Responsive widths checked
+- 375px
+- 430px
+- 768px
+- 1024px
+- 1280px
+- Browser automation was not available in this environment, so these were targeted through CSS refinement rather than captured screenshots.
+
+Remaining visual issues
+- The source artwork remains soft and low-contrast, so there is a limit to how distinct it can feel while staying subordinate to text.
+- If a future pass wants stronger personality without losing readability, the next move should be better crops or variant exports from the same source images rather than stronger overlays.
+
+Full-card background pass
+
+Exact files changed
+- /home/anchor/projects/grassmvt_survey/public/index.html
+- /home/anchor/projects/grassmvt_survey/public/css/site.css
+
+How the full-card background approach was implemented
+- The three primary action cards now use the existing `.webp` art as full-card backgrounds rather than a narrow side image region.
+- Each card keeps the same markup structure and links, but the text and actions now sit inside a semi-opaque cream content panel layered on top of the full-card image.
+- The account panel now uses a similar full-card background treatment with a single inner surface wrapper so the copy and buttons read as one anchored content panel.
+- Card and account images use `background-size: cover` so the art fills the full block.
+- Directional gradients were kept light enough for the art to remain visible while preserving readability under the content panels.
+
+Background-position chosen for each card
+- Survey card: `66% center`
+- Town Hall card: `57% center`
+- Continue card: `43% center`
+- Account panel: `68% center`
+
+Remaining visual issues after full-card background change
+- Because the source art is grayscale and relatively soft, some monitors may still make the images feel quieter than intended.
+- If stronger visual presence is still needed after this pass, the next step should be alternate crops or slightly higher-contrast exports from the same source files.

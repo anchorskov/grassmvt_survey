@@ -46,7 +46,7 @@
     "title": "Abortion Policy Survey: Finding Common Ground",
     "description": "The purpose of this survey is to aggregate our voices as a community on the divisive issue of abortion.",
     "status": "active",
-    "href": "/surveys/take/abortion"
+    "href": "/surveys/abortion"
   },
   {
     "id": "wy-public-school-funding-2026",
@@ -54,7 +54,7 @@
     "title": "Wyoming Public School Funding Priorities Survey 2026",
     "description": "Share your priorities for the 2026 school finance update.",
     "status": "active",
-    "href": "/surveys/take/wy-public-school-funding-2026"
+    "href": "/surveys/wy-public-school-funding-2026"
   },
   {
     "id": "wy-household-economic-outlook",
@@ -62,6 +62,14 @@
     "title": "Wyoming Household Economic Outlook",
     "description": "Tell us how the economy is functioning for your household and which solutions you support.",
     "status": "active",
-    "href": "/surveys/take/wy-household-economic-outlook"
+    "href": "/surveys/wy-household-economic-outlook"
+  },
+  {
+    "id": "wy-health-care-costs-access-options",
+    "scope": "wy",
+    "title": "Wyoming Health Care Survey: Costs, Access, and Options",
+    "description": "Share your experience with coverage, costs, access, and workable health care reforms in Wyoming.",
+    "status": "active",
+    "href": "/surveys/wy-health-care-costs-access-options"
   }
 ]

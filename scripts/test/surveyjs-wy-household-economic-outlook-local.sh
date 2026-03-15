@@ -93,7 +93,7 @@ process.stdin.on('end', () => {
     const row = Array.isArray(arr) ? arr.find((x) => x && x.id === 'wy-household-economic-outlook') : null;
     if (!row) process.exit(2);
     if (row.status !== 'active') process.exit(3);
-    if (row.href !== '/surveys/take/wy-household-economic-outlook') process.exit(4);
+    if (row.href !== '/surveys/wy-household-economic-outlook') process.exit(4);
     process.exit(0);
   } catch {
     process.exit(5);

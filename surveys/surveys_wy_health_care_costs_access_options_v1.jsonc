@@ -1,0 +1,516 @@
+// surveys_wy_health_care_costs_access_options_v1.jsonc
+// slug: wy-health-care-costs-access-options
+// version: v1 | 2026-02-16
+// title: Wyoming Health Care Survey: Costs, Access, and Options
+{
+  "title": "Wyoming Health Care Survey: Costs, Access, and Options",
+  "description": "We want to hear from Wyoming families on how health care is working today, the challenges you face, and the solutions you find most workable.",
+  "completedHtml": "<p>Thank you for sharing your perspective on health care in Wyoming.</p><p style='margin-top:1rem;'>We will publish results with full question wording and answer choices for transparency.</p>",
+  "showQuestionNumbers": "on",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys"
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_purpose",
+          "html": "<h3>Purpose</h3><p>We want to hear from Wyoming families on how health care is working today, the challenges you face, and the solutions you find most workable. This survey is designed to gather honest, baseline feedback from across the state.</p><p>Results will be published with full question wording and answer choices to ensure transparency and fairness.</p><h3>Instructions</h3><p>Please answer as honestly as you can. Your responses are anonymous unless you choose to share optional follow-up contact information at the end.</p>"
+        }
+      ]
+    },
+    {
+      "name": "section_1_about_you",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s1_header",
+          "html": "<h3>Section 1: About You</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "age_group",
+          "title": "1. Which age group are you in?",
+          "choices": [
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_2_coverage_and_costs",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s2_header",
+          "html": "<h3>Section 2: Your Coverage and Costs</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "has_insurance_today",
+          "title": "2. Do you have health insurance coverage today?",
+          "choices": [
+            "Yes",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "coverage_types",
+          "title": "3. If yes, what type of coverage do you have? (Check all that apply)",
+          "visibleIf": "{has_insurance_today} = 'Yes'",
+          "choices": [
+            "Employer-sponsored insurance",
+            "Individual or private insurance plan",
+            "Marketplace plan (ACA)",
+            "Medicare",
+            "Medicaid",
+            "VA, military, or Tribal/IHS coverage",
+            "Short-term or limited plan",
+            "Not sure"
+          ],
+          "hasOther": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "radiogroup",
+          "name": "coverage_satisfaction",
+          "title": "4. How satisfied are you with your current health care coverage?",
+          "choices": [
+            "Very satisfied",
+            "Somewhat satisfied",
+            "Neutral",
+            "Somewhat dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "delayed_care_due_to_cost",
+          "title": "5. In the past 12 months, has your household delayed or skipped medical care because of cost?",
+          "choices": [
+            "Yes, often",
+            "Yes, sometimes",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "highest_cost_burdens",
+          "title": "6. Which costs are the most significant burden for your household? (Pick up to 2)",
+          "choices": [
+            "Monthly premiums",
+            "Deductibles or out-of-pocket maximums",
+            "Prescription drugs",
+            "Dental or vision",
+            "Mental health care",
+            "Travel costs to get care",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 2
+        },
+        {
+          "type": "radiogroup",
+          "name": "monthly_premium_estimate",
+          "title": "7. About how much does your household pay in health insurance premiums each month? (Best estimate)",
+          "choices": [
+            "$0",
+            "$1-$250",
+            "$251-$500",
+            "$501-$1,000",
+            "$1,001-$1,500",
+            "More than $1,500",
+            "My employer covers the premium, I am unsure of the total value",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_3_health_and_access",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s3_header",
+          "html": "<h3>Section 3: Health and Access in Wyoming</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "household_chronic_condition",
+          "title": "8. Does anyone in your household have a chronic health condition (e.g., diabetes, heart disease, asthma, mental health condition)?",
+          "choices": [
+            "Yes",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "access_ease_in_area",
+          "title": "9. How easy is it to access health care in your specific area?",
+          "choices": [
+            "Very easy",
+            "Somewhat easy",
+            "Neutral",
+            "Somewhat difficult",
+            "Very difficult"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "travel_distance_primary_care",
+          "title": "10. How far do you usually travel for primary care?",
+          "choices": [
+            "0-25 miles",
+            "26-50 miles",
+            "51-100 miles",
+            "Over 100 miles"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "biggest_access_challenges",
+          "title": "11. What are the biggest challenges you face with health care in Wyoming? (Pick up to 3)",
+          "choices": [
+            "High cost of premiums or deductibles",
+            "Prescription drug costs",
+            "Limited doctors or specialists nearby",
+            "Long wait times for appointments",
+            "Insurance rules and paperwork",
+            "Travel distance or transportation"
+          ],
+          "maxSelectedChoices": 3,
+          "hasOther": true,
+          "otherText": "Other"
+        }
+      ]
+    },
+    {
+      "name": "section_4_priorities",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s4_header",
+          "html": "<h3>Section 4: Priorities for Future Solutions</h3><p>12. Please rate how important each goal is to you for any health care system (1 = Not important, 5 = Very important).</p>"
+        },
+        {
+          "type": "matrix",
+          "name": "system_goals_importance",
+          "title": "Rate each goal",
+          "columns": [
+            {
+              "value": "1",
+              "text": "1"
+            },
+            {
+              "value": "2",
+              "text": "2"
+            },
+            {
+              "value": "3",
+              "text": "3"
+            },
+            {
+              "value": "4",
+              "text": "4"
+            },
+            {
+              "value": "5",
+              "text": "5"
+            }
+          ],
+          "rows": [
+            {
+              "value": "affordable_costs",
+              "text": "Keeps costs affordable for families"
+            },
+            {
+              "value": "universal_access",
+              "text": "Guarantees every resident has access to care"
+            },
+            {
+              "value": "doctor_choice",
+              "text": "Allows choice of doctor or clinic"
+            },
+            {
+              "value": "rural_facilities",
+              "text": "Keeps local rural hospitals and clinics open"
+            },
+            {
+              "value": "transparent_billing",
+              "text": "Simple and transparent billing"
+            },
+            {
+              "value": "local_control",
+              "text": "Protects local control and transparency"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_5_reinsurance",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s5_header",
+          "html": "<h3>Section 5: Reinsurance and Backstop Options</h3><p>Context: In small states like Wyoming, a small number of very expensive medical cases can drive premiums up for everyone. A reinsurance or backstop program is a mechanism where the state or a fund covers a portion of the highest-cost claims to reduce pressure on standard premiums.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "backstop_support_level",
+          "title": "13. To what extent do you support or oppose Wyoming creating a state-managed reinsurance or catastrophic-claims backstop program?",
+          "choices": [
+            "Strongly support",
+            "Somewhat support",
+            "Neutral",
+            "Somewhat oppose",
+            "Strongly oppose",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q14_text",
+          "html": "<p>14. How important are the following safeguards to your support of a state backstop? (Rate 1-5)</p>"
+        },
+        {
+          "type": "matrix",
+          "name": "backstop_safeguards_importance",
+          "title": "Rate each safeguard",
+          "columns": [
+            {
+              "value": "1",
+              "text": "1"
+            },
+            {
+              "value": "2",
+              "text": "2"
+            },
+            {
+              "value": "3",
+              "text": "3"
+            },
+            {
+              "value": "4",
+              "text": "4"
+            },
+            {
+              "value": "5",
+              "text": "5"
+            }
+          ],
+          "rows": [
+            {
+              "value": "financial_cap",
+              "text": "Financial exposure is clearly capped"
+            },
+            {
+              "value": "independent_audit",
+              "text": "Program is independently audited"
+            },
+            {
+              "value": "annual_public_reporting",
+              "text": "Results are publicly reported each year"
+            }
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "backstop_primary_concern",
+          "title": "15. What is your biggest concern about a backstop program? (Pick one)",
+          "choices": [
+            "Federal rules attached",
+            "Cost to taxpayers",
+            "Trust and oversight",
+            "Complexity and paperwork",
+            "It might not actually reduce premiums",
+            "I do not think the state should be involved",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_6_cowboy_care",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s6_header",
+          "html": "<h3>Section 6: Wyoming-Managed Health Fund (Cowboy Care Concept)</h3><p>Context: Cowboy Care is a concept where Wyoming would organize coverage through a state-managed health fund. This could range from a plan that competes with private insurance to a system that replaces traditional premiums with a different payment structure.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "cowboy_care_overall_opinion",
+          "title": "16. In general, based on this description, what is your opinion of the Cowboy Care concept?",
+          "choices": [
+            "Very positive",
+            "Somewhat positive",
+            "Neutral",
+            "Somewhat negative",
+            "Very negative",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "cowboy_shift_premiums",
+          "title": "17. If Cowboy Care were available, would you support shifting the money you currently pay in premiums into a Wyoming-managed health fund?",
+          "choices": [
+            "Yes",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "cowboy_primary_concern_if_not_yes",
+          "title": "18. If you answered No or Not sure, what is your primary concern? (Pick one)",
+          "visibleIf": "{cowboy_shift_premiums} = 'No' or {cowboy_shift_premiums} = 'Not sure'",
+          "choices": [
+            "I do not trust a state agency to manage health care",
+            "Concern about higher costs or open-ended taxes",
+            "Concern about fewer choices of doctors or clinics",
+            "Concern about longer wait times or provider shortages",
+            "I prefer keeping my current plan",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "cowboy_preferred_design",
+          "title": "19. Which design for a Wyoming-managed plan seems most workable to you?",
+          "choices": [
+            "A single Wyoming plan that everyone belongs to",
+            "A Wyoming plan that competes with private plans (public option)",
+            "A basic Wyoming plan for everyone, with optional private upgrades",
+            "I do not find any state-managed plan workable",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "cowboy_financial_tradeoff_preference",
+          "title": "20. If such a plan required financial tradeoffs, which approach is most acceptable?",
+          "choices": [
+            "Replacing premiums with a required state health payment to lower overall costs",
+            "Redirecting existing state spending first, even if it covers fewer services",
+            "A mix of employer and individual payments with state support for low-income families",
+            "None of the above / Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_7_medical_costs_and_reform",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s7_header",
+          "html": "<h3>Section 7: Medical Costs and Reform</h3>"
+        },
+        {
+          "type": "checkbox",
+          "name": "cost_drivers_priority",
+          "title": "21. Even with better insurance design, costs can rise if medical prices increase. Which cost drivers should Wyoming tackle first? (Pick up to 2)",
+          "choices": [
+            "Hospital pricing and facility fees",
+            "Prescription drug pricing and middlemen",
+            "Consolidation of medical groups",
+            "Administrative burden and billing complexity",
+            "Provider shortages and access"
+          ],
+          "maxSelectedChoices": 2
+        },
+        {
+          "type": "radiogroup",
+          "name": "malpractice_reform_view",
+          "title": "22. What is your opinion on medical liability (malpractice) reform in Wyoming?",
+          "choices": [
+            "The state should pursue reforms to reduce legal overhead for doctors",
+            "The current system should be kept as it is",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "malpractice_reform_preference",
+          "title": "23. Which approach to medical liability reform do you prefer?",
+          "choices": [
+            "Keep the current system",
+            "Set limits on pain and suffering awards",
+            "Create a state compensation fund to settle claims without a lawsuit",
+            "Use specialized health courts with medical experts instead of juries",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_8_final_thoughts",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s8_header",
+          "html": "<h3>Section 8: Final Thoughts</h3>"
+        },
+        {
+          "type": "comment",
+          "name": "one_most_important_healthcare_need",
+          "title": "24. What is the one thing you want most from health care in Wyoming?",
+          "maxLength": 1200
+        },
+        {
+          "type": "comment",
+          "name": "one_change_to_avoid",
+          "title": "25. What is one change we must avoid because it would make things worse?",
+          "maxLength": 1200
+        },
+        {
+          "type": "html",
+          "name": "optional_follow_up_note",
+          "html": "<p><strong>Optional follow-up:</strong> If you want us to contact you, you can share info below.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "follow_up_contact_ok",
+          "title": "May we contact you for follow-up on your responses?",
+          "choices": [
+            "Yes",
+            "No"
+          ],
+          "isRequired": false
+        },
+        {
+          "type": "text",
+          "name": "follow_up_email",
+          "title": "Optional email for follow-up",
+          "inputType": "email",
+          "isRequired": false,
+          "visibleIf": "{follow_up_contact_ok} = 'Yes'",
+          "validators": [
+            {
+              "type": "email"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

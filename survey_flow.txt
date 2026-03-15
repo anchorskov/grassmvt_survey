@@ -5,16 +5,19 @@ Goal
 Load and publish SurveyJS JSON from JSONC files into D1 in a repeatable, auditable way and verify the survey flow end to end.
 
 Runtime routes to keep in mind
-- SurveyJS path (current): /surveys/<slug> and /api/surveys/<slug>
-- Legacy path (still supported): /surveys/take/<slug> and /api/surveys/<slug>/submit
+- Canonical path: /surveys/<slug> and /api/surveys/<slug>
+- Legacy /surveys/take/<slug> is compatibility-only and not the primary authoring flow.
 
 Source of truth
-Survey JSONC files follow a naming convention so we can scale to any number of surveys.
-Recommended pattern:
-- surveys_<slug>_v<version>.jsonc
-Example:
-- surveys_abortion_v1.jsonc
-- surveys_survey_process_v1.jsonc
+Survey JSONC files live in `surveys/` and are registered in
+`scripts/seed-surveys-from-jsonc.mjs` under `surveySources`.
+
+Naming pattern for new files:
+- surveys/surveys_<slug>_v<version>.jsonc
+
+Important:
+- Creating a file alone is not enough.
+- Every new survey must be added to `surveySources` before seeding.
 
 Multi-part survey metadata
 Use a top-level metadata object that SurveyJS ignores:
@@ -42,7 +45,7 @@ Working process
    - wrangler d1 migrations apply wy_local --local --config wrangler.jsonc
    - If you are only adding/updating survey JSONC content, skip this step.
 3) Seed surveys from JSONC into local D1
-   - node scripts/seed-surveys-from-jsonc.mjs --db=local --slug=all --version=1 --publish=true --changelog="Seed v1 from JSONC"
+   - node scripts/seed-surveys-from-jsonc.mjs --db=local --slug=all --version=<version> --publish=true --changelog="Seed from JSONC"
 4) Verify the stored JSON and hash in local D1
    - wrangler d1 execute wy_local --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash FROM survey_versions v JOIN surveys s ON s.id = v.survey_id ORDER BY s.slug, v.version" --local --config wrangler.jsonc
 5) Start the Worker for local testing
@@ -54,13 +57,23 @@ Working process
    - Complete the survey and capture the receipt ID
    - wrangler d1 execute wy_local --command "SELECT id, survey_version_id, version_hash FROM responses ORDER BY created_at DESC LIMIT 1" --local --config wrangler.jsonc
 
-Legacy survey_questions flow
-The /surveys/take/:slug route uses survey_questions, not survey_versions.
-The SurveyJS route (/surveys/:slug) uses survey_versions.
-If you need /surveys/take/:slug to work for a slug, survey_questions rows must exist.
+Add a new survey (canonical)
+1) Add JSONC file
+   - surveys/surveys_<slug>_v<version>.jsonc
+2) Register source key in seed script
+   - scripts/seed-surveys-from-jsonc.mjs (`surveySources`)
+3) Seed that source key
+   - node scripts/seed-surveys-from-jsonc.mjs --db=local --slug=<source-key> --version=<version> --publish=true --changelog="Add <slug> v<version>"
+4) Verify list discoverability
+   - GET /api/surveys/list should include slug/title/status
+5) Verify runtime load
+   - GET /api/surveys/<slug> returns surveyJson/versionId/versionHash
+   - GET /surveys/<slug> renders SurveyJS
 
-Verify missing questions for a slug:
-- wrangler d1 execute wy_local --command "SELECT s.slug, q.id, q.question_key FROM survey_questions q JOIN surveys s ON s.id = q.survey_id WHERE s.slug = '<slug>'" --local --config wrangler.jsonc
+Legacy survey_questions flow (reference only)
+- /surveys/take/:slug uses survey_questions.
+- Modern SurveyJS flow uses survey_versions.
+- Do not use legacy flow for new survey onboarding.
 
 Clear path to update the survey data table
 SurveyJS data lives in survey_versions. Use the JSONC seed script to update it and keep hashes in sync.
@@ -74,7 +87,7 @@ SurveyJS data lives in survey_versions. Use the JSONC seed script to update it a
 
 Production workflow
 1) Seed JSONC into production D1
-   - node scripts/seed-surveys-from-jsonc.mjs --db=prod --slug=all --version=1 --publish=true --changelog="Seed v1 from JSONC"
+   - node scripts/seed-surveys-from-jsonc.mjs --db=prod --slug=all --version=<version> --publish=true --changelog="Seed from JSONC"
 2) Verify production data
    - wrangler d1 execute wy --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash FROM survey_versions v JOIN surveys s ON s.id = v.survey_id ORDER BY s.slug, v.version" --config wrangler.jsonc
 

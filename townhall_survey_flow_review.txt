@@ -1,0 +1,143 @@
+Town Hall survey flow review
+Repo root: /home/anchor/projects/grassmvt_survey
+Date reviewed: 2026-03-15
+
+Files inspected
+- src/worker.js
+- public/js/surveys-list.js
+- public/js/survey-results.js
+- public/townhall/index.html
+- public/townhall/topic.html
+- public/townhall/townhall.js
+- public/townhall/townhall-topic.js
+- scripts/seed-surveys-from-jsonc.mjs
+- scripts/test/townhall_ui_smoke.mjs
+- db/migrations/0001_survey_tables.sql
+- db/migrations/0005_survey_versions.sql
+- db/migrations/0022_survey_flow_meta.sql
+- db/migrations/0027_create_townhall_tables.sql
+- db/migrations/0028_link_townhall_topics_to_surveys.sql
+
+Tables inspected
+- surveys
+  - key columns: id, slug, scope, title, status, created_at, flow_type, flow_meta
+- survey_versions
+  - key columns: id, survey_id, version, json_text, json_hash, changelog, created_at, published_at
+- responses
+  - key columns: id, survey_id, survey_version_id, user_id, submitted_at, updated_at, edit_count
+- survey_submissions
+  - key columns: id, survey_id, respondent_name, respondent_zip, submitted_at
+- survey_tokens
+  - key columns: token, created_at, completed_at
+- survey_token_submissions
+  - key columns: token, submission_id, survey_id, created_at
+- townhall_topics
+  - key columns before review: id, survey_slug, slug, title, description, status, created_at, updated_at
+  - key columns after migration 0028: id, survey_id, survey_slug, slug, title, description, status, created_at, updated_at
+- townhall_statements
+  - key columns: id, topic_id, user_id, body, tags_json, status, created_at, updated_at
+- townhall_reactions
+  - key columns: id, statement_id, actor_key, reaction_type, created_at
+- townhall_reports
+  - key columns: id, statement_id, actor_key, reason, details, status, created_at
+- townhall_moderation_actions
+  - key columns: id, item_type, item_id, action, reason, reviewer_id, created_at
+- townhall_receipts
+  - key columns: id, topic_id, title, url, note, created_at
+
+Current survey creation flow
+- No create-survey API handler was found in src/worker.js.
+- The active survey creation/update path is scripts/seed-surveys-from-jsonc.mjs.
+- That script reads survey JSONC files from surveys/, writes SQL, upserts into surveys, then upserts survey_versions.
+- Older survey creation also exists in seed migrations db/migrations/0001_survey_tables.sql and db/migrations/0002_seed_more_surveys.sql, but those are historical bootstraps, not the current operational path.
+
+Current Town Hall topic lookup flow
+- Survey list UI in public/js/surveys-list.js linked directly to /townhall/topic.html?slug=<survey-slug>.
+- Worker-rendered survey pages in src/worker.js also linked directly to /townhall/topic.html?slug=<survey-slug>.
+- public/townhall/townhall-topic.js calls /api/townhall/topic/<slug>.
+- src/worker.js resolves that route through townhallGetTopicBySlug(), which looks up townhall_topics where slug = ? OR survey_slug = ?.
+- If no topic row exists, the API returns TOPIC_NOT_FOUND and the topic page shows "Town Hall not enabled yet".
+
+Exact initialization gap found
+- scripts/seed-surveys-from-jsonc.mjs created surveys and survey_versions but did not create townhall_topics.
+- Because of that, new surveys could become visible in survey list and survey detail pages before a matching Town Hall topic existed.
+- The UI therefore showed active "Discuss topic" links even when the linked Town Hall topic row was missing.
+
+Relationship found before changes
+- Current operational relationship was by townhall_topics.survey_slug UNIQUE.
+- No explicit survey_id foreign key existed in townhall_topics before this review.
+
+Whether current UI links can be shown before a topic exists
+- Yes.
+- public/js/surveys-list.js previously rendered "Discuss topic" for every survey card.
+- src/worker.js previously rendered "Discuss this topic" for every /surveys/<slug> page.
+- Both links were based only on survey slug, not on actual Town Hall topic existence.
+
+Recommended canonical relationship
+- Recommendation: townhall_topics.survey_id UNIQUE
+- Why this fits the current project better:
+  - surveys already has a stable primary key id
+  - Town Hall topics are topic-side records with their own title, slug, receipts, moderation, and statements, so the explicit foreign key belongs naturally on townhall_topics
+  - public URLs can still use topic slug or survey slug, but the durable database relationship should not depend on a mutable string field
+  - this is a smaller schema change than adding surveys.townhall_topic_id and then updating all survey-side writes
+- survey_slug is still useful for readable lookup and backward compatibility, but survey_id should be the canonical database link
+
+Schema decision implemented
+- Added db/migrations/0028_link_townhall_topics_to_surveys.sql
+- This migration:
+  - adds townhall_topics.survey_id
+  - backfills survey_id from survey_slug
+  - adds a unique index on survey_id
+  - keeps survey_slug in place for compatibility
+
+Files changed
+- src/worker.js
+- public/js/surveys-list.js
+- scripts/seed-surveys-from-jsonc.mjs
+- db/migrations/0028_link_townhall_topics_to_surveys.sql
+- scripts/backfill-townhall-topics.mjs
+- townhall_survey_flow_review.txt
+
+Flow fixes implemented
+- scripts/seed-surveys-from-jsonc.mjs now:
+  - wraps survey seeding in a transaction
+  - creates a townhall_topics row when a survey is seeded
+  - updates the existing townhall_topics row to keep survey_id, survey_slug, slug, title, and status aligned
+- src/worker.js now:
+  - returns townhallEnabled and townhallTopicSlug in /api/surveys/list
+  - renders the SurveyJS "Discuss this topic" button only when a matching topic exists
+  - keeps the admin seed-topic endpoint but makes it use canonical survey slug/title values from surveys
+  - stores survey_id in topic creation when the survey_id column exists
+- public/js/surveys-list.js now:
+  - shows the Town Hall link only when townhallEnabled is true
+  - shows "Town Hall coming soon" instead of a broken active link for missing legacy data
+
+Backfill method added
+- Added scripts/backfill-townhall-topics.mjs
+- Supports:
+  - --db=local|preview|prod
+  - dry-run by default
+  - --dry-run=false to create missing topics
+- Behavior:
+  - finds active surveys with no matching Town Hall topic
+  - creates missing townhall_topics rows
+  - avoids duplicates with INSERT OR IGNORE
+  - logs what it will create or did create
+
+Local repair run during this review
+- Applied local migration: db/migrations/0028_link_townhall_topics_to_surveys.sql
+- Ran local dry-run:
+  - missing topics found for abortion
+  - missing topics found for wy-household-economic-outlook
+  - missing topics found for wy-public-school-funding-2026
+- Ran local backfill live:
+  - created 3 missing local Town Hall topics
+- Verified local result:
+  - all active local surveys now have matching townhall_topics rows
+  - survey_id is populated for those topic rows
+
+Remaining risks and follow-ups
+- Remote production was not backfilled in this session because that requires live Wrangler remote access and Cloudflare credentials.
+- The admin seed-topic endpoint is still a repair path, not the primary survey creation path.
+- Older historical migrations that inserted surveys did not create Town Hall topics; those environments need the backfill script or equivalent repair run.
+- Runtime lookup still supports slug-based behavior for compatibility. A later cleanup pass could move more worker queries to survey_id once migration 0028 is confirmed in all environments.

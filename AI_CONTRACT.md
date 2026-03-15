@@ -16,8 +16,9 @@ These rules apply to all work in this repository.
 
 ## Survey Data Exposure Rules
 
-- Do not create any endpoint that returns full survey definitions (prompt/options) as JSON.
-- Serve survey content only via HTML render routes like `/surveys/take/:slug`.
+- Keep full survey definition responses limited to the dedicated runtime endpoint:
+  `/api/surveys/:slug` for rendering `/surveys/:slug`.
+- Do not expose bulk prompt/options payloads in list/discovery endpoints.
 - Keep D1 access server-side only; client fetches may receive metadata only.
-- If `/data/surveys.json` or `/api/surveys` exists, restrict to non-sensitive metadata only: slug, title, status, scope, short description. No prompt/options.
+- If `/data/surveys.json` or `/api/surveys/list` exists, restrict to non-sensitive metadata only: slug, title, status, scope, short description. No prompt/options.
 - Keep PII separate from answers. Never return PII in public responses.
