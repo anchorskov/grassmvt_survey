@@ -10,38 +10,89 @@
   <body>
     <div data-include="/partials/header.html"></div>
     <main class="survey-home">
-      <h1>WELCOME!</h1>
-      <p>This is a Grassroots Movement, of the people, for the people and by the people.</p>
-      <p>Your responses are completely confidential.</p>
-      <p>Participate share your voice through these surveys from verified real voices.</p>
-      <p>
-        This is our people's platform.  Here we transform conversation into clarity.  From city, to county, on to state, and finally the nation. Our surveys are designed to gather and aggregate the voices of the electorate, verify our participation and demand integrity from those whom we elect as our senators and representatives. These surveys are designed to provide a tool for transparency and accountability  through published receipts.  Our methods are open source and within the public domain so results stay trustworthy. In states where data are available, an extra verification layer uses publicly available voter registration data to confirm district context without publishing personal details.
-      </p>
-      <div class="hero-actions" aria-label="Survey actions">
-        <a class="button button--primary" href="/surveys/list/">Take a Survey</a>
-        <a class="button button--secondary" href="/surveys/results/">View Results</a>
-        <p class="helper-text">Start with one survey, finish in minutes.</p>
-      </div>
-      <div class="how-it-works" aria-label="Survey process">
-        <span class="how-it-works__step">1. Enter basic info</span>
-        <span class="how-it-works__step">2. Verify participation</span>
-        <span class="how-it-works__step">3. Submit, receive a receipt</span>
-      </div>
-      <h2>Trust</h2>
-      <ul class="info-list">
-        <li>Bias review: Flag bias, review it, publish revisions with a visible trail.</li>
-        <li>Spam defense: Verification and rate limits protect results.</li>
-        <li>Open source: Code and methods stay public for audit and improvement.</li>
-      </ul>
-      <div class="hero-links">
-        <a href="/security/">Security</a>
-        <a href="/bias/">Bias</a>
-        <a href="/open-source/">Open source</a>
-        <a href="https://volunteers.grassrootsmvt.org/" rel="external">Volunteers</a>
-      </div>
-      <div data-include="/partials/support-skovgard.html"></div>
+      <section class="landing-hero" aria-labelledby="landing-hero-title">
+        <div class="landing-hero__copy">
+          <p class="landing-eyebrow">Grassroots Movement</p>
+          <h1 id="landing-hero-title">Verified voices. Clear public signal.</h1>
+          <p class="landing-hero__lede">
+            Take a survey, review the results, and join Wyoming conversations built for trust and follow-through.
+          </p>
+        </div>
+        <div class="landing-hero__quicklinks" aria-label="Quick links">
+          <a class="button button--primary" href="/surveys/list/">Browse surveys</a>
+          <a class="button button--secondary" href="/surveys/results/">View results</a>
+          <a class="button button--secondary" href="/townhall/">Join discussions</a>
+        </div>
+      </section>
+
+      <section class="account-panel" id="landing-account-panel" aria-live="polite">
+        <div class="account-panel__surface">
+          <div class="account-panel__copy">
+            <p class="landing-eyebrow">Your account</p>
+            <h2 id="landing-account-title">Create a free account</h2>
+            <p id="landing-account-message">
+              Save your place, return to surveys and Town Halls, and keep your receipts and participation history in one place.
+            </p>
+          </div>
+          <div class="account-panel__actions" id="landing-account-actions">
+            <button class="button button--primary" type="button" data-auth-open="signup">Create account</button>
+            <button class="button button--secondary" type="button" data-auth-open="login">Sign in</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-grid" id="landing-card-grid" aria-label="Primary actions"></section>
+
+      <section class="landing-process" aria-labelledby="landing-process-title">
+        <p class="landing-process__label" id="landing-process-title">How it works</p>
+        <div class="landing-process__steps">
+          <span class="how-it-works__step">1. Enter basic info</span>
+          <span class="how-it-works__step">2. Verify participation</span>
+          <span class="how-it-works__step">3. Submit, receive a receipt</span>
+        </div>
+        <p class="landing-process__link-row">
+          <a href="/how-surveys-work/">How Surveys Work</a>
+        </p>
+      </section>
+
+      <section class="landing-secondary">
+        <section class="landing-trust" aria-labelledby="landing-trust-title">
+          <p class="landing-eyebrow">Trust</p>
+          <h2 id="landing-trust-title">Built for transparency</h2>
+          <ul class="info-list">
+            <li>Bias review creates a visible revision trail.</li>
+            <li>Verification and rate limits protect public results.</li>
+            <li>Open methods keep audits and improvements possible.</li>
+          </ul>
+          <div class="hero-links">
+            <a href="/security/">Security</a>
+            <a href="/bias/">Bias</a>
+            <a href="/open-source/">Open source</a>
+            <a href="https://volunteers.grassrootsmvt.org/" rel="external">Volunteers</a>
+          </div>
+        </section>
+
+        <section class="landing-support">
+          <div data-include="/partials/support-skovgard.html"></div>
+        </section>
+      </section>
     </main>
+    <template id="landing-card-template">
+      <article class="landing-card">
+        <div class="landing-card__content">
+          <p class="landing-card__kicker" data-card-eyebrow></p>
+          <h2 data-card-title></h2>
+          <p class="landing-card__question" data-card-question></p>
+          <p class="landing-card__body" data-card-body></p>
+          <div class="landing-card__actions" data-card-actions>
+            <a class="button button--primary" data-card-primary></a>
+            <a class="landing-card__link" data-card-secondary></a>
+          </div>
+        </div>
+      </article>
+    </template>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>
+    <script src="/js/homepage.js"></script>
   </body>
 </html>

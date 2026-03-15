@@ -79,6 +79,23 @@
         flex-direction: column;
         gap: 0.25rem;
       }
+      .results-section-heading {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        margin: 0 0 0.75rem;
+      }
+      .results-section-heading h3,
+      .results-section-heading h4,
+      .results-section-heading p {
+        margin: 0;
+      }
+      .results-section-heading__label {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--color-text, #1a1a1a);
+      }
       .results-controls label {
         font-size: 0.75rem;
         font-weight: 600;
@@ -243,6 +260,7 @@
     </main>
     <div data-include="/partials/footer.html"></div>
     <script src="/js/include-partials.js"></script>
+    <script src="/js/section-help.js"></script>
     <script src="/js/survey-results.js"></script>
   </body>
 </html>

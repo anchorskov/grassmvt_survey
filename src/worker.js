@@ -12,6 +12,12 @@ import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { Lucia, TimeSpan } from 'lucia';
 import snarkdown from 'snarkdown';
 import { logPasskeyVerifyFailure, shouldDebugPasskeys } from './lib/debug-auth.js';
+import {
+  getTownhallModerationConfig,
+  moderateTownhallStatement,
+  TOWNHALL_STATEMENT_QUALITY_MESSAGE,
+  validateTownhallStatementQuality,
+} from './lib/townhall-moderation.js';
 import { sendEmail } from './server/email/resend.js';
 
 const escapeHtml = (value = '') =>
@@ -35,17 +41,24 @@ const GEO_TEST = 'T1';
 const localRateLimiters = {
   issueVerifyVoter: new Map(),
   verifyVoterAttempt: new Map(),
+  townhallSubmit: new Map(),
 };
 const TOWNHALL_ALLOWED_REACTIONS = new Set([
   'agree',
   'disagree',
-  'important',
   'needs_evidence',
 ]);
-const TOWNHALL_STATEMENT_MAX_LENGTH = 600;
+const TOWNHALL_STATEMENT_MAX_LENGTH = 500;
+const TOWNHALL_REPLY_MAX_LENGTH = 300;
 const TOWNHALL_DEFAULT_LIMIT = 25;
 const TOWNHALL_MAX_LIMIT = 100;
 const TOWNHALL_TOPIC_SLUG_PATTERN = /^[a-z0-9-_]+$/;
+const TOWNHALL_MODERATION_MESSAGES = {
+  revise:
+    'Your statement was not posted. Please revise the wording and try again. Keep it civil and avoid personal attacks or abusive language.',
+  block:
+    'Your statement could not be submitted because it appears to contain abusive or prohibited language.',
+};
 
 const truncateValue = (value, maxLength) => {
   if (!value) {
@@ -842,15 +855,53 @@ const countUrlsInText = (value) => {
   return matches ? matches.length : 0;
 };
 
-const normalizeTownhallTags = (value) => {
+const normalizeTownhallSources = (value) => {
   if (!Array.isArray(value)) {
     return [];
   }
-  const cleaned = value
-    .map((item) => (item || '').toString().trim())
-    .filter(Boolean)
-    .slice(0, 12);
-  return Array.from(new Set(cleaned));
+  const cleaned = [];
+  const seen = new Set();
+  for (const item of value) {
+    const raw = (item || '').toString().trim();
+    if (!raw) {
+      continue;
+    }
+    const candidate = /^https?:\/\//i.test(raw)
+      ? raw
+      : /^[a-z0-9-]+(\.[a-z0-9-]+)+([/:?#][^\s]*)?$/i.test(raw)
+        ? `https://${raw}`
+        : raw;
+    let parsed;
+    try {
+      parsed = new URL(candidate);
+    } catch (error) {
+      throw new Error('Source links must be valid http:// or https:// URLs.');
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Source links must start with http:// or https://.');
+    }
+    const normalized = parsed.toString();
+    if (seen.has(normalized)) {
+      throw new Error('Duplicate source links are not allowed in the same statement.');
+    }
+    seen.add(normalized);
+    cleaned.push(normalized);
+    if (cleaned.length >= 3) {
+      break;
+    }
+  }
+  return cleaned;
+};
+
+const normalizeTownhallTags = (value) => {
+  const cleaned = Array.isArray(value)
+    ? value
+        .map((item) => (item || '').toString().trim().replace(/^#+/, '').trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, 12)
+    : [];
+  const deduped = Array.from(new Set(cleaned));
+  return deduped.length ? deduped : ['opinion'];
 };
 
 const requireTownhallReady = async (env) => {
@@ -981,6 +1032,7 @@ const townhallCreateTopic = async (
 };
 
 const townhallListStatements = async (db, topicId, limit, cursor) => {
+  const support = await getTownhallStatementColumnSupport(db);
   const limitValue = normalizeTownhallLimit(limit);
   const cursorValue = parseTownhallCursor(cursor);
   const binds = [topicId];
@@ -991,10 +1043,15 @@ const townhallListStatements = async (db, topicId, limit, cursor) => {
   }
   binds.push(limitValue + 1);
 
-  const sql = `SELECT s.id, s.topic_id, s.user_id, s.body, s.tags_json, s.status, s.created_at, s.updated_at
+  const sql = `SELECT s.id, s.topic_id, s.user_id, s.body, s.tags_json, ${
+    support.hasSourcesJson ? 's.sources_json' : "'[]' AS sources_json"
+  }, s.status, s.created_at, s.updated_at${
+    support.hasParentStatementId ? ', s.parent_statement_id' : ", NULL AS parent_statement_id"
+  }
                FROM townhall_statements s
                WHERE s.topic_id = ?
                  AND s.status IN ('published', 'approved')
+                 ${support.hasParentStatementId ? 'AND s.parent_statement_id IS NULL' : ''}
                  ${cursorSql}
                ORDER BY s.created_at DESC, s.id DESC
                LIMIT ?`;
@@ -1004,9 +1061,29 @@ const townhallListStatements = async (db, topicId, limit, cursor) => {
   const hasMore = rows.length > limitValue;
   const pageRows = hasMore ? rows.slice(0, limitValue) : rows;
 
+  const topLevelIds = pageRows.map((row) => row.id);
+  let replyRows = [];
+  if (support.hasParentStatementId && topLevelIds.length) {
+    const replyResult = await db
+      .prepare(
+        `SELECT s.id, s.topic_id, s.user_id, s.body, s.tags_json, ${
+          support.hasSourcesJson ? 's.sources_json' : "'[]' AS sources_json"
+        }, s.status, s.created_at, s.updated_at, s.parent_statement_id
+         FROM townhall_statements s
+         WHERE s.topic_id = ?
+           AND s.status IN ('published', 'approved')
+           AND s.parent_statement_id IN (${topLevelIds.map(() => '?').join(', ')})
+         ORDER BY s.created_at ASC, s.id ASC`
+      )
+      .bind(topicId, ...topLevelIds)
+      .all();
+    replyRows = replyResult.results || [];
+  }
+
+  const allRows = [...pageRows, ...replyRows];
   const reactionSummaryByStatement = {};
-  if (pageRows.length) {
-    const placeholders = pageRows.map(() => '?').join(', ');
+  if (allRows.length) {
+    const placeholders = allRows.map(() => '?').join(', ');
     const reactionRows = await db
       .prepare(
         `SELECT statement_id, reaction_type, COUNT(*) AS count
@@ -1014,7 +1091,7 @@ const townhallListStatements = async (db, topicId, limit, cursor) => {
          WHERE statement_id IN (${placeholders})
          GROUP BY statement_id, reaction_type`
       )
-      .bind(...pageRows.map((row) => row.id))
+      .bind(...allRows.map((row) => row.id))
       .all();
     (reactionRows.results || []).forEach((row) => {
       if (!reactionSummaryByStatement[row.statement_id]) {
@@ -1024,7 +1101,7 @@ const townhallListStatements = async (db, topicId, limit, cursor) => {
     });
   }
 
-  const items = pageRows.map((row) => ({
+  const mapStatementRow = (row) => ({
     id: row.id,
     topicId: row.topic_id,
     userId: row.user_id || null,
@@ -1037,10 +1114,33 @@ const townhallListStatements = async (db, topicId, limit, cursor) => {
         return [];
       }
     })(),
+    sources: (() => {
+      try {
+        const parsed = JSON.parse(row.sources_json || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    })(),
     status: row.status,
+    parentStatementId: row.parent_statement_id || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at || null,
     reactions: reactionSummaryByStatement[row.id] || {},
+  });
+
+  const repliesByParent = {};
+  replyRows.forEach((row) => {
+    const reply = mapStatementRow(row);
+    if (!repliesByParent[reply.parentStatementId]) {
+      repliesByParent[reply.parentStatementId] = [];
+    }
+    repliesByParent[reply.parentStatementId].push(reply);
+  });
+
+  const items = pageRows.map((row) => ({
+    ...mapStatementRow(row),
+    replies: repliesByParent[row.id] || [],
   }));
 
   const last = items.length ? items[items.length - 1] : null;
@@ -1050,20 +1150,103 @@ const townhallListStatements = async (db, topicId, limit, cursor) => {
   };
 };
 
-const townhallCreateStatement = async (db, topicId, userId, body, tagsJson, status = 'published') => {
+const getTownhallStatementColumnSupport = async (db) => ({
+  hasSourcesJson: await tableColumnExists(db, 'townhall_statements', 'sources_json'),
+  hasModerationStatus: await tableColumnExists(db, 'townhall_statements', 'moderation_status'),
+  hasModerationProvider: await tableColumnExists(db, 'townhall_statements', 'moderation_provider'),
+  hasModerationFlagsJson: await tableColumnExists(db, 'townhall_statements', 'moderation_flags_json'),
+  hasModerationReason: await tableColumnExists(db, 'townhall_statements', 'moderation_reason'),
+  hasParentStatementId: await tableColumnExists(db, 'townhall_statements', 'parent_statement_id'),
+});
+
+const getTownhallReactionReportColumnSupport = async (db) => ({
+  reactionsHaveUserId: await tableColumnExists(db, 'townhall_reactions', 'user_id'),
+  reportsHaveUserId: await tableColumnExists(db, 'townhall_reports', 'user_id'),
+});
+
+const townhallCreateStatement = async (
+  db,
+  topicId,
+  userId,
+  body,
+  tagsJson,
+  sourcesJson = '[]',
+  status = 'published',
+  moderation = {},
+  parentStatementId = null
+) => {
   const statementId = crypto.randomUUID();
   const now = nowIso();
-  await db
-    .prepare(
-      `INSERT INTO townhall_statements
-       (id, topic_id, user_id, body, tags_json, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(statementId, topicId, userId || null, body, tagsJson, status, now, now)
-    .run();
+  const support = await getTownhallStatementColumnSupport(db);
+  const moderationStatus = moderation.status || 'unchecked';
+  const moderationProvider = moderation.provider || '';
+  const moderationFlagsJson = JSON.stringify(Array.isArray(moderation.flags) ? moderation.flags : []);
+  const moderationReason = moderation.reason || '';
+  if (
+    support.hasSourcesJson &&
+    support.hasModerationStatus &&
+    support.hasModerationProvider &&
+    support.hasModerationFlagsJson &&
+    support.hasModerationReason &&
+    support.hasParentStatementId
+  ) {
+    await db
+      .prepare(
+        `INSERT INTO townhall_statements
+         (id, topic_id, user_id, body, tags_json, sources_json, status, moderation_status, moderation_provider, moderation_flags_json, moderation_reason, parent_statement_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        statementId,
+        topicId,
+        userId || null,
+        body,
+        tagsJson,
+        sourcesJson,
+        status,
+        moderationStatus,
+        moderationProvider,
+        moderationFlagsJson,
+        moderationReason,
+        parentStatementId || null,
+        now,
+        now
+      )
+      .run();
+  } else if (support.hasSourcesJson && support.hasParentStatementId) {
+    await db
+      .prepare(
+        `INSERT INTO townhall_statements
+         (id, topic_id, user_id, body, tags_json, status, parent_statement_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(statementId, topicId, userId || null, body, tagsJson, status, parentStatementId || null, now, now)
+      .run();
+  } else {
+    await db
+      .prepare(
+        `INSERT INTO townhall_statements
+         (id, topic_id, user_id, body, tags_json, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(statementId, topicId, userId || null, body, tagsJson, status, now, now)
+      .run();
+  }
   return db
     .prepare(
-      `SELECT id, topic_id, user_id, body, tags_json, status, created_at, updated_at
+      `SELECT id, topic_id, user_id, body, tags_json, ${
+        support.hasSourcesJson ? 'sources_json' : "'[]' AS sources_json"
+      }, status, created_at, updated_at${
+        support.hasParentStatementId ? ', parent_statement_id' : ", NULL AS parent_statement_id"
+      }${
+        support.hasModerationStatus ? ', moderation_status' : ", 'unchecked' AS moderation_status"
+      }${
+        support.hasModerationProvider ? ', moderation_provider' : ", '' AS moderation_provider"
+      }${
+        support.hasModerationFlagsJson ? ', moderation_flags_json' : ", '[]' AS moderation_flags_json"
+      }${
+        support.hasModerationReason ? ', moderation_reason' : ", '' AS moderation_reason"
+      }
        FROM townhall_statements
        WHERE id = ?`
     )
@@ -1101,6 +1284,7 @@ const townhallSetStatementStatus = async (
   return db
     .prepare(
       `SELECT id, topic_id, user_id, body, tags_json, status, created_at, updated_at
+       ${await tableColumnExists(db, 'townhall_statements', 'sources_json') ? ', sources_json' : ", '[]' AS sources_json"}
        FROM townhall_statements
        WHERE id = ?`
     )
@@ -1108,62 +1292,101 @@ const townhallSetStatementStatus = async (
     .first();
 };
 
-const townhallReact = async (db, statementId, actorKey, reactionType) => {
+const townhallReact = async (db, statementId, userId, reactionType) => {
   const reactionId = crypto.randomUUID();
-  const result = await db
-    .prepare(
-      `INSERT OR IGNORE INTO townhall_reactions
-       (id, statement_id, actor_key, reaction_type, created_at)
-       VALUES (?, ?, ?, ?, ?)`
-    )
-    .bind(reactionId, statementId, actorKey, reactionType, nowIso())
-    .run();
+  const support = await getTownhallReactionReportColumnSupport(db);
+  const result = support.reactionsHaveUserId
+    ? await db
+        .prepare(
+          `INSERT OR IGNORE INTO townhall_reactions
+           (id, statement_id, actor_key, user_id, reaction_type, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .bind(reactionId, statementId, userId, userId, reactionType, nowIso())
+        .run()
+    : await db
+        .prepare(
+          `INSERT OR IGNORE INTO townhall_reactions
+           (id, statement_id, actor_key, reaction_type, created_at)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+        .bind(reactionId, statementId, userId, reactionType, nowIso())
+        .run();
   return {
     statementId,
-    actorKey,
+    userId,
     reactionType,
     active: true,
     created: Number(result?.meta?.changes || 0) > 0,
   };
 };
 
-const townhallUnreact = async (db, statementId, actorKey, reactionType) => {
-  const result = await db
-    .prepare(
-      `DELETE FROM townhall_reactions
-       WHERE statement_id = ? AND actor_key = ? AND reaction_type = ?`
-    )
-    .bind(statementId, actorKey, reactionType)
-    .run();
+const townhallUnreact = async (db, statementId, userId, reactionType) => {
+  const support = await getTownhallReactionReportColumnSupport(db);
+  const result = support.reactionsHaveUserId
+    ? await db
+        .prepare(
+          `DELETE FROM townhall_reactions
+           WHERE statement_id = ? AND reaction_type = ? AND (user_id = ? OR actor_key = ?)`
+        )
+        .bind(statementId, reactionType, userId, userId)
+        .run()
+    : await db
+        .prepare(
+          `DELETE FROM townhall_reactions
+           WHERE statement_id = ? AND actor_key = ? AND reaction_type = ?`
+        )
+        .bind(statementId, userId, reactionType)
+        .run();
   return {
     statementId,
-    actorKey,
+    userId,
     reactionType,
     active: false,
     removed: Number(result?.meta?.changes || 0) > 0,
   };
 };
 
-const townhallReport = async (db, statementId, actorKey, reason, details = null) => {
+const townhallReport = async (db, statementId, userId, reason, details = null) => {
   const reportId = crypto.randomUUID();
-  const result = await db
-    .prepare(
-      `INSERT OR IGNORE INTO townhall_reports
-       (id, statement_id, actor_key, reason, details, status, created_at)
-       VALUES (?, ?, ?, ?, ?, 'open', ?)`
-    )
-    .bind(reportId, statementId, actorKey, reason, details, nowIso())
-    .run();
+  const support = await getTownhallReactionReportColumnSupport(db);
+  const result = support.reportsHaveUserId
+    ? await db
+        .prepare(
+          `INSERT OR IGNORE INTO townhall_reports
+           (id, statement_id, actor_key, user_id, reason, details, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`
+        )
+        .bind(reportId, statementId, userId, userId, reason, details, nowIso())
+        .run()
+    : await db
+        .prepare(
+          `INSERT OR IGNORE INTO townhall_reports
+           (id, statement_id, actor_key, reason, details, status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'open', ?)`
+        )
+        .bind(reportId, statementId, userId, reason, details, nowIso())
+        .run();
 
-  const row = await db
-    .prepare(
-      `SELECT id, statement_id, actor_key, reason, details, status, created_at
-       FROM townhall_reports
-       WHERE statement_id = ? AND actor_key = ?
-       LIMIT 1`
-    )
-    .bind(statementId, actorKey)
-    .first();
+  const row = support.reportsHaveUserId
+    ? await db
+        .prepare(
+          `SELECT id, statement_id, actor_key, user_id, reason, details, status, created_at
+           FROM townhall_reports
+           WHERE statement_id = ? AND (user_id = ? OR actor_key = ?)
+           LIMIT 1`
+        )
+        .bind(statementId, userId, userId)
+        .first()
+    : await db
+        .prepare(
+          `SELECT id, statement_id, actor_key, reason, details, status, created_at
+           FROM townhall_reports
+           WHERE statement_id = ? AND actor_key = ?
+           LIMIT 1`
+        )
+        .bind(statementId, userId)
+        .first();
 
   return {
     ...(row || {}),
@@ -1318,6 +1541,34 @@ const checkLocalRateLimit = (map, key, limit, windowMs) => {
   existing.count += 1;
   map.set(key, existing);
   return { limited: existing.count > limit, count: existing.count };
+};
+
+const checkTownhallStatementSubmitRateLimit = async (env, userId) => {
+  const config = getTownhallModerationConfig(env);
+  const limit = config.submitLimitPer10Min;
+  if (!limit || limit < 1) {
+    return { limited: false, count: 0, limit: 0 };
+  }
+  if (env.DB && (await tableExists(env.DB, 'townhall_statements'))) {
+    const result = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM townhall_statements
+         WHERE user_id = ?
+           AND datetime(created_at) >= datetime('now', '-10 minutes')`
+      )
+      .bind(userId)
+      .first();
+    const count = Number(result?.count || 0);
+    return { limited: count >= limit, count, limit };
+  }
+  const local = checkLocalRateLimit(
+    localRateLimiters.townhallSubmit,
+    userId,
+    limit,
+    10 * 60 * 1000
+  );
+  return { ...local, limit };
 };
 
 const checkVerifyVoterIssueRateLimit = async (env, actorUserId) => {
@@ -5291,6 +5542,77 @@ const renderSurveyForm = ({
 
 const MIN_PUBLISH_N = 10;
 
+const formatDistrictNumber = (value, width = 2) => {
+  const parsed = parseInt(String(value || '').trim(), 10);
+  if (Number.isNaN(parsed)) {
+    return '';
+  }
+  return String(parsed).padStart(width, '0');
+};
+
+const getCanonicalGeoMeta = (geoType, geoKey) => {
+  if (geoType === 'all') {
+    return {
+      groupLabel: 'Statewide (All)',
+      optionLabel: 'Statewide (All)',
+      shortLabel: 'Statewide (All)',
+      longLabel: 'All Responses',
+    };
+  }
+
+  if (geoType === 'state') {
+    const stateLabel = geoKey === 'WY' ? 'Wyoming' : geoKey;
+    return {
+      groupLabel: 'State',
+      optionLabel: stateLabel,
+      shortLabel: stateLabel,
+      longLabel: stateLabel,
+    };
+  }
+
+  if (geoType === 'state_house') {
+    const district = formatDistrictNumber(String(geoKey || '').split('-HD-')[1], 2);
+    const numericDistrict = parseInt(district, 10);
+    if (!district || Number.isNaN(numericDistrict) || numericDistrict < 1 || numericDistrict > 61) {
+      return null;
+    }
+    return {
+      groupLabel: 'State House',
+      optionLabel: `HD-${district}`,
+      shortLabel: `HD-${district}`,
+      longLabel: `Wyoming House District ${district}`,
+    };
+  }
+
+  if (geoType === 'state_senate') {
+    const district = formatDistrictNumber(String(geoKey || '').split('-SD-')[1], 2);
+    const numericDistrict = parseInt(district, 10);
+    if (!district || Number.isNaN(numericDistrict) || numericDistrict < 1 || numericDistrict > 31) {
+      return null;
+    }
+    return {
+      groupLabel: 'State Senate',
+      optionLabel: `SD-${district}`,
+      shortLabel: `SD-${district}`,
+      longLabel: `Wyoming Senate District ${district}`,
+    };
+  }
+
+  if (geoType === 'us_house') {
+    if (String(geoKey || '').startsWith('56')) {
+      return null;
+    }
+    return {
+      groupLabel: 'US House',
+      optionLabel: 'At-Large',
+      shortLabel: 'At-Large',
+      longLabel: 'US House (At-Large)',
+    };
+  }
+
+  return null;
+};
+
 const buildGeoContextsForResponse = (addressVerification, userVerification) => {
   // Build list of geo contexts for aggregation
   // Tier 1: All responses - just statewide aggregate
@@ -5309,8 +5631,10 @@ const buildGeoContextsForResponse = (addressVerification, userVerification) => {
     // Tier 2: statewide
     contexts.push({ tier: 2, geo_type: 'state', geo_key: stateAbbrev });
 
-    // Tier 2: US House (Wyoming is at-large, code 00)
-    contexts.push({ tier: 2, geo_type: 'us_house', geo_key: `${stateFips}00-00` });
+    // Tier 2: US House only applies outside Wyoming for this project.
+    if (stateFips !== '56') {
+      contexts.push({ tier: 2, geo_type: 'us_house', geo_key: `${stateFips}00-00` });
+    }
 
     // Tier 2: State House
     if (addressVerification.state_house_dist) {
@@ -5769,20 +6093,74 @@ export default {
           }
           const bodyPayload = await parseJsonBody(request);
           const text = (bodyPayload.body || '').toString().trim();
-          const tags = normalizeTownhallTags(bodyPayload.tags);
+          const rawParentStatementId = (bodyPayload.parentStatementId || '').toString().trim();
+          const isReply = !!rawParentStatementId;
+          const tags = isReply ? [] : normalizeTownhallTags(bodyPayload.tags);
+          let sources = [];
+          let parentStatement = null;
+
+          if (isReply) {
+            const support = await getTownhallStatementColumnSupport(env.DB);
+            if (!support.hasParentStatementId) {
+              return townhallError(500, 'REPLIES_UNAVAILABLE', 'Replies are not available yet.');
+            }
+            parentStatement = await env.DB
+              .prepare(
+                `SELECT id, topic_id, parent_statement_id, status
+                 FROM townhall_statements
+                 WHERE id = ?
+                 LIMIT 1`
+              )
+              .bind(rawParentStatementId)
+              .first();
+            if (!parentStatement || parentStatement.topic_id !== topic.id) {
+              return townhallError(404, 'PARENT_NOT_FOUND', 'Parent statement not found.');
+            }
+            if (parentStatement.parent_statement_id) {
+              return townhallError(400, 'REPLY_DEPTH_EXCEEDED', 'Replies can only be added to top-level statements.');
+            }
+            if (!['published', 'approved'].includes(String(parentStatement.status || ''))) {
+              return townhallError(400, 'PARENT_NOT_PUBLISHED', 'Replies can only be added to published statements.');
+            }
+          }
 
           if (!text) {
-            return townhallError(400, 'BODY_REQUIRED', 'Statement body is required.');
+            return townhallError(400, 'BODY_REQUIRED', isReply ? 'Reply text is required.' : 'Statement body is required.');
           }
-          if (text.length > TOWNHALL_STATEMENT_MAX_LENGTH) {
+          const maxLength = isReply ? TOWNHALL_REPLY_MAX_LENGTH : TOWNHALL_STATEMENT_MAX_LENGTH;
+          if (text.length > maxLength) {
             return townhallError(
               400,
               'BODY_TOO_LONG',
-              `Statement body must be ${TOWNHALL_STATEMENT_MAX_LENGTH} characters or fewer.`
+              `${isReply ? 'Reply' : 'Statement body'} must be ${maxLength} characters or fewer.`
             );
           }
-          if (countUrlsInText(text) > 2) {
-            return townhallError(400, 'TOO_MANY_URLS', 'Maximum 2 URLs allowed in a statement.');
+          const qualityCheck = validateTownhallStatementQuality(text);
+          if (!qualityCheck.ok) {
+            return townhallError(400, 'STATEMENT_QUALITY', TOWNHALL_STATEMENT_QUALITY_MESSAGE);
+          }
+          if (countUrlsInText(text) > (isReply ? 0 : 2)) {
+            return townhallError(
+              400,
+              'TOO_MANY_URLS',
+              isReply ? 'Replies must be text only.' : 'Maximum 2 URLs allowed in a statement.'
+            );
+          }
+          if (!isReply) {
+            try {
+              sources = normalizeTownhallSources(bodyPayload.sources);
+            } catch (error) {
+              return townhallError(400, 'INVALID_SOURCE_URLS', error.message || 'Invalid source links.');
+            }
+          }
+
+          const submitRateLimit = await checkTownhallStatementSubmitRateLimit(env, auth.user.id);
+          if (submitRateLimit.limited) {
+            return townhallError(
+              429,
+              'RATE_LIMITED',
+              'Too many statements submitted too quickly. Please wait a few minutes and try again.'
+            );
           }
 
           const duplicate = await env.DB
@@ -5801,17 +6179,41 @@ export default {
             return townhallError(409, 'DUPLICATE_STATEMENT', 'Duplicate statement detected in the last 24 hours.');
           }
 
-          const priorPublished = await env.DB
-            .prepare(
-              `SELECT COUNT(*) AS count
-               FROM townhall_statements
-               WHERE user_id = ?
-                 AND status IN ('published', 'approved')`
-            )
-            .bind(auth.user.id)
-            .first();
-          const publishCount = Number(priorPublished?.count || 0);
-          const status = publishCount > 0 ? 'published' : 'pending';
+          const moderation = await moderateTownhallStatement({
+            env,
+            text,
+            tags,
+          });
+          if (moderation.outcome === 'revise') {
+            console.warn(
+              JSON.stringify({
+                event: 'townhall_statement_moderation_revise',
+                topic_slug: topic.slug,
+                user_id: auth.user.id,
+                flags: moderation.flags,
+                reason: moderation.reason || null,
+                score: moderation.score,
+                length: text.length,
+              })
+            );
+            return townhallError(400, 'MODERATION_REVISE', TOWNHALL_MODERATION_MESSAGES.revise);
+          }
+          if (moderation.outcome === 'block') {
+            console.warn(
+              JSON.stringify({
+                event: 'townhall_statement_moderation_block',
+                topic_slug: topic.slug,
+                user_id: auth.user.id,
+                flags: moderation.flags,
+                reason: moderation.reason || null,
+                score: moderation.score,
+                length: text.length,
+              })
+            );
+            return townhallError(400, 'MODERATION_BLOCK', TOWNHALL_MODERATION_MESSAGES.block);
+          }
+
+          const status = 'published';
 
           try {
             const created = await townhallCreateStatement(
@@ -5820,7 +6222,15 @@ export default {
               auth.user.id,
               text,
               JSON.stringify(tags),
-              status
+              JSON.stringify(sources),
+              status,
+              {
+                status: moderation.outcome,
+                provider: moderation.provider,
+                flags: moderation.flags,
+                reason: moderation.reason,
+              },
+              rawParentStatementId || null
             );
             return townhallOk({
               statement: {
@@ -5829,7 +6239,10 @@ export default {
                 userId: created.user_id,
                 body: created.body,
                 tags,
+                sources,
                 status: created.status,
+                parentStatementId: created.parent_statement_id || null,
+                moderationStatus: created.moderation_status || moderation.outcome,
                 createdAt: created.created_at,
                 updatedAt: created.updated_at,
               },
@@ -5921,12 +6334,12 @@ export default {
           if (typeof set !== 'boolean') {
             return townhallError(400, 'INVALID_SET_FLAG', 'set must be a boolean.');
           }
-          const actorKey = auth.user.id;
+          const userId = auth.user.id;
 
           try {
             const result = set
-              ? await townhallReact(env.DB, statementId, actorKey, reactionType)
-              : await townhallUnreact(env.DB, statementId, actorKey, reactionType);
+              ? await townhallReact(env.DB, statementId, userId, reactionType)
+              : await townhallUnreact(env.DB, statementId, userId, reactionType);
             return townhallOk({ reaction: result });
           } catch (error) {
             return townhallError(500, 'REACTION_FAILED', error.message || 'Unable to update reaction.');
@@ -7350,7 +7763,6 @@ export default {
             const geoContexts = [
               { tier: 1, geo_type: 'all', geo_key: 'ALL' },
               { tier: 2, geo_type: 'state', geo_key: 'WY' },
-              { tier: 2, geo_type: 'us_house', geo_key: '5600-00' },
               { tier: 2, geo_type: 'state_house', geo_key: `WY-HD-${String(houseDistrict).padStart(2, '0')}` },
               { tier: 2, geo_type: 'state_senate', geo_key: `WY-SD-${String(senateDistrict).padStart(2, '0')}` },
             ];
@@ -7564,7 +7976,7 @@ export default {
         if (townhallTopic) {
           townhallLinkHtml = `
         <p>
-          <a class="button button--small button--secondary" href="/townhall/topic.html?slug=${encodeURIComponent(
+          <a class="button button--small button--secondary" href="/townhall/topic/?slug=${encodeURIComponent(
             townhallTopic.slug || townhallTopic.survey_slug || slug
           )}">Discuss this topic</a>
         </p>
@@ -7988,18 +8400,8 @@ export default {
       const suppressed = n < MIN_PUBLISH_N;
 
       // Build geo label
-      let geoLabel = geoKey;
-      if (geoType === 'all') {
-        geoLabel = 'All Responses';
-      } else if (geoType === 'state') {
-        geoLabel = geoKey === 'WY' ? 'Wyoming' : geoKey;
-      } else if (geoType === 'us_house') {
-        geoLabel = 'US House (At-Large)';
-      } else if (geoType === 'state_house') {
-        geoLabel = geoKey.replace('-HD-', ' House District ').replace('WY', 'Wyoming');
-      } else if (geoType === 'state_senate') {
-        geoLabel = geoKey.replace('-SD-', ' Senate District ').replace('WY', 'Wyoming');
-      }
+      const geoMeta = getCanonicalGeoMeta(geoType, geoKey);
+      const geoLabel = geoMeta?.longLabel || geoKey;
 
       if (suppressed) {
         return jsonResponse({
@@ -8090,15 +8492,27 @@ export default {
       const geoOptions = await env.DB.prepare(
         `SELECT geo_type, geo_key, response_count
          FROM aggregate_rollups
-         WHERE survey_id = ? AND survey_version_id = ? AND tier = ? AND response_count >= ?
+         WHERE survey_id = ? AND survey_version_id = ? AND tier = ? AND response_count > 0
          ORDER BY geo_type, geo_key`
-      ).bind(survey.id, survey.version_id, tier, MIN_PUBLISH_N).all();
+      ).bind(survey.id, survey.version_id, tier).all();
 
-      const options = (geoOptions.results || []).map(row => ({
-        geo_type: row.geo_type,
-        geo_key: row.geo_key,
-        response_count: row.response_count,
-      }));
+      const options = (geoOptions.results || [])
+        .map((row) => {
+          const meta = getCanonicalGeoMeta(row.geo_type, row.geo_key);
+          if (!meta) {
+            return null;
+          }
+          return {
+            geo_type: row.geo_type,
+            geo_key: row.geo_key,
+            response_count: row.response_count,
+            group_label: meta.groupLabel,
+            option_label: meta.optionLabel,
+            short_label: meta.shortLabel,
+            long_label: meta.longLabel,
+          };
+        })
+        .filter(Boolean);
 
       return jsonResponse({
         ok: true,

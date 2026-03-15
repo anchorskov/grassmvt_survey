@@ -140,6 +140,40 @@ This file gives repo-specific instructions for coding agents working in `/home/a
 - Do not use `nano`.
 - If a task depends on exact markup or styles, inspect the real files first.
 
+## Help Scaffolding
+
+- Use section-level `?` help triggers by default, not field-level help, unless a field is unusually confusing.
+- Store help copy in the shared JSON registry at `public/data/help-registry.json`.
+- Key help entries by `page` plus `section`.
+- Keep help text concise, mobile-friendly, and written for public users.
+- Use click or tap behavior with real buttons and keyboard access; do not rely on hover-only help.
+- Prefer the JSON registry over D1 unless the project later needs admin-managed help editing.
+
+## Town Hall Moderation
+
+- All Town Hall statements are moderated before save in `src/worker.js`.
+- Use a three-outcome model:
+  - `pass`: save and continue normal flow
+  - `revise`: reject with a user-facing revise message
+  - `block`: reject with a stronger prohibited-language message
+- Keep moderation policy and thresholds centralized in `src/lib/townhall-moderation.js`.
+- Avoid duplicating hidden magic values across the UI and Worker.
+- Store moderation metadata on saved statements when schema support exists.
+- If provider behavior changes later, keep the provider switch modular and env-driven.
+
+## Interactive Identity
+
+- All public posting actions must be tied to an internal authenticated `user.id`.
+- This applies to Town Hall statements, replies, reactions, and reports.
+- Derive the trusted user identity from the backend session/auth layer, not from a browser-supplied field.
+- Public display names are optional and separate from internal identity; do not expose internal identifiers in the UI.
+- When adding new civic discussion features, prefer explicit `user_id` columns over generic actor keys where practical.
+- Keep abuse prevention hooks aligned with internal identity:
+  - per-user posting rate limits
+  - per-user moderation history
+  - per-user reaction uniqueness
+  - repeat-offender controls later
+
 ## Verification Checklist
 
 - For UI changes:

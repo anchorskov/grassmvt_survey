@@ -50,7 +50,7 @@
             <h2>${title}</h2>
             ${description ? `<p class="card__meta">${description}</p>` : '<p class="card__meta">Join this discussion.</p>'}
             <div class="card__actions">
-              <a class="button button--small" href="/townhall/topic.html?slug=${topicSlug}">Open topic</a>
+              <a class="button button--small" href="/townhall/topic/?slug=${topicSlug}">Open topic</a>
             </div>
           </article>
         `;

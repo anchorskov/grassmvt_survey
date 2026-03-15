@@ -148,3 +148,98 @@ Short explanation of the UI fix
 Remaining issues found
 - The landing-page "View Results" link is hard-coded to `?slug=abortion` in public/index.html, so it always opens that survey’s results rather than the newest or primary active survey.
 - public/surveys/index.html still uses a meta refresh redirect to /surveys/list/; that is functional, but it is a minimal redirect page rather than a real entry screen.
+
+Survey results geography filter review
+- Files changed
+  - public/js/survey-results.js
+  - src/worker.js
+- Exact source of the incorrect "US House" label
+  - src/worker.js was generating Wyoming `us_house` aggregate contexts (`5600-00`) in `buildGeoContextsForResponse`
+  - public/js/survey-results.js rendered any `geo_type === 'us_house'` option under an optgroup labeled `US House`
+- Was this a labeling bug, data bug, or both?
+  - Both
+  - Labeling bug: the results dropdown exposed `US House` for Wyoming
+  - Data bug: Wyoming results aggregation was still writing `us_house` rollups even though this project needs `state_house`
+- How State House HD-01 through HD-61 are now handled
+  - New Wyoming aggregates no longer create `us_house` contexts
+  - Legacy Wyoming `us_house` geo options are filtered out of `/api/results/geo-options`
+  - The dropdown now only groups lower-chamber Wyoming district results under `State House`
+  - District labels use `HD-01`, `HD-02`, etc from stored `WY-HD-##` keys
+  - State Senate remains grouped under `State Senate` with `SD-01`, `SD-02`, etc from `WY-SD-##`
+  - Per the latest requirement, only districts with data are shown
+- Remaining data-model limitations
+  - Legacy Wyoming `us_house` rows may still exist in aggregate tables from earlier writes, but they are now hidden from the dropdown
+  - The system stores and aggregates `state_house_dist` and `state_senate_dist`; that part of the data model is already present
+
+Geography dropdown logic flow
+- Source response fields
+  - Address-verified response context comes from `user_address_verification.state_house_dist`, `user_address_verification.state_senate_dist`, and `state_fips`
+- Backend aggregation
+  - `src/worker.js` builds per-response geo contexts in `buildGeoContextsForResponse`
+  - Canonical internal geo types are now:
+    - `all`
+    - `state`
+    - `state_house`
+    - `state_senate`
+    - `us_house` only for non-Wyoming states
+- API payload
+  - `/api/results/geo-options` now returns canonical option metadata from the backend:
+    - `geo_type`
+    - `geo_key`
+    - `response_count`
+    - `group_label`
+    - `option_label`
+    - `short_label`
+    - `long_label`
+- Frontend normalization
+  - `public/js/survey-results.js` no longer invents Wyoming district labels from raw keys for the dropdown
+  - It groups by backend `group_label` and renders backend `option_label`
+- Dropdown rendering
+  - The dropdown always includes:
+    - `Statewide (All)`
+    - `State` options from backend data
+    - `State House` district options with data
+    - `State Senate` district options with data
+- Selected geography application
+  - The selected `geo_type` and `geo_key` still drive `/api/results/summary`
+  - Low-response suppression still happens there, so districts can appear in the dropdown even when results are not yet publishable
+
+Duplicate or conflicting definitions found before the fix
+- `src/worker.js`
+  - built Wyoming `us_house` aggregate contexts
+  - built summary badge labels separately
+  - built geo-options rows without labels
+- `public/js/survey-results.js`
+  - independently grouped and labeled dropdown options
+  - separately formatted verified district links
+- Conflict that caused the observed bug
+  - House districts existed in aggregate data
+  - But `/api/results/geo-options` filtered options with `response_count >= MIN_PUBLISH_N`, which removed all House districts in local data while still leaving some Senate districts
+  - The verified House district link still worked because it was built from authenticated user district data, not from geo-options
+
+Verified district link vs dropdown sync bug
+- Root cause
+  - The verified district shortcut links and the geography dropdown were using different state update paths inside `public/js/survey-results.js`
+  - The verified House link was building keys directly from stored address verification values, which could produce `WY-HD-059`
+  - The dropdown options used normalized aggregate keys like `WY-HD-59`
+  - Because the shortcut click did not funnel through the same normalization and filter-application path, the page could update badges while leaving the dropdown and results state out of sync
+- Old behavior
+  - Dropdown change mutated `currentGeoType/currentGeoKey` directly and called `render()`
+  - Verified district link click separately forced tier 2, loaded geo options, mutated `currentGeoType/currentGeoKey`, and called `render()`
+  - URL load applied only the survey slug, not the same shared filter-selection path
+- New unified interaction model
+  - All geography selection paths now funnel through one canonical `applyFilter()` function in `public/js/survey-results.js`
+  - Covered paths:
+    - direct dropdown selection
+    - verified district shortcut links
+    - URL-based page load
+    - tier switching
+  - `applyFilter()` now:
+    - resolves the target tier and geography
+    - normalizes district keys
+    - validates against current geo options
+    - updates the canonical page state
+    - updates the URL query string
+    - triggers the same render path for badges, counts, dropdown selection, legislator cards, and low-response notices
+- Files changed
+  - public/js/survey-results.js

@@ -206,7 +206,7 @@
           : '';
         const buttonLabel = hasResponse ? 'Edit responses' : 'Start survey';
         const discussLink = survey.townhallEnabled
-          ? `<a class="button button--small button--secondary" href="/townhall/topic.html?slug=${encodeURIComponent(survey.townhallTopicSlug || survey.slug)}">Discuss topic</a>`
+          ? `<a class="button button--small button--secondary" href="/townhall/topic/?slug=${encodeURIComponent(survey.townhallTopicSlug || survey.slug)}">Discuss topic</a>`
           : '<span class="helper-text">Town Hall coming soon</span>';
         return `
           <article class="card">

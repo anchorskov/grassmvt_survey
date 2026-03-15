@@ -94,6 +94,29 @@
     return output;
   };
 
+  const normalizeDistrictNumber = (value, width = 2) => {
+    const parsed = parseInt(String(value || '').trim(), 10);
+    if (Number.isNaN(parsed)) {
+      return '';
+    }
+    return String(parsed).padStart(width, '0');
+  };
+
+  const buildGeoKey = (geoType, rawValue) => {
+    if (geoType === 'state_house') {
+      const district = normalizeDistrictNumber(rawValue, 2);
+      return district ? `WY-HD-${district}` : '';
+    }
+    if (geoType === 'state_senate') {
+      const district = normalizeDistrictNumber(rawValue, 2);
+      return district ? `WY-SD-${district}` : '';
+    }
+    if (geoType === 'state') {
+      return String(rawValue || '').trim() || 'WY';
+    }
+    return String(rawValue || '').trim();
+  };
+
   const getSlugFromUrl = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const querySlug = (urlParams.get('slug') || '').trim();
@@ -104,14 +127,40 @@
     return querySlug;
   };
 
-  const updateUrlForSlug = (nextSlug) => {
+  const getFilterFromUrl = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tierValue = parseInt(urlParams.get('tier') || '1', 10);
+    const geoType = (urlParams.get('geo_type') || '').trim();
+    const geoKey = (urlParams.get('geo_key') || '').trim();
+    return {
+      tier: tierValue === 2 ? 2 : 1,
+      geoType: geoType || 'all',
+      geoKey: geoKey || 'ALL',
+    };
+  };
+
+  const updateUrlForState = () => {
     const url = new URL(window.location.href);
-    if (nextSlug) {
+    if (slug) {
       url.pathname = '/surveys/results/';
-      url.searchParams.set('slug', nextSlug);
+      url.searchParams.set('slug', slug);
     } else {
       url.pathname = '/surveys/results/';
       url.searchParams.delete('slug');
+    }
+    if (!slug || currentTier === 1) {
+      url.searchParams.delete('tier');
+      url.searchParams.delete('geo_type');
+      url.searchParams.delete('geo_key');
+    } else {
+      url.searchParams.set('tier', String(currentTier));
+      if (currentGeoType === 'all' && currentGeoKey === 'ALL') {
+        url.searchParams.delete('geo_type');
+        url.searchParams.delete('geo_key');
+      } else {
+        url.searchParams.set('geo_type', currentGeoType);
+        url.searchParams.set('geo_key', currentGeoKey);
+      }
     }
     window.history.replaceState({}, '', `${url.pathname}${url.search}`);
   };
@@ -143,6 +192,24 @@
   const formatQuestionName = (name) =>
     name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
+  const renderHelpTrigger = (section, label) => `
+    <button
+      class="section-help-trigger"
+      type="button"
+      data-help-page="survey-results"
+      data-help-section="${escapeHtml(section)}"
+      aria-label="Help: ${escapeHtml(label)}"
+      aria-expanded="false"
+    >?</button>
+  `;
+
+  const renderSectionHeading = (level, title, section, cssClass = '') => `
+    <div class="results-section-heading${cssClass ? ` ${cssClass}` : ''}">
+      <${level} class="results-section-heading__label">${escapeHtml(title)}</${level}>
+      ${renderHelpTrigger(section, title)}
+    </div>
+  `;
+
   const renderControls = () => {
     const tierOptions = `
       <option value="1" ${currentTier === 1 ? 'selected' : ''}>Tier 1: All Responses</option>
@@ -151,46 +218,21 @@
 
     let geoOptionsHtml = '<option value="all|ALL">Statewide (All)</option>';
     if (currentTier === 2) {
-      const stateOpts = geoOptions.filter((o) => o.geo_type === 'state');
-      const usHouseOpts = geoOptions.filter((o) => o.geo_type === 'us_house');
-      const stateHouseOpts = geoOptions.filter((o) => o.geo_type === 'state_house');
-      const stateSenateOpts = geoOptions.filter((o) => o.geo_type === 'state_senate');
-
-      if (stateOpts.length > 0) {
-        geoOptionsHtml += '<optgroup label="State">';
-        for (const opt of stateOpts) {
-          const selected = opt.geo_type === currentGeoType && opt.geo_key === currentGeoKey ? 'selected' : '';
-          const label = opt.geo_key === 'WY' ? 'Wyoming' : opt.geo_key;
-          geoOptionsHtml += `<option value="${opt.geo_type}|${opt.geo_key}" ${selected}>${label} (n=${opt.response_count})</option>`;
+      const groupedOptions = geoOptions.reduce((accumulator, option) => {
+        const groupLabel = option.group_label || 'Other';
+        if (!accumulator.has(groupLabel)) {
+          accumulator.set(groupLabel, []);
         }
-        geoOptionsHtml += '</optgroup>';
-      }
+        accumulator.get(groupLabel).push(option);
+        return accumulator;
+      }, new Map());
 
-      if (usHouseOpts.length > 0) {
-        geoOptionsHtml += '<optgroup label="US House">';
-        for (const opt of usHouseOpts) {
+      for (const [groupLabel, options] of groupedOptions) {
+        geoOptionsHtml += `<optgroup label="${escapeHtml(groupLabel)}">`;
+        for (const opt of options) {
           const selected = opt.geo_type === currentGeoType && opt.geo_key === currentGeoKey ? 'selected' : '';
-          geoOptionsHtml += `<option value="${opt.geo_type}|${opt.geo_key}" ${selected}>At-Large (n=${opt.response_count})</option>`;
-        }
-        geoOptionsHtml += '</optgroup>';
-      }
-
-      if (stateHouseOpts.length > 0) {
-        geoOptionsHtml += '<optgroup label="State House">';
-        for (const opt of stateHouseOpts) {
-          const selected = opt.geo_type === currentGeoType && opt.geo_key === currentGeoKey ? 'selected' : '';
-          const distNum = opt.geo_key.split('-HD-')[1] || opt.geo_key;
-          geoOptionsHtml += `<option value="${opt.geo_type}|${opt.geo_key}" ${selected}>HD-${distNum} (n=${opt.response_count})</option>`;
-        }
-        geoOptionsHtml += '</optgroup>';
-      }
-
-      if (stateSenateOpts.length > 0) {
-        geoOptionsHtml += '<optgroup label="State Senate">';
-        for (const opt of stateSenateOpts) {
-          const selected = opt.geo_type === currentGeoType && opt.geo_key === currentGeoKey ? 'selected' : '';
-          const distNum = opt.geo_key.split('-SD-')[1] || opt.geo_key;
-          geoOptionsHtml += `<option value="${opt.geo_type}|${opt.geo_key}" ${selected}>SD-${distNum} (n=${opt.response_count})</option>`;
+          const optionLabel = opt.option_label || opt.geo_key;
+          geoOptionsHtml += `<option value="${opt.geo_type}|${opt.geo_key}" ${selected}>${escapeHtml(optionLabel)} (n=${opt.response_count})</option>`;
         }
         geoOptionsHtml += '</optgroup>';
       }
@@ -198,6 +240,7 @@
 
     return `
       <div class="results-controls">
+        ${renderSectionHeading('p', 'Filters', 'filters')}
         <div class="control-group">
           <label for="tier-select">Response Tier</label>
           <select id="tier-select">${tierOptions}</select>
@@ -228,7 +271,8 @@
 
   const renderSuppressed = (data) => `
     <div class="results-suppressed">
-      <h3>Not enough responses yet</h3>
+      ${renderSectionHeading('h3', 'Publishing threshold', 'threshold')}
+      <p><strong>Not enough responses yet</strong></p>
       <p>Results are shown when at least ${data.min_publish_n} responses are collected for this filter combination.</p>
       <p>Current responses: ${data.n}</p>
     </div>
@@ -333,7 +377,7 @@
 
     return `
       <div class="district-context">
-        <h3>District Representative</h3>
+        ${renderSectionHeading('h3', 'District legislators', 'legislators')}
         ${repsHtml}
       </div>
     `;
@@ -351,18 +395,24 @@
     let linksHtml = '<p class="user-district-links">View results for your district: ';
     const links = [];
     if (houseDist) {
-      const houseKey = `WY-HD-${String(houseDist).padStart(2, '0')}`;
-      links.push(`<a href="#" class="user-district-link" data-geo-type="state_house" data-geo-key="${houseKey}">House District ${houseDist}</a>`);
+      const houseLabel = normalizeDistrictNumber(houseDist, 2);
+      const houseKey = buildGeoKey('state_house', houseDist);
+      if (houseKey) {
+        links.push(`<a href="#" class="user-district-link" data-geo-type="state_house" data-geo-key="${houseKey}">HD-${houseLabel}</a>`);
+      }
     }
     if (senateDist) {
-      const senateKey = `WY-SD-${String(senateDist).padStart(2, '0')}`;
-      links.push(`<a href="#" class="user-district-link" data-geo-type="state_senate" data-geo-key="${senateKey}">Senate District ${senateDist}</a>`);
+      const senateLabel = normalizeDistrictNumber(senateDist, 2);
+      const senateKey = buildGeoKey('state_senate', senateDist);
+      if (senateKey) {
+        links.push(`<a href="#" class="user-district-link" data-geo-type="state_senate" data-geo-key="${senateKey}">SD-${senateLabel}</a>`);
+      }
     }
     linksHtml += `${links.join(' | ')}</p>`;
 
     return `
       <div class="user-district-panel">
-        <h4>Your Verified Districts</h4>
+        ${renderSectionHeading('h4', 'Your Verified Districts', 'verified-districts')}
         ${linksHtml}
       </div>
     `;
@@ -433,28 +483,15 @@
 
     if (tierSelect) {
       tierSelect.addEventListener('change', async (event) => {
-        currentTier = parseInt(event.target.value, 10);
-        if (currentTier === 1) {
-          currentGeoType = 'all';
-          currentGeoKey = 'ALL';
-        } else {
-          await loadGeoOptions();
-          const stateOpt = geoOptions.find((o) => o.geo_type === 'state');
-          if (stateOpt) {
-            currentGeoType = stateOpt.geo_type;
-            currentGeoKey = stateOpt.geo_key;
-          }
-        }
-        render();
+        const nextTier = parseInt(event.target.value, 10);
+        await applyFilter({ tier: nextTier });
       });
     }
 
     if (geoSelect) {
-      geoSelect.addEventListener('change', (event) => {
+      geoSelect.addEventListener('change', async (event) => {
         const [geoType, geoKey] = event.target.value.split('|');
-        currentGeoType = geoType;
-        currentGeoKey = geoKey;
-        render();
+        await applyFilter({ tier: 2, geoType, geoKey });
       });
     }
 
@@ -462,11 +499,11 @@
     userDistrictLinks.forEach((link) => {
       link.addEventListener('click', async (event) => {
         event.preventDefault();
-        currentTier = 2;
-        await loadGeoOptions();
-        currentGeoType = link.dataset.geoType;
-        currentGeoKey = link.dataset.geoKey;
-        render();
+        await applyFilter({
+          tier: 2,
+          geoType: link.dataset.geoType,
+          geoKey: link.dataset.geoKey,
+        });
       });
     });
   };
@@ -475,6 +512,54 @@
     const resp = await fetch(`/api/results/geo-options?slug=${encodeURIComponent(slug)}&tier=${currentTier}`);
     const data = await resp.json();
     geoOptions = data.ok ? data.options || [] : [];
+  };
+
+  const getDefaultTierTwoSelection = () => {
+    const stateOpt = geoOptions.find((option) => option.geo_type === 'state');
+    if (stateOpt) {
+      return { geoType: stateOpt.geo_type, geoKey: stateOpt.geo_key };
+    }
+    const firstOpt = geoOptions[0];
+    if (firstOpt) {
+      return { geoType: firstOpt.geo_type, geoKey: firstOpt.geo_key };
+    }
+    return { geoType: 'all', geoKey: 'ALL' };
+  };
+
+  const resolveFilterState = async ({ tier, geoType, geoKey }) => {
+    const resolvedTier = tier === 2 ? 2 : 1;
+    if (resolvedTier === 1) {
+      return { tier: 1, geoType: 'all', geoKey: 'ALL' };
+    }
+
+    currentTier = 2;
+    await loadGeoOptions();
+
+    if (geoType && geoKey) {
+      const matchingOption = geoOptions.find((option) => option.geo_type === geoType && option.geo_key === geoKey);
+      if (matchingOption) {
+        return { tier: 2, geoType: matchingOption.geo_type, geoKey: matchingOption.geo_key };
+      }
+    }
+
+    const fallback = getDefaultTierTwoSelection();
+    return { tier: 2, geoType: fallback.geoType, geoKey: fallback.geoKey };
+  };
+
+  const applyFilter = async ({
+    tier = currentTier,
+    geoType = currentGeoType,
+    geoKey = currentGeoKey,
+    updateUrl = true,
+  } = {}) => {
+    const resolved = await resolveFilterState({ tier, geoType, geoKey });
+    currentTier = resolved.tier;
+    currentGeoType = resolved.geoType;
+    currentGeoKey = resolved.geoKey;
+    if (updateUrl) {
+      updateUrlForState();
+    }
+    await render();
   };
 
   const loadVoterSnapshots = async () => {
@@ -581,13 +666,19 @@
     }
 
     surveyMeta = metaData;
-    await render();
+    const urlFilter = getFilterFromUrl();
+    await applyFilter({
+      tier: urlFilter.tier,
+      geoType: urlFilter.geoType,
+      geoKey: urlFilter.geoKey,
+      updateUrl: true,
+    });
   };
 
   surveySelect.addEventListener('change', async (event) => {
     slug = (event.target.value || '').trim();
-    updateUrlForSlug(slug);
     resetResultState();
+    updateUrlForState();
 
     if (!slug) {
       renderWaitingState();
@@ -618,7 +709,7 @@
       populateSelector();
 
       if (requestedSlug && !validSlug) {
-        updateUrlForSlug('');
+        updateUrlForState();
         renderFriendlyError('Survey not found', 'That survey is not available. Please choose a survey from the list.');
         return;
       }

@@ -1,0 +1,67 @@
+{
+  "entries": [
+    {
+      "page": "survey-results",
+      "section": "filters",
+      "title": "Results filters",
+      "summary": "Use the tier and geography filters to narrow the current survey's published results.",
+      "body": "Tier 1 shows all published responses for the survey. Tier 2 limits the view to responses tied to a verified Wyoming address. The geography dropdown then lets you review statewide, State House, or State Senate results when data is available for that grouping."
+    },
+    {
+      "page": "survey-results",
+      "section": "verified-districts",
+      "title": "Your verified districts",
+      "summary": "These shortcuts jump to the same district filters available in the geography dropdown.",
+      "body": "If your account has a verified Wyoming address, this section shows your current House and Senate districts. Choosing one of these links applies the same geography filter as selecting that district from the dropdown."
+    },
+    {
+      "page": "survey-results",
+      "section": "legislators",
+      "title": "District legislators",
+      "summary": "Representative cards appear when the selected geography maps to a Wyoming legislative district.",
+      "body": "When you choose a State House or State Senate district, the page looks up the legislators tied to that district and shows available contact and profile details. Statewide and state-level views do not show a district legislator card."
+    },
+    {
+      "page": "survey-results",
+      "section": "threshold",
+      "title": "Publishing threshold",
+      "summary": "Some survey and geography combinations do not yet have enough responses to publish detailed results.",
+      "body": "Results are shown only when at least 10 responses exist for the selected survey, tier, and geography combination. If a district has fewer responses than that threshold, the page shows the current count and waits to publish detailed charts until the minimum is reached."
+    },
+    {
+      "page": "townhall-topic",
+      "section": "responses",
+      "title": "Responses",
+      "summary": "Use these actions to show support, disagreement, request stronger support, reply to a statement, or report a problem.",
+      "body": "Reactions help show how the community is responding to a comment."
+    },
+    {
+      "page": "townhall-topic",
+      "section": "tag-browse",
+      "title": "Browse by tag",
+      "summary": "Select a tag to focus on similar statements.",
+      "body": "Matching comments are ordered by date, with the newest published statements first."
+    },
+    {
+      "page": "townhall-topic",
+      "section": "statement",
+      "title": "Statement",
+      "summary": "Use this space to share your position, add an idea, or suggest an improvement related to the topic.",
+      "body": "Keep your comment clear, concise, and civil. Statements are limited to 500 characters. If a source would help others verify your point, you can add a public link below."
+    },
+    {
+      "page": "townhall-topic",
+      "section": "tags",
+      "title": "Tags",
+      "summary": "Use tags to group related statements.",
+      "body": "Use tags to group related statements. Start each tag with # and separate multiple tags with commas. If you leave tags blank, your statement will be tagged #opinion by default. For example: #AI, #healthcare, #education"
+    },
+    {
+      "page": "townhall-topic",
+      "section": "sources",
+      "title": "Sources",
+      "summary": "Add up to 3 public links that support your statement.",
+      "body": "Use direct source links, public records, official documents, or other clearly described evidence when possible."
+    }
+  ]
+}
