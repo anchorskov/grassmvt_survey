@@ -1,24 +1,10 @@
 /* public/js/survey-results.js */
 (() => {
   const container = document.getElementById('results-container');
-  if (!container) return;
+  const surveySelect = document.getElementById('results-survey-select');
+  if (!container || !surveySelect) return;
 
-  // Get slug from URL query param or path
-  const urlParams = new URLSearchParams(window.location.search);
-  let slug = urlParams.get('slug');
-  
-  // Also check path for /surveys/results/<slug> pattern
-  const pathMatch = window.location.pathname.match(/\/surveys\/results\/([^/]+)/);
-  if (pathMatch) {
-    slug = decodeURIComponent(pathMatch[1]);
-  }
-
-  if (!slug) {
-    container.innerHTML = '<div class="results-error"><h3>No survey specified</h3><p>Please select a survey to view results.</p></div>';
-    return;
-  }
-
-  // State
+  let slug = '';
   let surveyMeta = null;
   let currentTier = 1;
   let currentGeoType = 'all';
@@ -26,7 +12,8 @@
   let geoOptions = [];
   let voterSnapshots = null;
   let districtContext = null;
-  let userAuth = null; // Store user auth info for verified district display
+  let userAuth = null;
+  let availableSurveys = [];
 
   const escapeHtml = (str) => {
     if (!str) return '';
@@ -37,12 +24,124 @@
       .replace(/"/g, '&quot;');
   };
 
-  const formatQuestionName = (name) => {
-    // Convert snake_case to Title Case
-    return name
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase());
+  const stripJsonc = (input) => {
+    let output = '';
+    let inString = false;
+    let stringChar = '';
+    let escaping = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+
+    for (let i = 0; i < input.length; i += 1) {
+      const char = input[i];
+      const nextChar = input[i + 1];
+
+      if (inLineComment) {
+        if (char === '\n') {
+          inLineComment = false;
+          output += char;
+        }
+        continue;
+      }
+
+      if (inBlockComment) {
+        if (char === '*' && nextChar === '/') {
+          inBlockComment = false;
+          i += 1;
+        }
+        continue;
+      }
+
+      if (inString) {
+        output += char;
+        if (escaping) {
+          escaping = false;
+          continue;
+        }
+        if (char === '\\') {
+          escaping = true;
+          continue;
+        }
+        if (char === stringChar) {
+          inString = false;
+          stringChar = '';
+        }
+        continue;
+      }
+
+      if (char === '"' || char === "'") {
+        inString = true;
+        stringChar = char;
+        output += char;
+        continue;
+      }
+
+      if (char === '/' && nextChar === '/') {
+        inLineComment = true;
+        i += 1;
+        continue;
+      }
+
+      if (char === '/' && nextChar === '*') {
+        inBlockComment = true;
+        i += 1;
+        continue;
+      }
+
+      output += char;
+    }
+
+    return output;
   };
+
+  const getSlugFromUrl = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const querySlug = (urlParams.get('slug') || '').trim();
+    const pathMatch = window.location.pathname.match(/\/surveys\/results\/([^/]+)/);
+    if (pathMatch) {
+      return decodeURIComponent(pathMatch[1]);
+    }
+    return querySlug;
+  };
+
+  const updateUrlForSlug = (nextSlug) => {
+    const url = new URL(window.location.href);
+    if (nextSlug) {
+      url.pathname = '/surveys/results/';
+      url.searchParams.set('slug', nextSlug);
+    } else {
+      url.pathname = '/surveys/results/';
+      url.searchParams.delete('slug');
+    }
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  };
+
+  const resetResultState = () => {
+    surveyMeta = null;
+    currentTier = 1;
+    currentGeoType = 'all';
+    currentGeoKey = 'ALL';
+    geoOptions = [];
+    districtContext = null;
+  };
+
+  const renderWaitingState = (message = 'Select a survey to review results.') => {
+    document.title = 'Survey Results - Grassroots Movement';
+    container.innerHTML = `<div class="results-loading">${escapeHtml(message)}</div>`;
+  };
+
+  const renderFriendlyError = (title, message) => {
+    document.title = 'Survey Results - Grassroots Movement';
+    container.innerHTML = `
+      <div class="results-error">
+        <h3>${escapeHtml(title)}</h3>
+        <p>${escapeHtml(message)}</p>
+      </div>
+    `;
+  };
+
+  const formatQuestionName = (name) =>
+    name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   const renderControls = () => {
     const tierOptions = `
@@ -52,11 +151,10 @@
 
     let geoOptionsHtml = '<option value="all|ALL">Statewide (All)</option>';
     if (currentTier === 2) {
-      // Filter options by type for cleaner grouping
-      const stateOpts = geoOptions.filter(o => o.geo_type === 'state');
-      const usHouseOpts = geoOptions.filter(o => o.geo_type === 'us_house');
-      const stateHouseOpts = geoOptions.filter(o => o.geo_type === 'state_house');
-      const stateSenateOpts = geoOptions.filter(o => o.geo_type === 'state_senate');
+      const stateOpts = geoOptions.filter((o) => o.geo_type === 'state');
+      const usHouseOpts = geoOptions.filter((o) => o.geo_type === 'us_house');
+      const stateHouseOpts = geoOptions.filter((o) => o.geo_type === 'state_house');
+      const stateSenateOpts = geoOptions.filter((o) => o.geo_type === 'state_senate');
 
       if (stateOpts.length > 0) {
         geoOptionsHtml += '<optgroup label="State">';
@@ -128,28 +226,24 @@
     `;
   };
 
-  const renderSuppressed = (data) => {
-    return `
-      <div class="results-suppressed">
-        <h3>Not enough responses yet</h3>
-        <p>Results are shown when at least ${data.min_publish_n} responses are collected for this filter combination.</p>
-        <p>Current responses: ${data.n}</p>
-      </div>
-    `;
-  };
+  const renderSuppressed = (data) => `
+    <div class="results-suppressed">
+      <h3>Not enough responses yet</h3>
+      <p>Results are shown when at least ${data.min_publish_n} responses are collected for this filter combination.</p>
+      <p>Current responses: ${data.n}</p>
+    </div>
+  `;
 
   const renderQuestion = (q, questionDefs) => {
-    // Find question definition for better labels
-    const def = questionDefs.find(d => d.name === q.question_name);
+    const def = questionDefs.find((d) => d.name === q.question_name);
     const title = def?.title || formatQuestionName(q.question_name);
 
     let barsHtml = '';
     for (const t of q.totals) {
       const pct = t.pct || 0;
-      const label = t.choice_value;
       barsHtml += `
         <div class="results-bar">
-          <div class="results-bar-label">${escapeHtml(label)}</div>
+          <div class="results-bar-label">${escapeHtml(t.choice_value)}</div>
           <div class="results-bar-track">
             <div class="results-bar-fill" style="width: ${pct}%"></div>
           </div>
@@ -171,7 +265,11 @@
 
     let snapshotsHtml = '';
     for (const snap of voterSnapshots.snapshots) {
-      const date = new Date(snap.as_of).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const date = new Date(snap.as_of).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      });
       snapshotsHtml += `<li>Registered voters: ${snap.registered_voters.toLocaleString()} as of ${date}</li>`;
     }
 
@@ -185,15 +283,16 @@
   };
 
   const renderDistrictContext = () => {
-    if (!districtContext) return '';
-    if (!districtContext.representatives || districtContext.representatives.length === 0) return '';
+    if (!districtContext || !districtContext.representatives || districtContext.representatives.length === 0) {
+      return '';
+    }
 
     const isDistrict = districtContext.geo_type === 'state_house' || districtContext.geo_type === 'state_senate';
     if (!isDistrict) return '';
 
     let repsHtml = '';
     for (const rep of districtContext.representatives) {
-      const voterCountHtml = districtContext.voter_count > 0 
+      const voterCountHtml = districtContext.voter_count > 0
         ? `<p class="district-voter-count">Registered voters in ${rep.chamber} District ${rep.district}: ${districtContext.voter_count.toLocaleString()}</p>`
         : '';
 
@@ -240,7 +339,6 @@
     `;
   };
 
-  // Render user's own district info panel when logged in and verified
   const renderUserDistrictPanel = () => {
     if (!userAuth || !userAuth.authenticated || !userAuth.user) return '';
     const av = userAuth.user.address_verification;
@@ -260,7 +358,7 @@
       const senateKey = `WY-SD-${String(senateDist).padStart(2, '0')}`;
       links.push(`<a href="#" class="user-district-link" data-geo-type="state_senate" data-geo-key="${senateKey}">Senate District ${senateDist}</a>`);
     }
-    linksHtml += links.join(' | ') + '</p>';
+    linksHtml += `${links.join(' | ')}</p>`;
 
     return `
       <div class="user-district-panel">
@@ -271,36 +369,31 @@
   };
 
   const render = async () => {
-    if (!surveyMeta) {
-      container.innerHTML = '<div class="results-error"><h3>Survey not found</h3><p>Could not load survey metadata.</p></div>';
+    if (!slug || !surveyMeta) {
+      renderWaitingState();
       return;
     }
 
-    // Fetch district context if a district is selected
     if (currentGeoType === 'state_house' || currentGeoType === 'state_senate') {
       try {
         const ctxResp = await fetch(`/api/results/district-context?geo_type=${encodeURIComponent(currentGeoType)}&geo_key=${encodeURIComponent(currentGeoKey)}`);
-        if (ctxResp.ok) {
-          districtContext = await ctxResp.json();
-        }
+        districtContext = ctxResp.ok ? await ctxResp.json() : null;
       } catch (e) {
-        // Ignore errors loading district context
+        districtContext = null;
       }
     } else {
       districtContext = null;
     }
 
-    // Fetch summary data
     const summaryUrl = `/api/results/summary?slug=${encodeURIComponent(slug)}&tier=${currentTier}&geo_type=${currentGeoType}&geo_key=${encodeURIComponent(currentGeoKey)}`;
     const summaryResp = await fetch(summaryUrl);
     const summaryData = await summaryResp.json();
 
     if (!summaryData.ok) {
-      container.innerHTML = `<div class="results-error"><h3>Error</h3><p>${escapeHtml(summaryData.error || 'Unknown error')}</p></div>`;
+      renderFriendlyError('Error', summaryData.error || 'Unknown error');
       return;
     }
 
-    // Update page title
     document.title = `Results: ${surveyMeta.title} - Grassroots Movement`;
 
     let html = `
@@ -311,13 +404,11 @@
       ${renderControls()}
     `;
 
-    // Show user's district panel if logged in and verified
     const userDistrictHtml = renderUserDistrictPanel();
     if (userDistrictHtml) {
       html += userDistrictHtml;
     }
 
-    // Show district context if available
     const districtHtml = renderDistrictContext();
     if (districtHtml) {
       html += districtHtml;
@@ -331,28 +422,24 @@
       }
     }
 
-    // Show voter panel for Wyoming-focused surveys
     if (surveyMeta.scope === 'wy' || currentGeoKey.startsWith('WY')) {
       html += renderVoterPanel();
     }
 
     container.innerHTML = html;
 
-    // Attach event listeners
     const tierSelect = document.getElementById('tier-select');
     const geoSelect = document.getElementById('geo-select');
 
     if (tierSelect) {
-      tierSelect.addEventListener('change', async (e) => {
-        currentTier = parseInt(e.target.value, 10);
+      tierSelect.addEventListener('change', async (event) => {
+        currentTier = parseInt(event.target.value, 10);
         if (currentTier === 1) {
           currentGeoType = 'all';
           currentGeoKey = 'ALL';
         } else {
-          // Load geo options for tier 2
           await loadGeoOptions();
-          // Default to state if available
-          const stateOpt = geoOptions.find(o => o.geo_type === 'state');
+          const stateOpt = geoOptions.find((o) => o.geo_type === 'state');
           if (stateOpt) {
             currentGeoType = stateOpt.geo_type;
             currentGeoKey = stateOpt.geo_key;
@@ -363,26 +450,22 @@
     }
 
     if (geoSelect) {
-      geoSelect.addEventListener('change', (e) => {
-        const [geoType, geoKey] = e.target.value.split('|');
+      geoSelect.addEventListener('change', (event) => {
+        const [geoType, geoKey] = event.target.value.split('|');
         currentGeoType = geoType;
         currentGeoKey = geoKey;
         render();
       });
     }
 
-    // Attach click handlers for user district links
     const userDistrictLinks = container.querySelectorAll('.user-district-link');
-    userDistrictLinks.forEach(link => {
-      link.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const geoType = link.dataset.geoType;
-        const geoKey = link.dataset.geoKey;
-        // Switch to tier 2 and select the user's district
+    userDistrictLinks.forEach((link) => {
+      link.addEventListener('click', async (event) => {
+        event.preventDefault();
         currentTier = 2;
         await loadGeoOptions();
-        currentGeoType = geoType;
-        currentGeoKey = geoKey;
+        currentGeoType = link.dataset.geoType;
+        currentGeoKey = link.dataset.geoKey;
         render();
       });
     });
@@ -391,9 +474,7 @@
   const loadGeoOptions = async () => {
     const resp = await fetch(`/api/results/geo-options?slug=${encodeURIComponent(slug)}&tier=${currentTier}`);
     const data = await resp.json();
-    if (data.ok) {
-      geoOptions = data.options || [];
-    }
+    geoOptions = data.ok ? data.options || [] : [];
   };
 
   const loadVoterSnapshots = async () => {
@@ -403,7 +484,7 @@
         voterSnapshots = await resp.json();
       }
     } catch (e) {
-      // Ignore errors loading voter data
+      return;
     }
   };
 
@@ -414,33 +495,143 @@
         userAuth = await resp.json();
       }
     } catch (e) {
-      // Ignore errors loading user auth
+      return;
     }
   };
 
-  const init = async () => {
+  const loadStaticSurveys = async () => {
     try {
-      // Load survey metadata
-      const metaResp = await fetch(`/api/results/meta?slug=${encodeURIComponent(slug)}`);
-      const metaData = await metaResp.json();
-
-      if (!metaData.ok) {
-        container.innerHTML = `<div class="results-error"><h3>Survey not found</h3><p>${escapeHtml(metaData.error || 'Unknown error')}</p></div>`;
-        return;
+      const response = await fetch('/data/surveys.json', { credentials: 'same-origin' });
+      if (!response.ok) {
+        return [];
       }
+      const rawText = await response.text();
+      const data = JSON.parse(stripJsonc(rawText));
+      if (!Array.isArray(data)) {
+        return [];
+      }
+      return data
+        .filter((survey) => survey.status === 'active' && typeof survey.href === 'string')
+        .map((survey) => {
+          const match = survey.href.match(/^\/surveys\/([^/]+)\/?$/);
+          return {
+            slug: match ? decodeURIComponent(match[1]) : '',
+            title: survey.title || 'Survey',
+          };
+        })
+        .filter((survey) => survey.slug);
+    } catch (error) {
+      return [];
+    }
+  };
 
-      surveyMeta = metaData;
+  const loadAvailableSurveys = async () => {
+    let apiSurveys = [];
+    try {
+      const response = await fetch('/api/surveys/list', { credentials: 'same-origin' });
+      if (response.ok) {
+        const data = await response.json();
+        apiSurveys = Array.isArray(data)
+          ? data
+            .filter((survey) => survey.status === 'active' && survey.slug)
+            .map((survey) => ({
+              slug: survey.slug,
+              title: survey.title || 'Survey',
+            }))
+          : [];
+      }
+    } catch (error) {
+      apiSurveys = [];
+    }
 
-      // Load voter registration data and user auth in parallel
+    const staticSurveys = await loadStaticSurveys();
+    const merged = [...apiSurveys];
+    staticSurveys.forEach((survey) => {
+      if (!merged.some((item) => item.slug === survey.slug)) {
+        merged.push(survey);
+      }
+    });
+
+    availableSurveys = merged.sort((a, b) => a.title.localeCompare(b.title));
+  };
+
+  const populateSelector = () => {
+    const options = ['<option value="">Choose a survey</option>'];
+    availableSurveys.forEach((survey) => {
+      const selected = survey.slug === slug ? ' selected' : '';
+      options.push(`<option value="${escapeHtml(survey.slug)}"${selected}>${escapeHtml(survey.title)}</option>`);
+    });
+    surveySelect.innerHTML = options.join('');
+  };
+
+  const loadSelectedSurvey = async () => {
+    if (!slug) {
+      resetResultState();
+      renderWaitingState();
+      return;
+    }
+
+    const metaResp = await fetch(`/api/results/meta?slug=${encodeURIComponent(slug)}`);
+    const metaData = await metaResp.json();
+
+    if (!metaData.ok) {
+      resetResultState();
+      renderFriendlyError('Survey not found', metaData.error || 'Please choose another survey.');
+      return;
+    }
+
+    surveyMeta = metaData;
+    await render();
+  };
+
+  surveySelect.addEventListener('change', async (event) => {
+    slug = (event.target.value || '').trim();
+    updateUrlForSlug(slug);
+    resetResultState();
+
+    if (!slug) {
+      renderWaitingState();
+      return;
+    }
+
+    container.innerHTML = '<div class="results-loading">Loading results...</div>';
+    try {
+      await loadSelectedSurvey();
+    } catch (error) {
+      renderFriendlyError('Error loading results', error.message);
+    }
+  });
+
+  const init = async () => {
+    container.innerHTML = '<div class="results-loading">Loading available surveys...</div>';
+
+    try {
       await Promise.all([
+        loadAvailableSurveys(),
         loadVoterSnapshots(),
         loadUserAuth(),
       ]);
 
-      // Initial render
-      await render();
+      const requestedSlug = getSlugFromUrl();
+      const validSlug = availableSurveys.some((survey) => survey.slug === requestedSlug) ? requestedSlug : '';
+      slug = validSlug;
+      populateSelector();
+
+      if (requestedSlug && !validSlug) {
+        updateUrlForSlug('');
+        renderFriendlyError('Survey not found', 'That survey is not available. Please choose a survey from the list.');
+        return;
+      }
+
+      if (!slug) {
+        renderWaitingState();
+        return;
+      }
+
+      container.innerHTML = '<div class="results-loading">Loading results...</div>';
+      await loadSelectedSurvey();
     } catch (error) {
-      container.innerHTML = `<div class="results-error"><h3>Error loading results</h3><p>${escapeHtml(error.message)}</p></div>`;
+      renderFriendlyError('Error loading results', error.message);
     }
   };
 

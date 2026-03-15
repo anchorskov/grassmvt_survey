@@ -36,6 +36,16 @@ const localRateLimiters = {
   issueVerifyVoter: new Map(),
   verifyVoterAttempt: new Map(),
 };
+const TOWNHALL_ALLOWED_REACTIONS = new Set([
+  'agree',
+  'disagree',
+  'important',
+  'needs_evidence',
+]);
+const TOWNHALL_STATEMENT_MAX_LENGTH = 600;
+const TOWNHALL_DEFAULT_LIMIT = 25;
+const TOWNHALL_MAX_LIMIT = 100;
+const TOWNHALL_TOPIC_SLUG_PATTERN = /^[a-z0-9-_]+$/;
 
 const truncateValue = (value, maxLength) => {
   if (!value) {
@@ -781,6 +791,518 @@ const writeAuditLog = async (env, request, { actorUserId, action, targetUserId =
       metadataJson
     )
     .run();
+};
+
+const townhallOk = (data, init = {}) => jsonResponse({ ok: true, data }, init);
+
+const townhallError = (status, code, message, init = {}) =>
+  jsonResponse(
+    {
+      ok: false,
+      error: {
+        code,
+        message,
+      },
+    },
+    {
+      status,
+      headers: init.headers || undefined,
+    }
+  );
+
+const normalizeTownhallLimit = (value) => {
+  const parsed = Number(value || '');
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return TOWNHALL_DEFAULT_LIMIT;
+  }
+  return Math.min(Math.floor(parsed), TOWNHALL_MAX_LIMIT);
+};
+
+const parseTownhallCursor = (raw) => {
+  const value = (raw || '').toString().trim();
+  if (!value) {
+    return null;
+  }
+  const [createdAt, id] = value.split('|');
+  if (!createdAt || !id) {
+    return null;
+  }
+  return { createdAt, id };
+};
+
+const encodeTownhallCursor = (createdAt, id) => {
+  if (!createdAt || !id) {
+    return '';
+  }
+  return `${createdAt}|${id}`;
+};
+
+const countUrlsInText = (value) => {
+  const matches = (value || '').match(/https?:\/\/[^\s)]+/gi);
+  return matches ? matches.length : 0;
+};
+
+const normalizeTownhallTags = (value) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const cleaned = value
+    .map((item) => (item || '').toString().trim())
+    .filter(Boolean)
+    .slice(0, 12);
+  return Array.from(new Set(cleaned));
+};
+
+const requireTownhallReady = async (env) => {
+  if (!env.DB) {
+    return townhallError(500, 'DB_UNAVAILABLE', 'Database binding not available.');
+  }
+  const hasTopics = await tableExists(env.DB, 'townhall_topics');
+  if (!hasTopics) {
+    return townhallError(503, 'TOWNHALL_NOT_READY', 'Town Hall tables are not available.');
+  }
+  return null;
+};
+
+const requireTownhallAuth = async (request, env) => {
+  const auth = await requireSessionUser(request, env);
+  if (auth.response) {
+    return {
+      response: townhallError(401, 'UNAUTHORIZED', 'Authentication required.', {
+        headers: auth.response.headers,
+      }),
+    };
+  }
+  return auth;
+};
+
+const requireTownhallModerator = async (request, env) => {
+  const auth = await requireTownhallAuth(request, env);
+  if (auth.response) {
+    return auth;
+  }
+  const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+  const isReviewer = isAdmin ? true : await userHasRole(env, auth.user.id, 'reviewer');
+  if (!isReviewer) {
+    return {
+      response: townhallError(403, 'FORBIDDEN', 'Reviewer or admin role required.'),
+    };
+  }
+  return auth;
+};
+
+const townhallListTopics = async (db) => {
+  const result = await db.prepare(
+    `SELECT id, survey_slug, slug, title, description, status, created_at, updated_at
+     FROM townhall_topics
+     WHERE status = 'active'
+     ORDER BY created_at DESC`
+  ).all();
+  return result.results || [];
+};
+
+const townhallGetTopicBySlug = async (db, slug) => {
+  return db
+    .prepare(
+      `SELECT id, survey_slug, slug, title, description, status, created_at, updated_at
+       FROM townhall_topics
+       WHERE slug = ? OR survey_slug = ?
+       LIMIT 1`
+    )
+    .bind(slug, slug)
+    .first();
+};
+
+const townhallGetTopicBySurveySlug = async (db, surveySlug) => {
+  return db
+    .prepare(
+      `SELECT id, survey_slug, slug, title, description, status, created_at, updated_at
+       FROM townhall_topics
+       WHERE survey_slug = ?
+       LIMIT 1`
+    )
+    .bind(surveySlug)
+    .first();
+};
+
+const townhallCreateTopic = async (
+  db,
+  { surveyId = null, surveySlug, slug, title, description = '', status = 'active' }
+) => {
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  if (await tableColumnExists(db, 'townhall_topics', 'survey_id')) {
+    await db
+      .prepare(
+        `INSERT INTO townhall_topics
+         (id, survey_id, survey_slug, slug, title, description, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        surveyId,
+        surveySlug,
+        slug,
+        title,
+        description || null,
+        status || 'active',
+        now,
+        now
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `INSERT INTO townhall_topics
+         (id, survey_slug, slug, title, description, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        surveySlug,
+        slug,
+        title,
+        description || null,
+        status || 'active',
+        now,
+        now
+      )
+      .run();
+  }
+  return db
+    .prepare(
+      `SELECT id, survey_slug, slug, title, description, status, created_at, updated_at
+       FROM townhall_topics
+       WHERE id = ?
+       LIMIT 1`
+    )
+    .bind(id)
+    .first();
+};
+
+const townhallListStatements = async (db, topicId, limit, cursor) => {
+  const limitValue = normalizeTownhallLimit(limit);
+  const cursorValue = parseTownhallCursor(cursor);
+  const binds = [topicId];
+  let cursorSql = '';
+  if (cursorValue) {
+    cursorSql = ` AND (s.created_at < ? OR (s.created_at = ? AND s.id < ?))`;
+    binds.push(cursorValue.createdAt, cursorValue.createdAt, cursorValue.id);
+  }
+  binds.push(limitValue + 1);
+
+  const sql = `SELECT s.id, s.topic_id, s.user_id, s.body, s.tags_json, s.status, s.created_at, s.updated_at
+               FROM townhall_statements s
+               WHERE s.topic_id = ?
+                 AND s.status IN ('published', 'approved')
+                 ${cursorSql}
+               ORDER BY s.created_at DESC, s.id DESC
+               LIMIT ?`;
+
+  const result = await db.prepare(sql).bind(...binds).all();
+  const rows = result.results || [];
+  const hasMore = rows.length > limitValue;
+  const pageRows = hasMore ? rows.slice(0, limitValue) : rows;
+
+  const reactionSummaryByStatement = {};
+  if (pageRows.length) {
+    const placeholders = pageRows.map(() => '?').join(', ');
+    const reactionRows = await db
+      .prepare(
+        `SELECT statement_id, reaction_type, COUNT(*) AS count
+         FROM townhall_reactions
+         WHERE statement_id IN (${placeholders})
+         GROUP BY statement_id, reaction_type`
+      )
+      .bind(...pageRows.map((row) => row.id))
+      .all();
+    (reactionRows.results || []).forEach((row) => {
+      if (!reactionSummaryByStatement[row.statement_id]) {
+        reactionSummaryByStatement[row.statement_id] = {};
+      }
+      reactionSummaryByStatement[row.statement_id][row.reaction_type] = Number(row.count || 0);
+    });
+  }
+
+  const items = pageRows.map((row) => ({
+    id: row.id,
+    topicId: row.topic_id,
+    userId: row.user_id || null,
+    body: row.body,
+    tags: (() => {
+      try {
+        const parsed = JSON.parse(row.tags_json || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    })(),
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || null,
+    reactions: reactionSummaryByStatement[row.id] || {},
+  }));
+
+  const last = items.length ? items[items.length - 1] : null;
+  return {
+    items,
+    nextCursor: hasMore && last ? encodeTownhallCursor(last.createdAt, last.id) : null,
+  };
+};
+
+const townhallCreateStatement = async (db, topicId, userId, body, tagsJson, status = 'published') => {
+  const statementId = crypto.randomUUID();
+  const now = nowIso();
+  await db
+    .prepare(
+      `INSERT INTO townhall_statements
+       (id, topic_id, user_id, body, tags_json, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(statementId, topicId, userId || null, body, tagsJson, status, now, now)
+    .run();
+  return db
+    .prepare(
+      `SELECT id, topic_id, user_id, body, tags_json, status, created_at, updated_at
+       FROM townhall_statements
+       WHERE id = ?`
+    )
+    .bind(statementId)
+    .first();
+};
+
+const townhallSetStatementStatus = async (
+  db,
+  statementId,
+  status,
+  reviewerId,
+  reason = '',
+  moderationAction = ''
+) => {
+  if (!moderationAction) {
+    throw new Error('Moderation action is required.');
+  }
+  await db
+    .prepare(
+      `UPDATE townhall_statements
+       SET status = ?, updated_at = ?
+       WHERE id = ?`
+    )
+    .bind(status, nowIso(), statementId)
+    .run();
+  await townhallModerationAction(
+    db,
+    'statement',
+    statementId,
+    moderationAction,
+    reviewerId,
+    reason || null
+  );
+  return db
+    .prepare(
+      `SELECT id, topic_id, user_id, body, tags_json, status, created_at, updated_at
+       FROM townhall_statements
+       WHERE id = ?`
+    )
+    .bind(statementId)
+    .first();
+};
+
+const townhallReact = async (db, statementId, actorKey, reactionType) => {
+  const reactionId = crypto.randomUUID();
+  const result = await db
+    .prepare(
+      `INSERT OR IGNORE INTO townhall_reactions
+       (id, statement_id, actor_key, reaction_type, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .bind(reactionId, statementId, actorKey, reactionType, nowIso())
+    .run();
+  return {
+    statementId,
+    actorKey,
+    reactionType,
+    active: true,
+    created: Number(result?.meta?.changes || 0) > 0,
+  };
+};
+
+const townhallUnreact = async (db, statementId, actorKey, reactionType) => {
+  const result = await db
+    .prepare(
+      `DELETE FROM townhall_reactions
+       WHERE statement_id = ? AND actor_key = ? AND reaction_type = ?`
+    )
+    .bind(statementId, actorKey, reactionType)
+    .run();
+  return {
+    statementId,
+    actorKey,
+    reactionType,
+    active: false,
+    removed: Number(result?.meta?.changes || 0) > 0,
+  };
+};
+
+const townhallReport = async (db, statementId, actorKey, reason, details = null) => {
+  const reportId = crypto.randomUUID();
+  const result = await db
+    .prepare(
+      `INSERT OR IGNORE INTO townhall_reports
+       (id, statement_id, actor_key, reason, details, status, created_at)
+       VALUES (?, ?, ?, ?, ?, 'open', ?)`
+    )
+    .bind(reportId, statementId, actorKey, reason, details, nowIso())
+    .run();
+
+  const row = await db
+    .prepare(
+      `SELECT id, statement_id, actor_key, reason, details, status, created_at
+       FROM townhall_reports
+       WHERE statement_id = ? AND actor_key = ?
+       LIMIT 1`
+    )
+    .bind(statementId, actorKey)
+    .first();
+
+  return {
+    ...(row || {}),
+    created: Number(result?.meta?.changes || 0) > 0,
+  };
+};
+
+const townhallListReceipts = async (db, topicId) => {
+  const result = await db
+    .prepare(
+      `SELECT id, topic_id, title, url, note, created_at
+       FROM townhall_receipts
+       WHERE topic_id = ?
+       ORDER BY created_at DESC, id DESC`
+    )
+    .bind(topicId)
+    .all();
+  return result.results || [];
+};
+
+const townhallCreateReceipt = async (db, topicId, title, url, note, reviewerId) => {
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      `INSERT INTO townhall_receipts
+       (id, topic_id, title, url, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .bind(id, topicId, title, url || null, note || null, nowIso())
+    .run();
+  await townhallModerationAction(
+    db,
+    'receipt',
+    id,
+    'create',
+    reviewerId,
+    note || null
+  );
+  return db
+    .prepare(
+      `SELECT id, topic_id, title, url, note, created_at
+       FROM townhall_receipts
+       WHERE id = ?`
+    )
+    .bind(id)
+    .first();
+};
+
+const townhallModerationQueue = async (db, limit, cursor) => {
+  const limitValue = normalizeTownhallLimit(limit);
+  const cursorValue = parseTownhallCursor(cursor);
+
+  const statementBinds = [];
+  const reportBinds = [];
+  let statementCursorSql = '';
+  let reportCursorSql = '';
+  if (cursorValue) {
+    statementCursorSql = ` AND (s.created_at < ? OR (s.created_at = ? AND s.id < ?))`;
+    reportCursorSql = ` AND (r.created_at < ? OR (r.created_at = ? AND r.id < ?))`;
+    statementBinds.push(cursorValue.createdAt, cursorValue.createdAt, cursorValue.id);
+    reportBinds.push(cursorValue.createdAt, cursorValue.createdAt, cursorValue.id);
+  }
+  statementBinds.push(limitValue + 1);
+  reportBinds.push(limitValue + 1);
+
+  const statementRows = await db
+    .prepare(
+      `SELECT
+         'statement' AS item_type,
+         s.id AS item_id,
+         s.created_at AS created_at,
+         s.topic_id AS topic_id,
+         t.slug AS topic_slug,
+         s.user_id AS user_id,
+         s.body AS body,
+         s.status AS status
+       FROM townhall_statements s
+       JOIN townhall_topics t ON t.id = s.topic_id
+       WHERE s.status = 'pending'
+       ${statementCursorSql}
+       ORDER BY s.created_at DESC, s.id DESC
+       LIMIT ?`
+    )
+    .bind(...statementBinds)
+    .all();
+
+  const reportRows = await db
+    .prepare(
+      `SELECT
+         'report' AS item_type,
+         r.id AS item_id,
+         r.created_at AS created_at,
+         s.topic_id AS topic_id,
+         t.slug AS topic_slug,
+         r.actor_key AS actor_key,
+         r.reason AS reason,
+         r.details AS details,
+         r.status AS status,
+         r.statement_id AS statement_id
+       FROM townhall_reports r
+       JOIN townhall_statements s ON s.id = r.statement_id
+       JOIN townhall_topics t ON t.id = s.topic_id
+       WHERE r.status = 'open'
+       ${reportCursorSql}
+       ORDER BY r.created_at DESC, r.id DESC
+       LIMIT ?`
+    )
+    .bind(...reportBinds)
+    .all();
+
+  const combined = [...(statementRows.results || []), ...(reportRows.results || [])]
+    .sort((a, b) => {
+      if (a.created_at === b.created_at) {
+        return b.item_id.localeCompare(a.item_id);
+      }
+      return b.created_at.localeCompare(a.created_at);
+    });
+
+  const hasMore = combined.length > limitValue;
+  const items = hasMore ? combined.slice(0, limitValue) : combined;
+  const last = items.length ? items[items.length - 1] : null;
+
+  return {
+    items,
+    nextCursor: hasMore && last ? encodeTownhallCursor(last.created_at, last.item_id) : null,
+  };
+};
+
+const townhallModerationAction = async (db, itemType, itemId, action, reviewerId, reason = null) => {
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      `INSERT INTO townhall_moderation_actions
+       (id, item_type, item_id, action, reason, reviewer_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(id, itemType, itemId, action, reason || null, reviewerId, nowIso())
+    .run();
+  return id;
 };
 
 const checkLocalRateLimit = (map, key, limit, windowMs) => {
@@ -1663,6 +2185,14 @@ const tableExists = async (db, tableName) => {
     .bind(tableName)
     .first();
   return !!result;
+};
+
+const tableColumnExists = async (db, tableName, columnName) => {
+  if (!db) {
+    return false;
+  }
+  const result = await db.prepare(`PRAGMA table_info(${tableName})`).all();
+  return (result.results || []).some((row) => row.name === columnName);
 };
 
 const requirePasskeyTables = async (env) => {
@@ -4183,6 +4713,42 @@ const generateToken = () => crypto.randomUUID().replace(/-/g, '').slice(0, 12);
 const isLocalRequest = (url) =>
   url.hostname === 'localhost' || url.hostname === '127.0.0.1';
 
+const isLocalDevRequest = (env, url) =>
+  (env.ENVIRONMENT || '').toLowerCase() === 'local' && isLocalRequest(url);
+
+const devNotFoundResponse = () =>
+  jsonResponse(
+    {
+      ok: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Not found',
+      },
+    },
+    { status: 404 }
+  );
+
+const getCookieNamesWithLength = (request) => {
+  const cookieHeader = request.headers.get('Cookie') || '';
+  if (!cookieHeader.trim()) {
+    return [];
+  }
+  return cookieHeader
+    .split(';')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const eq = item.indexOf('=');
+      if (eq < 0) {
+        return { name: item, length: 0 };
+      }
+      const name = item.slice(0, eq).trim();
+      const value = item.slice(eq + 1);
+      return { name, length: value.length };
+    })
+    .filter((entry) => !!entry.name);
+};
+
 const getUsStates = () => [
   { code: 'AL', name: 'Alabama' },
   { code: 'AK', name: 'Alaska' },
@@ -5025,6 +5591,466 @@ export default {
       }
     }
 
+    if (pathParts[0] === 'api' && pathParts[1] === 'townhall') {
+      const townhallGuard = await requireTownhallReady(env);
+      if (townhallGuard) {
+        return townhallGuard;
+      }
+
+      if (request.method === 'GET' && pathParts[2] === 'topics' && pathParts.length === 3) {
+        try {
+          const topics = await townhallListTopics(env.DB);
+          return townhallOk({ topics });
+        } catch (error) {
+          return townhallError(500, 'TOWNHALL_TOPICS_FAILED', error.message || 'Unable to load topics.');
+        }
+      }
+
+      // curl example:
+      // curl -i -X POST http://localhost:8787/api/townhall/admin/seed-topic \
+      //   -H "content-type: application/json" \
+      //   -H "cookie: session=YOUR_SESSION_COOKIE" \
+      //   -d '{"surveySlug":"wy-health-care-costs-access-options","title":"Wyoming Health Care","description":"Town Hall for the health care survey","slug":"wy-health-care-costs-access-options"}'
+      if (
+        request.method === 'POST' &&
+        pathParts[2] === 'admin' &&
+        pathParts[3] === 'seed-topic' &&
+        pathParts.length === 4
+      ) {
+        const auth = await requireTownhallAuth(request, env);
+        if (auth.response) {
+          return auth.response;
+        }
+        const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+        if (!isAdmin) {
+          return townhallError(403, 'FORBIDDEN', 'Admin role required.');
+        }
+
+        let bodyPayload = null;
+        try {
+          bodyPayload = await parseJsonBody(request);
+        } catch (error) {
+          return townhallError(400, 'INVALID_JSON', 'Invalid JSON body.');
+        }
+
+        const surveySlug = (bodyPayload?.surveySlug || '').toString().trim();
+        const description = (bodyPayload?.description || '').toString().trim();
+
+        if (!surveySlug) {
+          return townhallError(400, 'SURVEY_SLUG_REQUIRED', 'surveySlug is required.');
+        }
+
+        const survey = await env.DB
+          .prepare(
+            `SELECT id, slug, title
+             FROM surveys
+             WHERE slug = ?
+             LIMIT 1`
+          )
+          .bind(surveySlug)
+          .first();
+        if (!survey) {
+          return townhallError(400, 'SURVEY_NOT_FOUND', 'Survey slug does not exist.');
+        }
+
+        const slug = survey.slug;
+        const title = survey.title;
+        if (!TOWNHALL_TOPIC_SLUG_PATTERN.test(slug)) {
+          return townhallError(
+            400,
+            'INVALID_SLUG',
+            'slug must contain only lowercase letters, numbers, hyphens, and underscores.'
+          );
+        }
+
+        const existingBySurveySlug = await townhallGetTopicBySurveySlug(env.DB, surveySlug);
+        const existingBySlug = await townhallGetTopicBySlug(env.DB, slug);
+        const existing = existingBySurveySlug || existingBySlug;
+        if (existing) {
+          return townhallOk(
+            { created: false, topic: existing },
+            { status: 200 }
+          );
+        }
+
+        try {
+          const createdTopic = await townhallCreateTopic(env.DB, {
+            surveyId: survey.id,
+            surveySlug,
+            slug,
+            title,
+            description,
+            status: 'active',
+          });
+          await writeAuditLog(env, request, {
+            actorUserId: auth.user.id,
+            action: 'townhall_seed_topic',
+            targetUserId: null,
+            metadata: {
+              survey_slug: surveySlug,
+              topic_id: createdTopic?.id || null,
+              topic_slug: createdTopic?.slug || slug,
+              title,
+            },
+          });
+          return townhallOk(
+            { created: true, topic: createdTopic },
+            { status: 201 }
+          );
+        } catch (error) {
+          if ((error && error.message && String(error.message).toLowerCase().includes('unique')) || false) {
+            const existingAfterRace =
+              (await townhallGetTopicBySurveySlug(env.DB, surveySlug)) ||
+              (await townhallGetTopicBySlug(env.DB, slug));
+            if (existingAfterRace) {
+              return townhallOk({ created: false, topic: existingAfterRace }, { status: 200 });
+            }
+          }
+          return townhallError(500, 'SEED_TOPIC_FAILED', error.message || 'Unable to seed topic.');
+        }
+      }
+
+      if (pathParts[2] === 'topic' && pathParts[3]) {
+        const slug = decodeURIComponent(pathParts[3]);
+        const topic = await townhallGetTopicBySlug(env.DB, slug);
+        if (!topic) {
+          return townhallError(404, 'TOPIC_NOT_FOUND', 'Town Hall topic not found.');
+        }
+
+        if (request.method === 'GET' && pathParts.length === 4) {
+          return townhallOk({ topic });
+        }
+
+        if (
+          request.method === 'GET' &&
+          pathParts[4] === 'statements' &&
+          pathParts.length === 5
+        ) {
+          try {
+            const limit = normalizeTownhallLimit(url.searchParams.get('limit'));
+            const cursor = (url.searchParams.get('cursor') || '').trim();
+            const result = await townhallListStatements(env.DB, topic.id, limit, cursor);
+            return townhallOk({
+              topic: {
+                id: topic.id,
+                slug: topic.slug,
+                surveySlug: topic.survey_slug,
+                title: topic.title,
+              },
+              statements: result.items,
+              nextCursor: result.nextCursor,
+            });
+          } catch (error) {
+            return townhallError(500, 'STATEMENTS_LIST_FAILED', error.message || 'Unable to load statements.');
+          }
+        }
+
+        if (
+          request.method === 'GET' &&
+          pathParts[4] === 'receipts' &&
+          pathParts.length === 5
+        ) {
+          try {
+            const receipts = await townhallListReceipts(env.DB, topic.id);
+            return townhallOk({ topic: { id: topic.id, slug: topic.slug }, receipts });
+          } catch (error) {
+            return townhallError(500, 'RECEIPTS_LIST_FAILED', error.message || 'Unable to load receipts.');
+          }
+        }
+
+        if (
+          request.method === 'POST' &&
+          pathParts[4] === 'statements' &&
+          pathParts.length === 5
+        ) {
+          const auth = await requireTownhallAuth(request, env);
+          if (auth.response) {
+            return auth.response;
+          }
+          const bodyPayload = await parseJsonBody(request);
+          const text = (bodyPayload.body || '').toString().trim();
+          const tags = normalizeTownhallTags(bodyPayload.tags);
+
+          if (!text) {
+            return townhallError(400, 'BODY_REQUIRED', 'Statement body is required.');
+          }
+          if (text.length > TOWNHALL_STATEMENT_MAX_LENGTH) {
+            return townhallError(
+              400,
+              'BODY_TOO_LONG',
+              `Statement body must be ${TOWNHALL_STATEMENT_MAX_LENGTH} characters or fewer.`
+            );
+          }
+          if (countUrlsInText(text) > 2) {
+            return townhallError(400, 'TOO_MANY_URLS', 'Maximum 2 URLs allowed in a statement.');
+          }
+
+          const duplicate = await env.DB
+            .prepare(
+              `SELECT id
+               FROM townhall_statements
+               WHERE topic_id = ?
+                 AND user_id = ?
+                 AND body = ?
+                 AND datetime(created_at) >= datetime('now', '-1 day')
+               LIMIT 1`
+            )
+            .bind(topic.id, auth.user.id, text)
+            .first();
+          if (duplicate) {
+            return townhallError(409, 'DUPLICATE_STATEMENT', 'Duplicate statement detected in the last 24 hours.');
+          }
+
+          const priorPublished = await env.DB
+            .prepare(
+              `SELECT COUNT(*) AS count
+               FROM townhall_statements
+               WHERE user_id = ?
+                 AND status IN ('published', 'approved')`
+            )
+            .bind(auth.user.id)
+            .first();
+          const publishCount = Number(priorPublished?.count || 0);
+          const status = publishCount > 0 ? 'published' : 'pending';
+
+          try {
+            const created = await townhallCreateStatement(
+              env.DB,
+              topic.id,
+              auth.user.id,
+              text,
+              JSON.stringify(tags),
+              status
+            );
+            return townhallOk({
+              statement: {
+                id: created.id,
+                topicId: created.topic_id,
+                userId: created.user_id,
+                body: created.body,
+                tags,
+                status: created.status,
+                createdAt: created.created_at,
+                updatedAt: created.updated_at,
+              },
+            });
+          } catch (error) {
+            return townhallError(500, 'STATEMENT_CREATE_FAILED', error.message || 'Unable to create statement.');
+          }
+        }
+
+        if (
+          request.method === 'POST' &&
+          pathParts[4] === 'receipts' &&
+          pathParts.length === 5
+        ) {
+          const auth = await requireTownhallAuth(request, env);
+          if (auth.response) {
+            return auth.response;
+          }
+          const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+          if (!isAdmin) {
+            return townhallError(403, 'FORBIDDEN', 'Admin role required.');
+          }
+
+          const bodyPayload = await parseJsonBody(request);
+          const title = (bodyPayload.title || '').toString().trim();
+          const receiptUrl = (bodyPayload.url || '').toString().trim();
+          const note = (bodyPayload.note || '').toString().trim();
+          if (!title) {
+            return townhallError(400, 'TITLE_REQUIRED', 'Receipt title is required.');
+          }
+
+          try {
+            const created = await townhallCreateReceipt(
+              env.DB,
+              topic.id,
+              title,
+              receiptUrl || null,
+              note || null,
+              auth.user.id
+            );
+            await writeAuditLog(env, request, {
+              actorUserId: auth.user.id,
+              action: 'townhall_receipt_created',
+              targetUserId: null,
+              metadata: {
+                topic_id: topic.id,
+                topic_slug: topic.slug,
+                receipt_id: created.id,
+                title,
+              },
+            });
+            return townhallOk({ receipt: created });
+          } catch (error) {
+            return townhallError(500, 'RECEIPT_CREATE_FAILED', error.message || 'Unable to create receipt.');
+          }
+        }
+      }
+
+      if (pathParts[2] === 'statements' && pathParts[3]) {
+        const statementId = decodeURIComponent(pathParts[3]);
+        const statement = await env.DB
+          .prepare(
+            `SELECT id, topic_id, status
+             FROM townhall_statements
+             WHERE id = ?
+             LIMIT 1`
+          )
+          .bind(statementId)
+          .first();
+        if (!statement) {
+          return townhallError(404, 'STATEMENT_NOT_FOUND', 'Statement not found.');
+        }
+
+        if (
+          request.method === 'POST' &&
+          pathParts[4] === 'react' &&
+          pathParts.length === 5
+        ) {
+          const auth = await requireTownhallAuth(request, env);
+          if (auth.response) {
+            return auth.response;
+          }
+          const bodyPayload = await parseJsonBody(request);
+          const reactionType = (bodyPayload.reactionType || '').toString().trim();
+          const set = bodyPayload.set;
+          if (!TOWNHALL_ALLOWED_REACTIONS.has(reactionType)) {
+            return townhallError(400, 'INVALID_REACTION', 'Invalid reaction type.');
+          }
+          if (typeof set !== 'boolean') {
+            return townhallError(400, 'INVALID_SET_FLAG', 'set must be a boolean.');
+          }
+          const actorKey = auth.user.id;
+
+          try {
+            const result = set
+              ? await townhallReact(env.DB, statementId, actorKey, reactionType)
+              : await townhallUnreact(env.DB, statementId, actorKey, reactionType);
+            return townhallOk({ reaction: result });
+          } catch (error) {
+            return townhallError(500, 'REACTION_FAILED', error.message || 'Unable to update reaction.');
+          }
+        }
+
+        if (
+          request.method === 'POST' &&
+          pathParts[4] === 'report' &&
+          pathParts.length === 5
+        ) {
+          const auth = await requireTownhallAuth(request, env);
+          if (auth.response) {
+            return auth.response;
+          }
+          const bodyPayload = await parseJsonBody(request);
+          const reason = (bodyPayload.reason || '').toString().trim();
+          const details = (bodyPayload.details || '').toString().trim();
+          if (!reason) {
+            return townhallError(400, 'REASON_REQUIRED', 'Report reason is required.');
+          }
+          try {
+            const report = await townhallReport(
+              env.DB,
+              statementId,
+              auth.user.id,
+              reason,
+              details || null
+            );
+            return townhallOk({ report });
+          } catch (error) {
+            return townhallError(500, 'REPORT_FAILED', error.message || 'Unable to file report.');
+          }
+        }
+      }
+
+      if (pathParts[2] === 'moderation') {
+        if (
+          request.method === 'GET' &&
+          pathParts[3] === 'queue' &&
+          pathParts.length === 4
+        ) {
+          const auth = await requireTownhallModerator(request, env);
+          if (auth.response) {
+            return auth.response;
+          }
+          const limit = normalizeTownhallLimit(url.searchParams.get('limit'));
+          const cursor = (url.searchParams.get('cursor') || '').trim();
+          try {
+            const queue = await townhallModerationQueue(env.DB, limit, cursor);
+            return townhallOk(queue);
+          } catch (error) {
+            return townhallError(500, 'MODERATION_QUEUE_FAILED', error.message || 'Unable to load moderation queue.');
+          }
+        }
+
+        if (
+          request.method === 'POST' &&
+          pathParts[3] === 'statement' &&
+          pathParts[4] &&
+          pathParts.length === 5
+        ) {
+          const auth = await requireTownhallModerator(request, env);
+          if (auth.response) {
+            return auth.response;
+          }
+          const statementId = decodeURIComponent(pathParts[4]);
+          const existing = await env.DB
+            .prepare(
+              `SELECT id, status
+               FROM townhall_statements
+               WHERE id = ?
+               LIMIT 1`
+            )
+            .bind(statementId)
+            .first();
+          if (!existing) {
+            return townhallError(404, 'STATEMENT_NOT_FOUND', 'Statement not found.');
+          }
+
+          const bodyPayload = await parseJsonBody(request);
+          const action = (bodyPayload.action || '').toString().trim();
+          const reason = (bodyPayload.reason || '').toString().trim();
+          const statusByAction = {
+            approve: 'published',
+            reject: 'rejected',
+            hide: 'hidden',
+            unhide: 'published',
+          };
+          const nextStatus = statusByAction[action];
+          if (!nextStatus) {
+            return townhallError(400, 'INVALID_ACTION', 'Invalid moderation action.');
+          }
+
+          try {
+            const updated = await townhallSetStatementStatus(
+              env.DB,
+              statementId,
+              nextStatus,
+              auth.user.id,
+              reason || null,
+              action
+            );
+            await writeAuditLog(env, request, {
+              actorUserId: auth.user.id,
+              action: 'townhall_statement_moderation',
+              targetUserId: updated?.user_id || null,
+              metadata: {
+                statement_id: statementId,
+                moderation_action: action,
+                new_status: nextStatus,
+                reason: reason || null,
+              },
+            });
+            return townhallOk({ statement: updated });
+          } catch (error) {
+            return townhallError(500, 'MODERATION_ACTION_FAILED', error.message || 'Unable to moderate statement.');
+          }
+        }
+      }
+
+      return townhallError(404, 'TOWNHALL_ROUTE_NOT_FOUND', 'Town Hall endpoint not found.');
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/surveys/list') {
       try {
         if (!env.DB) {
@@ -5049,6 +6075,8 @@ export default {
                   s.status,
                   s.flow_type,
                   s.flow_meta,
+                  t.slug AS townhall_topic_slug,
+                  CASE WHEN t.id IS NULL THEN 0 ELSE 1 END AS townhall_enabled,
                   v.id AS version_id,
                   v.json_hash,
                   v.json_text,
@@ -5056,6 +6084,8 @@ export default {
                   r.updated_at AS updated_at,
                   r.edit_count AS edit_count
            FROM surveys s
+           LEFT JOIN townhall_topics t
+             ON t.survey_slug = s.slug
            JOIN survey_versions v ON v.id = (
              SELECT v2.id
              FROM survey_versions v2
@@ -5097,6 +6127,8 @@ export default {
               type: row.flow_type || 'standard',
               meta: flowMeta,
             },
+            townhallTopicSlug: row.townhall_topic_slug || '',
+            townhallEnabled: !!row.townhall_enabled,
             versionId: row.version_id,
             versionHash: row.json_hash,
             response: row.submitted_at
@@ -6096,6 +7128,56 @@ export default {
       }
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/dev/whoami') {
+      if (!isLocalDevRequest(env, url)) {
+        return devNotFoundResponse();
+      }
+
+      const auth = await requireSessionUser(request, env);
+      if (auth.response) {
+        return jsonResponse({
+          ok: true,
+          data: {
+            loggedIn: false,
+          },
+        }, { headers: auth.response.headers });
+      }
+
+      const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+      const isReviewer = await userHasRole(env, auth.user.id, 'reviewer');
+
+      return jsonResponse({
+        ok: true,
+        data: {
+          loggedIn: true,
+          user: {
+            id: auth.user.id,
+            email: auth.user.email || null,
+          },
+          roles: {
+            admin: !!isAdmin,
+            reviewer: !!isReviewer,
+          },
+          cookieHint: {
+            name: 'session',
+          },
+        },
+      });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/dev/cookies') {
+      if (!isLocalDevRequest(env, url)) {
+        return devNotFoundResponse();
+      }
+
+      return jsonResponse({
+        ok: true,
+        data: {
+          cookies: getCookieNamesWithLength(request),
+        },
+      });
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/dev/seed-results') {
       // Local-only endpoint to seed test data across WY districts
       try {
@@ -6476,8 +7558,22 @@ export default {
       }
 
       const slug = decodeURIComponent(pathParts[1]);
+      let townhallLinkHtml = '<p class="helper-text">Town Hall discussion is not enabled for this survey yet.</p>';
+      if (env.DB && (await tableExists(env.DB, 'townhall_topics'))) {
+        const townhallTopic = await townhallGetTopicBySurveySlug(env.DB, slug);
+        if (townhallTopic) {
+          townhallLinkHtml = `
+        <p>
+          <a class="button button--small button--secondary" href="/townhall/topic.html?slug=${encodeURIComponent(
+            townhallTopic.slug || townhallTopic.survey_slug || slug
+          )}">Discuss this topic</a>
+        </p>
+      `;
+        }
+      }
       const bodyHtml = `
         <h1 id="surveyjs-title">Survey</h1>
+        ${townhallLinkHtml}
         <p class="helper-text is-hidden" id="surveyjs-editing"></p>
         <p class="helper-text" id="surveyjs-status">Loading survey...</p>
         <div id="surveyjs-root" data-slug="${escapeHtml(slug)}"></div>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Town Hall Topic | Grassroots Movement</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <div data-include="/partials/header.html"></div>
+    <main>
+      <p><a class="link-button" href="/townhall/">Back to Town Hall topics</a></p>
+      <h1 id="topic-title">Town Hall topic</h1>
+      <p class="helper-text" id="topic-description"></p>
+      <p class="form-error is-hidden" id="topic-error" role="alert"></p>
+      <section class="card is-hidden" id="topic-missing">
+        <h2 id="topic-missing-title">Town Hall not enabled yet</h2>
+        <p id="topic-missing-body">This survey does not have a Town Hall topic yet.</p>
+        <p class="card__actions">
+          <a class="button button--small button--secondary" href="/surveys/list/">Back to surveys list</a>
+          <a class="button button--small button--secondary" href="/townhall/">Town Hall home</a>
+        </p>
+        <p class="card__actions">
+          <button class="button button--small is-hidden" id="enable-topic-btn" type="button">
+            Enable Town Hall for this survey
+          </button>
+        </p>
+        <p class="form-error is-hidden" id="enable-topic-error" role="alert"></p>
+      </section>
+
+      <section class="townhall-layout">
+        <div class="townhall-main">
+          <section class="card is-hidden" id="compose-card">
+            <h2>Add your statement</h2>
+            <form id="compose-form" class="survey-form" novalidate>
+              <div class="form-row">
+                <label for="statement-body">Statement</label>
+                <textarea id="statement-body" maxlength="600" required></textarea>
+              </div>
+              <div class="form-row">
+                <label for="statement-tags">Tags (optional, comma separated)</label>
+                <input id="statement-tags" type="text" maxlength="120" placeholder="costs, access" />
+              </div>
+              <p class="form-error is-hidden" id="compose-error" role="alert"></p>
+              <p class="helper-text is-hidden" id="compose-success"></p>
+              <button class="button button--small" type="submit" id="compose-submit">Post statement</button>
+            </form>
+          </section>
+
+          <section class="card" id="sign-in-card">
+            <h2>Join the discussion</h2>
+            <p class="helper-text">
+              Sign in to post statements, react, and report.
+              <button class="link-button" type="button" data-auth-open>Sign in</button>
+            </p>
+          </section>
+
+          <section>
+            <h2>Statements</h2>
+            <div id="statements-feed" class="townhall-feed"></div>
+            <p class="helper-text is-hidden" id="feed-empty">No statements yet.</p>
+            <p class="form-error is-hidden" id="feed-error" role="alert"></p>
+            <button class="button button--small button--secondary is-hidden" id="load-more" type="button">
+              Load more
+            </button>
+          </section>
+        </div>
+
+        <aside class="townhall-side">
+          <section class="card">
+            <h2>Receipts</h2>
+            <div id="receipts-list"></div>
+            <p class="helper-text is-hidden" id="receipts-empty">No receipts published yet.</p>
+            <p class="form-error is-hidden" id="receipts-error" role="alert"></p>
+          </section>
+        </aside>
+      </section>
+    </main>
+    <div data-include="/partials/footer.html"></div>
+    <script src="/js/include-partials.js"></script>
+    <script src="/townhall/townhall-topic.js"></script>
+  </body>
+</html>

@@ -21,6 +21,10 @@ const surveySources = {
     slug: 'wy-household-economic-outlook',
     file: 'surveys/surveys_wy_household_economic_outlook_v1.jsonc',
   },
+  'wy-health-care-costs-access-options-v1': {
+    slug: 'wy-health-care-costs-access-options',
+    file: 'surveys/surveys_wy_health_care_costs_access_options_v1.jsonc',
+  },
 };
 
 const parseArgs = (argv) => {
@@ -152,7 +156,18 @@ const loadSurvey = (source) => {
   };
 };
 
-const buildSql = ({ slug, title, version, flowType, flowMeta, jsonText, jsonHash, publish, changelog }) => {
+const buildSql = ({
+  slug,
+  title,
+  version,
+  flowType,
+  flowMeta,
+  jsonText,
+  jsonHash,
+  publish,
+  changelog,
+  topicId,
+}) => {
   const publishedAt = publish ? "datetime('now')" : 'NULL';
   const flowMetaValue = flowMeta ? `'${flowMeta.replace(/'/g, "''")}'` : 'NULL';
   return `
@@ -190,6 +205,40 @@ ON CONFLICT(survey_id, version) DO UPDATE SET
   json_hash = excluded.json_hash,
   changelog = excluded.changelog,
   published_at = ${publishedAt};
+
+INSERT OR IGNORE INTO townhall_topics (
+  id,
+  survey_id,
+  survey_slug,
+  slug,
+  title,
+  description,
+  status,
+  created_at,
+  updated_at
+)
+SELECT
+  '${topicId}',
+  id,
+  slug,
+  slug,
+  title,
+  '',
+  'active',
+  datetime('now'),
+  datetime('now')
+FROM surveys
+WHERE slug = '${slug.replace(/'/g, "''")}';
+
+UPDATE townhall_topics
+SET survey_id = (SELECT id FROM surveys WHERE slug = '${slug.replace(/'/g, "''")}'),
+    survey_slug = '${slug.replace(/'/g, "''")}',
+    slug = '${slug.replace(/'/g, "''")}',
+    title = '${title.replace(/'/g, "''")}',
+    status = 'active',
+    updated_at = datetime('now')
+WHERE survey_slug = '${slug.replace(/'/g, "''")}'
+   OR survey_id = (SELECT id FROM surveys WHERE slug = '${slug.replace(/'/g, "''")}');
 `;
 };
 
@@ -246,7 +295,7 @@ const main = () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'survey-seed-'));
   const sqlFile = path.join(tempDir, `seed-surveys-${Date.now()}.sql`);
 
-  let sql = '-- Auto-generated seed file from JSONC sources\n';
+  let sql = '-- Auto-generated seed file from JSONC sources\nBEGIN TRANSACTION;\n';
 
   targets.forEach((source) => {
     const survey = loadSurvey(source);
@@ -260,11 +309,14 @@ const main = () => {
       jsonHash: survey.jsonHash,
       publish,
       changelog,
+      topicId: crypto.randomUUID(),
     });
     console.log(
       `Prepared ${survey.slug} v${version} hash ${survey.jsonHash} length ${survey.jsonText.length}`
     );
   });
+
+  sql += '\nCOMMIT;\n';
 
   fs.writeFileSync(sqlFile, sql);
   runWrangler({ dbName, local: dbTarget === 'local', sqlFile, envName });

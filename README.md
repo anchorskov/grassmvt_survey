@@ -3,6 +3,8 @@
 
 A no-build static site intended for deployment from `/public` to Cloudflare Pages.
 
+See `AGENTS.md` for repo-specific guidance for coding agents and update workflows.
+
 ## Quick start
 
 ```bash
@@ -173,10 +175,21 @@ curl -s https://grassmvtsurvey-production.anchorskov.workers.dev/api/auth/turnst
 
 ## JSONC survey seeding
 
-Survey definitions live in JSONC files at repo root:
+Survey definitions live in `surveys/` and are seeded via a registry in
+`scripts/seed-surveys-from-jsonc.mjs` (`surveySources`).
 
-- `surveys_abortion_v1.jsonc`
-- `surveys_survey_process_v1.jsonc`
+Current sources:
+
+- `surveys/surveys_abortion_v2.jsonc`
+- `surveys/surveys_wy_public_school_funding_2026_v2.jsonc`
+- `surveys/surveys_wy_household_economic_outlook_v1.jsonc`
+
+To add a new survey:
+
+1. Create a new JSONC file under `surveys/` using the pattern
+   `surveys_<slug>_v<version>.jsonc`.
+2. Add it to `surveySources` in `scripts/seed-surveys-from-jsonc.mjs`.
+3. Seed with `--slug=<registry-key>` or `--slug=all`.
 
 Seed from JSONC into D1:
 
@@ -199,8 +212,10 @@ wrangler d1 execute wy_local --command "SELECT s.slug, v.version, length(v.json_
 Confirm the survey loads:
 
 - `http://localhost:8787/surveys/abortion`
-- `http://localhost:8787/surveys/survey-process`
+- `http://localhost:8787/surveys/wy-public-school-funding-2026`
+- `http://localhost:8787/surveys/wy-household-economic-outlook`
 
 ## Seed artifacts
 
-The root `seed-*.sql` files are deprecated and kept only for reference. Use the JSONC seed script above.
+Legacy SQL/setup artifacts are archived under `surveys/archive/`. Use the JSONC
+seed script above.

@@ -1,0 +1,150 @@
+Project snapshot generated from repo root: /home/anchor/projects/grassmvt_survey
+Date reviewed: 2026-03-15
+
+Top-level structure
+- db/
+  - migrations/
+- docs/
+  - archive/
+  - survey/
+- public/
+  - account/
+    - districts/
+    - location/
+  - admin/
+  - auth/
+    - email-verify/
+    - login/
+    - password-reset/
+    - signup/
+  - bias/
+  - credits/
+  - css/
+    - site.css
+    - surveyjs.css
+  - data/
+    - surveys.json
+    - wy_voter_registration_snapshots.json
+  - donate/
+  - js/
+    - auth/
+    - include-partials.js
+    - survey-results.js
+    - survey-take.js
+    - surveys-list.js
+    - surveys-render.js
+  - open-source/
+  - partials/
+    - footer.html
+    - header.html
+    - support-skovgard.html
+  - public/
+    - surveys/
+  - security/
+  - surveys/
+    - index.html
+    - list/
+      - index.html
+    - results/
+      - index.html
+  - templates/
+    - survey_template.md
+  - townhall/
+  - verify-voter/
+  - wy/
+    - surveys/
+- scripts/
+  - test/
+- src/
+  - lib/
+  - server/
+    - email/
+  - surveyjs-app.js
+  - worker.js
+- surveys/
+  - archive/
+
+Likely files for survey landing page, layout, buttons, CSS, JS, templates, partials, routes, components
+- public/index.html
+- public/css/site.css
+- public/js/include-partials.js
+- public/partials/header.html
+- public/partials/footer.html
+- public/surveys/index.html
+- public/surveys/list/index.html
+- public/js/surveys-list.js
+- public/surveys/results/index.html
+- public/js/survey-results.js
+- public/js/survey-take.js
+- public/data/surveys.json
+- public/templates/survey_template.md
+- src/worker.js
+
+Files containing requested strings
+- "Take a Survey"
+  - public/index.html
+- "View Results"
+  - public/index.html
+  - public/js/surveys-list.js
+- "Enter basic info"
+  - public/index.html
+- "Verify participation"
+  - public/index.html
+- "Submit, receive a receipt"
+  - public/index.html
+
+Likely entry points
+- HTML/templates
+  - public/index.html
+  - public/surveys/index.html
+  - public/surveys/list/index.html
+  - public/surveys/results/index.html
+  - public/templates/survey_template.md
+- CSS
+  - public/css/site.css
+  - public/css/surveyjs.css
+- JS
+  - public/js/include-partials.js
+  - public/js/surveys-list.js
+  - public/js/survey-results.js
+  - public/js/survey-take.js
+- Route/renderer
+  - src/worker.js
+
+Files inspected
+- public/index.html
+- public/css/site.css
+- public/js/include-partials.js
+- public/partials/header.html
+- public/partials/footer.html
+- public/surveys/index.html
+- public/surveys/list/index.html
+- public/js/surveys-list.js
+- public/surveys/results/index.html
+- public/js/survey-results.js
+- public/js/survey-take.js
+- public/data/surveys.json
+- src/worker.js
+
+Survey page logic flow review
+- The landing page loads from public/index.html and pulls shared header/footer markup with public/js/include-partials.js. The top action controls are rendered directly in public/index.html, not injected by JavaScript.
+- "Take a Survey" and "View Results" on the landing page are anchor links (`<a>`), not `<button>` elements. They link to /surveys/list/ and /surveys/results/?slug=abortion.
+- The full-width behavior was caused by the landing-page container in public/css/site.css: `.hero-actions` used `display: flex` with `flex-direction: column`. In a column flex container, child flex items stretch across the cross-axis by default, so the anchor elements appeared as full-width bars even though `.button` itself is `display: inline-block`.
+- The survey list page is public/surveys/list/index.html. It loads public/js/surveys-list.js, which checks auth, requests /api/scope/start and /api/auth/me, then loads survey data from /api/surveys/list and public/data/surveys.json. Survey cards render action anchors for starting a survey, viewing results, and discussing the topic.
+- The survey results page is public/surveys/results/index.html plus public/js/survey-results.js. Results are filtered client-side by slug from the query string or `/surveys/results/<slug>` path.
+- Survey take pages are rendered dynamically by src/worker.js for `/surveys/<slug>` and `/surveys/take/<slug>`. The former serves the SurveyJS app shell; the latter renders the older markdown/template-based take flow and loads public/js/survey-take.js.
+- The three lower pills on the landing page were already non-clickable spans in public/index.html. They are decorative/process indicators, not anchors and not wired to section targets. They were not broken controls, but their pill styling could read as clickable chips without any step cue.
+
+Exact files changed
+- public/index.html
+- public/css/site.css
+- project_snapshot.txt
+
+Short explanation of the UI fix
+- Scoped the homepage action layout to `.survey-home .hero-actions` so the two top controls render as compact inline buttons, wrap when needed, and keep the helper text on its own line.
+- Kept shared `.button` styles unchanged so survey list cards, auth modals, and other buttons are unaffected.
+- Restyled the three lower pills as explicit numbered step indicators on the homepage only, keeping them non-clickable.
+
+Remaining issues found
+- The landing-page "View Results" link is hard-coded to `?slug=abortion` in public/index.html, so it always opens that survey’s results rather than the newest or primary active survey.
+- public/surveys/index.html still uses a meta refresh redirect to /surveys/list/; that is functional, but it is a minimal redirect page rather than a real entry screen.
