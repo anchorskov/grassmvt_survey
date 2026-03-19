@@ -1,0 +1,226 @@
+// surveys/surveys_infrastructure_and_daily_systems_v1.jsonc
+// slug: infrastructure-and-daily-systems
+// version: v1 | 2026-03-19
+// title: Infrastructure & Transportation
+{
+  "title": "Infrastructure & Transportation",
+  "description": "Understand whether roads, travel, and connectivity support daily life or create barriers.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "infrastructure",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "overall_condition",
+      "title": "Section 1: Overall condition",
+      "description": "How infrastructure feels in your daily life.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "infrastructure_condition",
+          "title": "1. How would you rate infrastructure where you live (roads, utilities, services)?",
+          "isRequired": true,
+          "choices": [
+            "Excellent",
+            "Good",
+            "Mixed",
+            "Poor",
+            "Very poor",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "infrastructure_change",
+          "title": "2. Compared to one year ago, infrastructure in your area is:",
+          "isRequired": true,
+          "choices": [
+            "Improving",
+            "About the same",
+            "Worsening",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "transportation",
+      "title": "Section 2: Transportation",
+      "description": "Travel and movement in daily life.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "travel_ease",
+          "title": "3. How easy is it to travel where you need to go (work, school, services)?",
+          "isRequired": true,
+          "choices": [
+            "Very easy",
+            "Mostly easy",
+            "Difficult",
+            "Very difficult",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "travel_time",
+          "title": "4. How much time do you typically spend traveling for essential needs?",
+          "isRequired": true,
+          "choices": [
+            "Less than 15 minutes",
+            "15-30 minutes",
+            "30-60 minutes",
+            "1-2 hours",
+            "More than 2 hours",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "road_conditions",
+      "title": "Section 3: Roads and maintenance",
+      "description": "Condition and reliability of roads.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "road_quality",
+          "title": "5. How would you rate the condition of roads where you live?",
+          "isRequired": true,
+          "choices": [
+            "Excellent",
+            "Good",
+            "Mixed",
+            "Poor",
+            "Very poor",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "seasonal_reliability",
+          "title": "6. How reliable are roads during weather or seasonal conditions?",
+          "isRequired": true,
+          "choices": [
+            "Very reliable",
+            "Mostly reliable",
+            "Unreliable at times",
+            "Frequently unreliable",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "access_to_services",
+      "title": "Section 4: Access to services",
+      "description": "Distance and access to key services.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "access_services",
+          "title": "7. How easy is it to access essential services (health care, groceries, schools)?",
+          "isRequired": true,
+          "choices": [
+            "Very easy",
+            "Mostly easy",
+            "Difficult",
+            "Very difficult",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "distance_services",
+          "title": "8. How far do you typically travel for essential services?",
+          "isRequired": true,
+          "choices": [
+            "Within my community",
+            "Within 30 minutes",
+            "30-60 minutes",
+            "More than 1 hour",
+            "More than 2 hours",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "connectivity",
+      "title": "Section 5: Connectivity",
+      "description": "Internet and communication access.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "internet_quality",
+          "title": "9. How reliable is your internet or data connection?",
+          "isRequired": true,
+          "choices": [
+            "Very reliable",
+            "Mostly reliable",
+            "Unreliable at times",
+            "Frequently unreliable",
+            "No reliable access",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "connectivity_limits",
+          "title": "10. Does connectivity limit your ability to work, learn, or access services?",
+          "isRequired": true,
+          "choices": [
+            "Yes, significantly",
+            "Yes, somewhat",
+            "No",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "solutions",
+      "title": "Section 6: What would help most",
+      "description": "Improvements that would make the biggest difference.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "infrastructure_solutions",
+          "title": "11. Which improvements would help most right now? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Road repairs and maintenance",
+            "Better winter or seasonal road support",
+            "Improved local transportation options",
+            "Closer access to services",
+            "Better internet or broadband",
+            "Infrastructure investment",
+            "Utility reliability",
+            "Other"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "comment",
+          "name": "one_change_infrastructure",
+          "title": "12. If one thing could improve infrastructure where you live, what would it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

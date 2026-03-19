@@ -1,0 +1,206 @@
+// surveys/surveys_community_and_belonging_v1.jsonc
+// slug: community-and-belonging
+// version: v1 | 2026-03-19
+// title: Community Voice & Shared Direction
+{
+  "title": "Community Voice & Shared Direction",
+  "description": "Understand whether people share a sense of direction and are willing to move forward together.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "shared-direction",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "direction",
+      "title": "Section 1: Direction",
+      "description": "Where things feel like they are heading.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "community_direction",
+          "title": "1. Do you feel your community is heading in the right direction?",
+          "isRequired": true,
+          "choices": [
+            "Yes, clearly",
+            "Somewhat",
+            "Not really",
+            "Not at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "country_direction",
+          "title": "2. Do you feel the country is heading in the right direction?",
+          "isRequired": true,
+          "choices": [
+            "Yes, clearly",
+            "Somewhat",
+            "Not really",
+            "Not at all",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "priorities",
+      "title": "Section 2: Priorities",
+      "description": "What matters most right now.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "top_priorities",
+          "title": "3. What are the top priorities right now? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Cost of living",
+            "Housing",
+            "Jobs and income",
+            "Health care",
+            "Education and training",
+            "Local economy",
+            "Community safety",
+            "Infrastructure",
+            "Trust in leadership",
+            "Other"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "unity",
+      "title": "Section 3: Working together",
+      "description": "Ability to move forward together.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "work_together",
+          "title": "4. Do you believe people with different views can work together to solve problems?",
+          "isRequired": true,
+          "choices": [
+            "Yes, definitely",
+            "Possibly",
+            "Unlikely",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "division_trend",
+          "title": "5. Is division getting better or worse?",
+          "isRequired": true,
+          "choices": [
+            "Improving",
+            "About the same",
+            "Getting worse",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "problem_solving",
+      "title": "Section 4: Solving problems",
+      "description": "Openness to practical solutions.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "open_to_solutions",
+          "title": "6. Do you feel people are open to practical solutions?",
+          "isRequired": true,
+          "choices": [
+            "Yes, very open",
+            "Somewhat",
+            "Not very open",
+            "Not at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "blocks_progress",
+          "title": "7. What most blocks progress? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Lack of trust",
+            "Poor communication",
+            "Conflicting priorities",
+            "Lack of leadership",
+            "Too much complexity",
+            "Lack of accountability",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "personal_role",
+      "title": "Section 5: Personal role",
+      "description": "Willingness to engage.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "want_involvement",
+          "title": "8. Do you want to be more involved in shaping your community's future?",
+          "isRequired": true,
+          "choices": [
+            "Yes, definitely",
+            "Possibly",
+            "Not right now",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "ways_to_participate",
+          "title": "9. How would you be willing to participate? Select all that apply.",
+          "isRequired": false,
+          "choices": [
+            "Sharing ideas",
+            "Attending events",
+            "Volunteering",
+            "Helping organize",
+            "Providing feedback online",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "vision",
+      "title": "Section 6: Looking ahead",
+      "description": "What a better future looks like.",
+      "elements": [
+        {
+          "type": "comment",
+          "name": "better_future",
+          "title": "10. What does a better future for your community look like?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

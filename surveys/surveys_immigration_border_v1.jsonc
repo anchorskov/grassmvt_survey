@@ -1,0 +1,224 @@
+// surveys/surveys_immigration_border_v1.jsonc
+// slug: immigration-border
+// version: v1 | 2026-03-19
+// title: Immigration & Border System
+{
+  "title": "Immigration & Border System",
+  "description": "Understand perspectives on border security, legal pathways, and the role of immigration in our communities.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "immigration-border",
+    "estimated_minutes": 6,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "baseline",
+      "title": "Section 1: Overall direction",
+      "description": "Your general view of the current system.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "system_direction",
+          "title": "1. How well is the current immigration system working?",
+          "isRequired": true,
+          "choices": [
+            "Very well",
+            "Somewhat well",
+            "Not very well",
+            "Not working at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "priority_focus",
+          "title": "2. What should be the top priority?",
+          "isRequired": true,
+          "choices": [
+            "Strengthening border security",
+            "Expanding legal immigration pathways",
+            "Enforcing existing laws",
+            "Reforming the entire system",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "border_security",
+      "title": "Section 2: Border security",
+      "description": "Managing entry at the border.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "border_security_level",
+          "title": "3. How strong should border enforcement be?",
+          "isRequired": true,
+          "choices": [
+            "Very strong enforcement",
+            "Balanced enforcement with humanitarian considerations",
+            "Moderate enforcement",
+            "Reduced enforcement",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "border_tools",
+          "title": "4. Which tools should be used? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Physical barriers",
+            "Technology and surveillance",
+            "Increased staffing",
+            "International cooperation",
+            "Legal processing improvements",
+            "None of these",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "legal_pathways",
+      "title": "Section 3: Legal pathways",
+      "description": "Entry through legal systems.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "legal_immigration_expansion",
+          "title": "5. Should legal immigration pathways be expanded?",
+          "isRequired": true,
+          "choices": [
+            "Yes, significantly",
+            "Yes, somewhat",
+            "No change",
+            "Reduce legal immigration",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "worker_programs",
+          "title": "6. How important are worker visa programs to the economy?",
+          "isRequired": true,
+          "choices": [
+            "Very important",
+            "Important",
+            "Somewhat important",
+            "Not important",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "enforcement_inside",
+      "title": "Section 4: Enforcement inside the country",
+      "description": "Handling immigration status within communities.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "internal_enforcement",
+          "title": "7. How should enforcement be handled within communities?",
+          "isRequired": true,
+          "choices": [
+            "Strict enforcement and removal",
+            "Case-by-case approach",
+            "Focus on serious offenses only",
+            "Minimal enforcement",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "long_term_residents",
+          "title": "8. How should long-term undocumented residents be handled?",
+          "isRequired": true,
+          "choices": [
+            "Pathway to legal status",
+            "Temporary status without full citizenship",
+            "Maintain current status",
+            "Require departure",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "community_impact",
+      "title": "Section 5: Community and economy",
+      "description": "Impact on local communities.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "economic_impact",
+          "title": "9. What is the overall economic impact of immigration?",
+          "isRequired": true,
+          "choices": [
+            "Mostly positive",
+            "Somewhat positive",
+            "Neutral",
+            "Somewhat negative",
+            "Mostly negative",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "community_effect",
+          "title": "10. How does immigration affect local communities?",
+          "isRequired": true,
+          "choices": [
+            "Strengthens communities",
+            "Mixed impact",
+            "Strains resources",
+            "Varies by location",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "future",
+      "title": "Section 6: Direction forward",
+      "description": "Long-term structure.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "system_goal",
+          "title": "11. What should the long-term goal be?",
+          "isRequired": true,
+          "choices": [
+            "Secure borders with expanded legal pathways",
+            "Strict enforcement-focused system",
+            "Flexible, needs-based system",
+            "Comprehensive reform",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "one_change_immigration",
+          "title": "12. If one change would improve the system, what should it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

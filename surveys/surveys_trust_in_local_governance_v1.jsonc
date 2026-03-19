@@ -1,0 +1,214 @@
+// surveys/surveys_trust_in_local_governance_v1.jsonc
+// slug: trust-in-local-governance
+// version: v1 | 2026-03-19
+// title: Trust, Accountability & Representation
+{
+  "title": "Trust, Accountability & Representation",
+  "description": "Understand whether people feel heard, represented, and able to trust the systems that make decisions affecting their lives.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "trust-and-representation",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "representation",
+      "title": "Section 1: Feeling represented",
+      "description": "Whether leadership reflects your concerns.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "feel_represented",
+          "title": "1. Do you feel represented by people making decisions that affect your life?",
+          "isRequired": true,
+          "choices": [
+            "Yes, strongly",
+            "Somewhat",
+            "Not really",
+            "Not at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "leaders_understand",
+          "title": "2. Do you feel leaders understand the challenges people face in your community?",
+          "isRequired": true,
+          "choices": [
+            "Yes, clearly",
+            "Somewhat",
+            "Not really",
+            "Not at all",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "trust",
+      "title": "Section 2: Trust",
+      "description": "Confidence in institutions and leadership.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "trust_in_leadership",
+          "title": "3. How much do you trust leadership to act in the public interest?",
+          "isRequired": true,
+          "choices": [
+            "A great deal",
+            "Some",
+            "A little",
+            "None",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "trust_trend",
+          "title": "4. Compared to a few years ago, your level of trust is:",
+          "isRequired": true,
+          "choices": [
+            "Higher",
+            "About the same",
+            "Lower",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "accountability",
+      "title": "Section 3: Accountability",
+      "description": "Whether decisions are explained and leaders are held responsible.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "leaders_accountable",
+          "title": "5. Do you believe leaders are held accountable for their decisions?",
+          "isRequired": true,
+          "choices": [
+            "Yes, clearly",
+            "Somewhat",
+            "Not really",
+            "Not at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "decision_transparency",
+          "title": "6. How clear and transparent are decisions that affect your community?",
+          "isRequired": true,
+          "choices": [
+            "Very clear",
+            "Somewhat clear",
+            "Unclear",
+            "Very unclear",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "voice",
+      "title": "Section 4: Voice and participation",
+      "description": "Whether people feel their voice matters.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "voice_matters",
+          "title": "7. Do you feel your voice matters in decisions that affect your life?",
+          "isRequired": true,
+          "choices": [
+            "Yes, strongly",
+            "Somewhat",
+            "Not really",
+            "Not at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "attempted_engagement",
+          "title": "8. Have you tried to engage or speak up about an issue in the past year?",
+          "isRequired": true,
+          "choices": [
+            "Yes, multiple times",
+            "Yes, once",
+            "No",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "barriers",
+      "title": "Section 5: Barriers to engagement",
+      "description": "What prevents participation.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "engagement_barriers",
+          "title": "9. What prevents people from participating or being heard? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Lack of time",
+            "Lack of information",
+            "Feeling it will not make a difference",
+            "Complex processes",
+            "Lack of access to leaders",
+            "Fear of backlash",
+            "Not interested",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "solutions",
+      "title": "Section 6: What would improve trust",
+      "description": "Changes that would strengthen trust and accountability.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "trust_solutions",
+          "title": "10. Which changes would most improve trust and representation? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Clear communication",
+            "Greater transparency",
+            "More direct access to leaders",
+            "Stronger accountability measures",
+            "More opportunities for input",
+            "Simpler participation processes",
+            "Regular community engagement",
+            "Other"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "comment",
+          "name": "one_change_trust",
+          "title": "11. If one thing could improve trust or representation where you live, what would it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

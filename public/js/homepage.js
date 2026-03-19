@@ -9,6 +9,7 @@
   const accountTitle = document.getElementById('landing-account-title');
   const accountMessage = document.getElementById('landing-account-message');
   const accountActions = document.getElementById('landing-account-actions');
+  const pathChooser = document.getElementById('landing-path-chooser');
   let continueTitle = null;
   let continueQuestion = null;
   let continueBody = null;
@@ -19,7 +20,8 @@
     !cardTemplate ||
     !accountTitle ||
     !accountMessage ||
-    !accountActions
+    !accountActions ||
+    !pathChooser
   ) {
     return;
   }
@@ -61,6 +63,9 @@
       element.setAttribute('data-auth-open', config.authOpen);
     } else if (config.href) {
       element.href = config.href;
+      if (config.surveyChooserToggle) {
+        element.setAttribute('data-survey-chooser-toggle', '');
+      }
     } else {
       return null;
     }
@@ -78,7 +83,7 @@
       body: 'Start with a survey, finish in minutes, and keep your receipt.',
       imagePath: '/assets/cards/survey.webp',
       tint: '#efe5d8',
-      primary: { label: 'Browse surveys', href: '/surveys/list/' },
+      primary: { label: 'Browse surveys', href: '/surveys/list/', surveyChooserToggle: true },
       secondary: { label: 'Review results', href: '/surveys/results/' },
     },
     {
@@ -177,6 +182,20 @@
   };
 
   renderLandingCards();
+
+  const openPathChooser = () => {
+    pathChooser.classList.remove('is-hidden');
+    pathChooser.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  document.addEventListener('click', (event) => {
+    const trigger = event.target instanceof Element ? event.target.closest('[data-survey-chooser-toggle]') : null;
+    if (!trigger) {
+      return;
+    }
+    event.preventDefault();
+    openPathChooser();
+  });
 
   const setSignedOutState = () => {
     accountTitle.textContent = 'Create a free account';

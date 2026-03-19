@@ -1,0 +1,302 @@
+// surveys/surveys_housing_v1.jsonc
+// slug: housing
+// version: v1 | 2026-03-19
+// title: Housing Stability
+{
+  "title": "Housing Stability",
+  "description": "Understand whether housing is stable, affordable, and workable where you live.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "housing",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "snapshot",
+      "title": "Section 1: Housing situation",
+      "description": "A quick look at your current housing.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "housing_type",
+          "title": "1. What best describes your current housing situation?",
+          "isRequired": true,
+          "choices": [
+            "Own home",
+            "Rent",
+            "Living with family or friends",
+            "Temporary or unstable housing",
+            "Other",
+            "Prefer not to answer"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "radiogroup",
+          "name": "housing_security",
+          "title": "2. How secure does your housing feel right now?",
+          "isRequired": true,
+          "choices": [
+            "Very secure",
+            "Mostly secure",
+            "Uncertain",
+            "At risk",
+            "Not secure",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cost_pressure",
+      "title": "Section 2: Cost pressure",
+      "description": "How housing costs affect your situation.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "income_share_housing",
+          "title": "3. About how much of your income goes toward housing?",
+          "isRequired": true,
+          "choices": [
+            "Less than 25%",
+            "25-40%",
+            "40-60%",
+            "Over 60%",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "housing_cost_change",
+          "title": "4. Over the past year, your housing costs have:",
+          "isRequired": true,
+          "choices": [
+            "Increased significantly",
+            "Increased somewhat",
+            "Stayed about the same",
+            "Decreased",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tradeoffs",
+      "title": "Section 3: Tradeoffs",
+      "description": "Adjustments made to maintain housing.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "housing_tradeoffs",
+          "title": "5. Have you made any of these changes due to housing costs? Select all that apply.",
+          "isRequired": true,
+          "choices": [
+            "Delayed moving due to cost",
+            "Taken on roommates",
+            "Moved to a less desirable area",
+            "Stayed in a situation that is not working",
+            "Reduced spending on other essentials",
+            "None of these"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "housing_compromise",
+          "title": "6. What has been the biggest compromise in your housing situation?",
+          "isRequired": true,
+          "choices": [
+            "Location",
+            "Quality or condition",
+            "Space",
+            "Stability",
+            "Affordability",
+            "No major compromise",
+            "Other",
+            "Not sure"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "mobility",
+      "title": "Section 4: Mobility and options",
+      "description": "Whether better options are available.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "could_move",
+          "title": "7. If you needed to move, could you afford to?",
+          "isRequired": true,
+          "choices": [
+            "Yes, easily",
+            "Possibly",
+            "Difficult",
+            "Not realistic",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "local_options",
+          "title": "8. Are there better housing options available where you live?",
+          "isRequired": true,
+          "choices": [
+            "Yes, many options",
+            "Some options",
+            "Very limited options",
+            "No realistic options",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "future",
+      "title": "Section 5: Looking ahead",
+      "description": "Future stability and concerns.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "future_housing_confidence",
+          "title": "9. How confident are you in your housing situation over the next 1-2 years?",
+          "isRequired": true,
+          "choices": [
+            "Very confident",
+            "Somewhat confident",
+            "Uncertain",
+            "Worried",
+            "Very worried",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "primary_housing_concern",
+          "title": "10. What concerns you most about housing going forward?",
+          "isRequired": true,
+          "choices": [
+            "Rising costs",
+            "Availability",
+            "Stability",
+            "Quality of housing",
+            "Location constraints",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "solutions",
+      "title": "Section 6: What would help",
+      "description": "What changes would improve your housing situation.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "housing_solutions",
+          "title": "11. Which changes would help you most right now? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Lower rent or home prices",
+            "More available housing",
+            "More stable payments",
+            "Easier financing or loans",
+            "Better local development",
+            "Support for first-time buyers or renters",
+            "Other"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "comment",
+          "name": "one_change_housing",
+          "title": "12. If one thing could improve your housing situation immediately, what would it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_background",
+      "title": "Optional background",
+      "description": "Helps interpret results without identifying you personally.",
+      "elements": [
+        {
+          "type": "dropdown",
+          "name": "state",
+          "title": "13. State",
+          "isRequired": false,
+          "choices": [
+            "Alabama",
+            "Alaska",
+            "Arizona",
+            "Arkansas",
+            "California",
+            "Colorado",
+            "Connecticut",
+            "Delaware",
+            "District of Columbia",
+            "Florida",
+            "Georgia",
+            "Hawaii",
+            "Idaho",
+            "Illinois",
+            "Indiana",
+            "Iowa",
+            "Kansas",
+            "Kentucky",
+            "Louisiana",
+            "Maine",
+            "Maryland",
+            "Massachusetts",
+            "Michigan",
+            "Minnesota",
+            "Mississippi",
+            "Missouri",
+            "Montana",
+            "Nebraska",
+            "Nevada",
+            "New Hampshire",
+            "New Jersey",
+            "New Mexico",
+            "New York",
+            "North Carolina",
+            "North Dakota",
+            "Ohio",
+            "Oklahoma",
+            "Oregon",
+            "Pennsylvania",
+            "Rhode Island",
+            "South Carolina",
+            "South Dakota",
+            "Tennessee",
+            "Texas",
+            "Utah",
+            "Vermont",
+            "Virginia",
+            "Washington",
+            "West Virginia",
+            "Wisconsin",
+            "Wyoming",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

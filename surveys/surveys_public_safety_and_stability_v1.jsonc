@@ -1,0 +1,198 @@
+// surveys/surveys_public_safety_and_stability_v1.jsonc
+// slug: public-safety-and-stability
+// version: v1 | 2026-03-19
+// title: Community Safety & Stability
+{
+  "title": "Community Safety & Stability",
+  "description": "Understand whether people feel safe, stable, and supported in their daily lives within their community.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "community-safety",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "overall_safety",
+      "title": "Section 1: Overall safety",
+      "description": "How safe your community feels in daily life.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "feel_safe_day_to_day",
+          "title": "1. How safe do you feel in your community day to day?",
+          "isRequired": true,
+          "choices": [
+            "Very safe",
+            "Mostly safe",
+            "Somewhat unsafe",
+            "Unsafe",
+            "Very unsafe",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "safety_change",
+          "title": "2. Compared to one year ago, safety in your community is:",
+          "isRequired": true,
+          "choices": [
+            "Improving",
+            "About the same",
+            "Getting worse",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "specific_concerns",
+      "title": "Section 2: Community concerns",
+      "description": "Issues that affect stability and safety.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "safety_issues",
+          "title": "3. Which issues affect safety or stability in your community? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Property crime",
+            "Violent crime",
+            "Drug or substance issues",
+            "Mental health crises",
+            "Homelessness",
+            "Traffic safety",
+            "Lack of law enforcement presence",
+            "Lack of community resources",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "radiogroup",
+          "name": "biggest_safety_issue",
+          "title": "4. What is the single biggest concern for safety or stability?",
+          "isRequired": true,
+          "choices": [
+            "Property crime",
+            "Violent crime",
+            "Drug or substance issues",
+            "Mental health crises",
+            "Homelessness",
+            "Traffic safety",
+            "Lack of enforcement",
+            "Lack of resources",
+            "Other",
+            "Not sure"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "response_and_trust",
+      "title": "Section 3: Response and trust",
+      "description": "Confidence in how issues are handled.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "confidence_response",
+          "title": "5. How confident are you that local systems respond effectively to safety concerns?",
+          "isRequired": true,
+          "choices": [
+            "Very confident",
+            "Somewhat confident",
+            "Not very confident",
+            "Not confident at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "trust_local_institutions",
+          "title": "6. How much do you trust local institutions to maintain safety and stability?",
+          "isRequired": true,
+          "choices": [
+            "A great deal",
+            "Some",
+            "A little",
+            "None",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "daily_impact",
+      "title": "Section 4: Daily impact",
+      "description": "How safety affects your behavior.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "change_behavior",
+          "title": "7. Have you changed your daily behavior due to safety concerns?",
+          "isRequired": true,
+          "choices": [
+            "Yes, significantly",
+            "Yes, somewhat",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "community_connection",
+          "title": "8. How connected do you feel to people in your community?",
+          "isRequired": true,
+          "choices": [
+            "Very connected",
+            "Somewhat connected",
+            "Not very connected",
+            "Not connected at all",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "future_outlook",
+      "title": "Section 5: Looking ahead",
+      "description": "Future stability and outlook.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "future_safety_confidence",
+          "title": "9. How confident are you in the future safety and stability of your community?",
+          "isRequired": true,
+          "choices": [
+            "Very confident",
+            "Somewhat confident",
+            "Uncertain",
+            "Worried",
+            "Very worried",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "one_change_safety",
+          "title": "10. If one thing could improve safety or stability in your community, what would it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

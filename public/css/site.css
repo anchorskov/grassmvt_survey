@@ -199,6 +199,49 @@ main {
   gap: 0.75rem;
 }
 
+.survey-home .landing-path-chooser {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem 1.35rem;
+  border: 1px solid #d8d2c6;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 250, 243, 0.98), rgba(242, 234, 221, 0.96));
+}
+
+.survey-home .landing-path-chooser__copy {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.survey-home .landing-path-chooser__copy h2,
+.survey-home .landing-path-chooser__copy p {
+  margin: 0;
+}
+
+.survey-home .landing-path-chooser__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.survey-home .landing-path-chooser__card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid #cdbfae;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  color: inherit;
+  text-decoration: none;
+  box-shadow: 0 10px 20px rgba(78, 57, 32, 0.04);
+}
+
+.survey-home .landing-path-chooser__card:hover,
+.survey-home .landing-path-chooser__card:focus {
+  border-color: #8d6e4a;
+  text-decoration: none;
+}
+
 .survey-home .account-panel {
   --landing-panel-image: url('/assets/cards/account.webp');
   --landing-panel-position: 68% center;
@@ -480,12 +523,14 @@ main {
   }
 
   .survey-home .landing-hero__quicklinks,
+  .survey-home .landing-path-chooser__actions,
   .survey-home .account-panel__actions,
   .survey-home .landing-card__actions {
     align-items: stretch;
   }
 
   .survey-home .landing-hero__quicklinks .button,
+  .survey-home .landing-path-chooser__card,
   .survey-home .account-panel__actions .button,
   .survey-home .landing-card__actions .button {
     width: 100%;
@@ -798,6 +843,139 @@ main {
 
 .grid--cards {
   margin-top: 2rem;
+}
+
+.survey-browse-page {
+  max-width: 1100px;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.survey-browse-page__hero,
+.survey-path-picker,
+.survey-listings__section {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.3rem 1.35rem;
+  border: 1px solid #d8d2c6;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.survey-browse-page__hero {
+  background:
+    radial-gradient(circle at top right, rgba(200, 188, 170, 0.28), transparent 36%),
+    linear-gradient(180deg, rgba(255, 250, 243, 0.97), rgba(245, 237, 226, 0.96));
+}
+
+.survey-browse-page__eyebrow {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6b4e2e;
+}
+
+.survey-browse-page__hero h1,
+.survey-path-picker__header h2,
+.survey-listings__header h2 {
+  margin: 0;
+}
+
+.survey-browse-page__lede {
+  margin: 0;
+  max-width: 42rem;
+  color: #3a2a1a;
+  line-height: 1.5;
+}
+
+.survey-path-picker__header,
+.survey-listings__header {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.survey-path-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.survey-path-picker__card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid #cfbea9;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 242, 233, 0.96));
+  color: inherit;
+  text-decoration: none;
+  box-shadow: 0 10px 20px rgba(78, 57, 32, 0.04);
+}
+
+.survey-path-picker__card:hover,
+.survey-path-picker__card:focus,
+.survey-path-picker__card.is-current {
+  border-color: #6b4e2e;
+  text-decoration: none;
+}
+
+.survey-path-picker__card.is-current {
+  box-shadow: inset 0 0 0 1px #6b4e2e;
+}
+
+.survey-path-picker__label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6b4e2e;
+}
+
+.survey-browse-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.survey-browse-card__header,
+.survey-browse-card__meta,
+.survey-browse-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.survey-browse-card__header {
+  justify-content: space-between;
+}
+
+.survey-browse-card__header h2 {
+  margin: 0;
+  font-size: 1.18rem;
+}
+
+.survey-browse-card__pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #efe5d8;
+  color: #4b3520;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.survey-browse-card__pill--featured {
+  background: #e5efe6;
+  color: #26412f;
+}
+
+@media (max-width: 720px) {
+  .survey-path-picker__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {

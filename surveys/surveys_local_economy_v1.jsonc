@@ -1,0 +1,236 @@
+// surveys/surveys_local_economy_v1.jsonc
+// slug: local-economy
+// version: v1 | 2026-03-19
+// title: Local Economy & Small Business Climate
+{
+  "title": "Local Economy & Small Business Climate",
+  "description": "Understand whether the local economy creates real opportunity for work, growth, and small business.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "local-economy",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "local_snapshot",
+      "title": "Section 1: Local economy",
+      "description": "A quick view of how your local economy feels right now.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "local_economy_condition",
+          "title": "1. How would you describe your local economy right now?",
+          "isRequired": true,
+          "choices": [
+            "Strong and growing",
+            "Stable",
+            "Mixed",
+            "Weak",
+            "Declining",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "economy_direction",
+          "title": "2. Compared to one year ago, your local economy is:",
+          "isRequired": true,
+          "choices": [
+            "Improving",
+            "About the same",
+            "Worsening",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "business_climate",
+      "title": "Section 2: Small business climate",
+      "description": "How supportive the environment is for small business.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "start_business",
+          "title": "3. Is this a good time to start or grow a small business where you live?",
+          "isRequired": true,
+          "choices": [
+            "Yes, very good",
+            "Somewhat good",
+            "Difficult",
+            "Very difficult",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "business_support",
+          "title": "4. How supportive does your local environment feel for small business?",
+          "isRequired": true,
+          "choices": [
+            "Very supportive",
+            "Somewhat supportive",
+            "Not very supportive",
+            "Not supportive at all",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "jobs_opportunity",
+      "title": "Section 3: Jobs and opportunity",
+      "description": "Availability and quality of local work.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "job_availability",
+          "title": "5. Are there enough good job opportunities where you live?",
+          "isRequired": true,
+          "choices": [
+            "Yes, many",
+            "Some",
+            "Very limited",
+            "None",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "job_quality",
+          "title": "6. Do local jobs offer a path to stability and growth?",
+          "isRequired": true,
+          "choices": [
+            "Yes, clearly",
+            "Somewhat",
+            "Not really",
+            "Not at all",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "barriers",
+      "title": "Section 4: Barriers",
+      "description": "What is holding the local economy back.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "economic_barriers",
+          "title": "7. What are the biggest barriers to a stronger local economy? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "High cost of living",
+            "Lack of housing",
+            "Limited workforce skills",
+            "Lack of investment",
+            "Regulatory burden",
+            "Limited infrastructure",
+            "Declining population",
+            "Limited local demand",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "checkbox",
+          "name": "business_barriers",
+          "title": "8. What are the biggest barriers for small businesses? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Cost of doing business",
+            "Hiring and workforce",
+            "Access to financing",
+            "Regulations",
+            "Competition",
+            "Lack of customers",
+            "Supply costs",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "confidence",
+      "title": "Section 5: Confidence in the future",
+      "description": "Outlook on local opportunity.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "local_future_confidence",
+          "title": "9. How confident are you in your community's economic future?",
+          "isRequired": true,
+          "choices": [
+            "Very confident",
+            "Somewhat confident",
+            "Uncertain",
+            "Not confident",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "recommend_future",
+          "title": "10. Would you encourage a young person to build a future where you live?",
+          "isRequired": true,
+          "choices": [
+            "Yes, strongly",
+            "Yes, with caution",
+            "No",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "solutions",
+      "title": "Section 6: What would help most",
+      "description": "Changes that would strengthen the local economy.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "economic_solutions",
+          "title": "11. Which changes would help most right now? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Lower costs for businesses",
+            "More housing",
+            "Workforce training programs",
+            "Access to capital",
+            "Infrastructure investment",
+            "Local investment and development",
+            "Reduced regulatory burden",
+            "Stronger local demand",
+            "Other"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "comment",
+          "name": "one_change_economy",
+          "title": "12. If one thing could improve your local economy immediately, what would it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

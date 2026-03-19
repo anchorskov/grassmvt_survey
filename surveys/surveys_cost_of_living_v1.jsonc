@@ -1,0 +1,375 @@
+// surveys/surveys_cost_of_living_v1.jsonc
+// slug: cost-of-living
+// version: v1 | 2026-03-19
+// title: Cost of Living
+{
+  "title": "Cost of Living",
+  "description": "A short pulse on groceries, rent, fuel, utilities, and whether everyday costs are still manageable.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "cost-of-living",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "snapshot",
+      "title": "Section 1: Financial snapshot",
+      "description": "A quick picture of how everyday life feels right now.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "financial_situation_now",
+          "title": "1. How would you describe your current financial situation?",
+          "isRequired": true,
+          "choices": [
+            "Comfortable",
+            "Stable",
+            "Tight but manageable",
+            "Struggling",
+            "In crisis",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "financial_change_year",
+          "title": "2. Compared to one year ago, your financial situation is:",
+          "isRequired": true,
+          "choices": [
+            "Much better",
+            "Slightly better",
+            "About the same",
+            "Slightly worse",
+            "Much worse",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pressure_points",
+      "title": "Section 2: Pressure points",
+      "description": "Which costs are creating the most strain?",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "expenses_increased_most",
+          "title": "3. Which expenses have increased the most for you? Pick up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Groceries",
+            "Housing (rent or mortgage)",
+            "Utilities",
+            "Fuel or transportation",
+            "Health care",
+            "Insurance",
+            "Childcare",
+            "Debt payments",
+            "Other"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "radiogroup",
+          "name": "hardest_expense_now",
+          "title": "4. Which one is currently the hardest to manage?",
+          "isRequired": true,
+          "choices": [
+            "Groceries",
+            "Housing (rent or mortgage)",
+            "Utilities",
+            "Fuel or transportation",
+            "Health care",
+            "Insurance",
+            "Childcare",
+            "Debt payments",
+            "Other",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        }
+      ]
+    },
+    {
+      "name": "tradeoffs",
+      "title": "Section 3: Tradeoffs",
+      "description": "What changes have you had to make to stay afloat?",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "tradeoffs_past_6_months",
+          "title": "5. In the past 6 months, have you had to do any of the following? Select all that apply.",
+          "isRequired": true,
+          "choices": [
+            "Cut back on groceries or essentials",
+            "Delay medical or dental care",
+            "Skip bills or pay late",
+            "Take on new debt",
+            "Work extra hours or take a second job",
+            "Use savings to cover basics",
+            "Ask family or friends for help",
+            "None of these"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "reduced_most_to_stay_afloat",
+          "title": "6. What have you reduced the most to stay afloat?",
+          "isRequired": true,
+          "choices": [
+            "Food quality or quantity",
+            "Health care",
+            "Savings",
+            "Transportation",
+            "Leisure or personal spending",
+            "Housing stability",
+            "Other",
+            "Nothing reduced",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        }
+      ]
+    },
+    {
+      "name": "income_vs_costs",
+      "title": "Section 4: Income and costs",
+      "description": "Does income still keep up with ordinary life?",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "income_keeps_up",
+          "title": "7. Does your income keep up with your cost of living?",
+          "isRequired": true,
+          "choices": [
+            "Yes, comfortably",
+            "Mostly keeps up",
+            "Barely keeps up",
+            "Does not keep up",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "income_vs_cost_change",
+          "title": "8. What has changed more in the past year?",
+          "isRequired": true,
+          "choices": [
+            "Income increased more than costs",
+            "Costs increased more than income",
+            "Both increased about equally",
+            "Neither changed much",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "local_reality",
+      "title": "Section 5: Local reality",
+      "description": "How does the cost of living feel where you live?",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "local_cost_feels",
+          "title": "9. Where you live, the cost of living feels:",
+          "isRequired": true,
+          "choices": [
+            "Very affordable",
+            "Reasonable",
+            "High",
+            "Very high",
+            "Unsustainable",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "could_move_to_improve",
+          "title": "10. If you wanted to move to improve your situation, could you?",
+          "isRequired": true,
+          "choices": [
+            "Yes, easily",
+            "Possibly",
+            "Difficult",
+            "Not realistic",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "future_outlook",
+      "title": "Section 6: Stability and future",
+      "description": "How secure does the future feel from here?",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "future_confidence",
+          "title": "11. How confident are you about your financial future?",
+          "isRequired": true,
+          "choices": [
+            "Very confident",
+            "Somewhat confident",
+            "Uncertain",
+            "Worried",
+            "Very worried",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "main_future_concern",
+          "title": "12. What concerns you most looking ahead?",
+          "isRequired": true,
+          "choices": [
+            "Rising prices",
+            "Job stability",
+            "Housing costs",
+            "Health costs",
+            "Debt",
+            "Retirement security",
+            "Supporting family",
+            "Other",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        }
+      ]
+    },
+    {
+      "name": "solutions",
+      "title": "Section 7: What would help most",
+      "description": "Which changes would relieve pressure the fastest?",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "changes_that_help_most",
+          "title": "13. Which changes would help you most right now? Pick up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Lower everyday costs such as food, fuel, or utilities",
+            "Higher wages or income",
+            "Lower housing costs",
+            "Lower health care costs",
+            "Lower taxes or fees",
+            "More stable work opportunities",
+            "Childcare support",
+            "Debt relief options",
+            "Other"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "comment",
+          "name": "one_thing_that_would_help_now",
+          "title": "14. If one thing could improve your situation immediately, what would it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_background",
+      "title": "Optional background",
+      "description": "These questions help interpret results without identifying you personally.",
+      "elements": [
+        {
+          "type": "dropdown",
+          "name": "state",
+          "title": "15. State",
+          "isRequired": false,
+          "choices": [
+            "Alabama",
+            "Alaska",
+            "Arizona",
+            "Arkansas",
+            "California",
+            "Colorado",
+            "Connecticut",
+            "Delaware",
+            "District of Columbia",
+            "Florida",
+            "Georgia",
+            "Hawaii",
+            "Idaho",
+            "Illinois",
+            "Indiana",
+            "Iowa",
+            "Kansas",
+            "Kentucky",
+            "Louisiana",
+            "Maine",
+            "Maryland",
+            "Massachusetts",
+            "Michigan",
+            "Minnesota",
+            "Mississippi",
+            "Missouri",
+            "Montana",
+            "Nebraska",
+            "Nevada",
+            "New Hampshire",
+            "New Jersey",
+            "New Mexico",
+            "New York",
+            "North Carolina",
+            "North Dakota",
+            "Ohio",
+            "Oklahoma",
+            "Oregon",
+            "Pennsylvania",
+            "Rhode Island",
+            "South Carolina",
+            "South Dakota",
+            "Tennessee",
+            "Texas",
+            "Utah",
+            "Vermont",
+            "Virginia",
+            "Washington",
+            "West Virginia",
+            "Wisconsin",
+            "Wyoming",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "age_range",
+          "title": "16. Age range",
+          "isRequired": false,
+          "choices": [
+            "Under 18",
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -25,6 +25,62 @@ const surveySources = {
     slug: 'wy-health-care-costs-access-options',
     file: 'surveys/surveys_wy_health_care_costs_access_options_v1.jsonc',
   },
+  'cost-of-living-v1': {
+    slug: 'cost-of-living',
+    file: 'surveys/surveys_cost_of_living_v1.jsonc',
+  },
+  'housing-v1': {
+    slug: 'housing',
+    file: 'surveys/surveys_housing_v1.jsonc',
+  },
+  'work-and-wages-v1': {
+    slug: 'work-and-wages',
+    file: 'surveys/surveys_work_and_wages_v1.jsonc',
+  },
+  'health-and-care-access-v1': {
+    slug: 'health-and-care-access',
+    file: 'surveys/surveys_health_and_care_access_v1.jsonc',
+  },
+  'education-and-opportunity-v1': {
+    slug: 'education-and-opportunity',
+    file: 'surveys/surveys_education_and_opportunity_v1.jsonc',
+  },
+  'local-economy-v1': {
+    slug: 'local-economy',
+    file: 'surveys/surveys_local_economy_v1.jsonc',
+  },
+  'public-safety-and-stability-v1': {
+    slug: 'public-safety-and-stability',
+    file: 'surveys/surveys_public_safety_and_stability_v1.jsonc',
+  },
+  'infrastructure-and-daily-systems-v1': {
+    slug: 'infrastructure-and-daily-systems',
+    file: 'surveys/surveys_infrastructure_and_daily_systems_v1.jsonc',
+  },
+  'trust-in-local-governance-v1': {
+    slug: 'trust-in-local-governance',
+    file: 'surveys/surveys_trust_in_local_governance_v1.jsonc',
+  },
+  'community-and-belonging-v1': {
+    slug: 'community-and-belonging',
+    file: 'surveys/surveys_community_and_belonging_v1.jsonc',
+  },
+  'military-force-ai-v1': {
+    slug: 'military-force-ai',
+    file: 'surveys/surveys_military_force_ai_v1.jsonc',
+  },
+  'digital-privacy-identity-v1': {
+    slug: 'digital-privacy-identity',
+    file: 'surveys/surveys_digital_privacy_identity_v1.jsonc',
+  },
+  'immigration-border-v1': {
+    slug: 'immigration-border',
+    file: 'surveys/surveys_immigration_border_v1.jsonc',
+  },
+  'energy-public-lands-v1': {
+    slug: 'energy-public-lands',
+    file: 'surveys/surveys_energy_public_lands_v1.jsonc',
+  },
 };
 
 const parseArgs = (argv) => {

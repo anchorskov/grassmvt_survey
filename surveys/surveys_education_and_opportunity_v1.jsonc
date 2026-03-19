@@ -1,0 +1,321 @@
+// surveys/surveys_education_and_opportunity_v1.jsonc
+// slug: education-and-opportunity
+// version: v1 | 2026-03-19
+// title: Education & Skills Access
+{
+  "title": "Education & Skills Access",
+  "description": "Understand whether people can access affordable, useful education and training where they live.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "education-and-opportunity",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "education_background",
+      "title": "Section 1: Education background",
+      "description": "A quick look at your current education or training situation.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "highest_education",
+          "title": "1. What is the highest level of education you have completed?",
+          "isRequired": true,
+          "choices": [
+            "Less than high school",
+            "High school diploma or GED",
+            "Some college",
+            "Certificate or trade program",
+            "Associate degree",
+            "Bachelor's degree",
+            "Graduate or professional degree",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "current_connection_to_learning",
+          "title": "2. Which best describes your current connection to education or training?",
+          "isRequired": true,
+          "choices": [
+            "Currently in school",
+            "Currently in job training or skill-building",
+            "Working but not currently in training",
+            "Would like more training or education",
+            "Do not need more education or training right now",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "local_access",
+      "title": "Section 2: Local access",
+      "description": "Whether learning and training options are available where you live.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "local_training_options",
+          "title": "3. Are useful education or training options available where you live?",
+          "isRequired": true,
+          "choices": [
+            "Yes, many options",
+            "Some options",
+            "Very limited options",
+            "No realistic options",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "ease_of_access",
+          "title": "4. How easy is it to access education or training that fits your needs?",
+          "isRequired": true,
+          "choices": [
+            "Very easy",
+            "Mostly easy",
+            "Difficult",
+            "Very difficult",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "affordability",
+      "title": "Section 3: Cost and affordability",
+      "description": "Whether cost blocks learning and training.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "education_affordability",
+          "title": "5. How affordable does education or training feel for you right now?",
+          "isRequired": true,
+          "choices": [
+            "Very affordable",
+            "Mostly affordable",
+            "Difficult to afford",
+            "Not affordable",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "cost_prevented_participation",
+          "title": "6. In the past 3 years, has cost prevented you from pursuing education or training you wanted?",
+          "isRequired": true,
+          "choices": [
+            "Yes, often",
+            "Yes, once or twice",
+            "No",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "relevance",
+      "title": "Section 4: Relevance and usefulness",
+      "description": "Whether available education leads somewhere real.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "programs_match_jobs",
+          "title": "7. Do available education and training programs match real job opportunities where you live?",
+          "isRequired": true,
+          "choices": [
+            "Very well",
+            "Somewhat well",
+            "Not very well",
+            "Not at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "skills_would_help",
+          "title": "8. How much would gaining new skills improve your financial stability or opportunity?",
+          "isRequired": true,
+          "choices": [
+            "A great deal",
+            "Some",
+            "A little",
+            "Not much",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "barriers",
+      "title": "Section 5: Barriers",
+      "description": "What gets in the way of improving skills or education.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "main_barriers",
+          "title": "9. What are the main barriers to more education or training for you? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Cost",
+            "Time",
+            "Work schedule",
+            "Childcare or family responsibilities",
+            "Travel distance",
+            "Limited local options",
+            "Lack of information",
+            "Health issues",
+            "Not needed right now",
+            "Other"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "radiogroup",
+          "name": "biggest_barrier",
+          "title": "10. What is the single biggest barrier for you right now?",
+          "isRequired": true,
+          "choices": [
+            "Cost",
+            "Time",
+            "Work schedule",
+            "Childcare or family responsibilities",
+            "Travel distance",
+            "Limited local options",
+            "Lack of information",
+            "Health issues",
+            "Not needed right now",
+            "Other",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        }
+      ]
+    },
+    {
+      "name": "mobility_and_future",
+      "title": "Section 6: Mobility and future",
+      "description": "Whether education opens a path forward.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "could_improve_locally",
+          "title": "11. Do you believe you could improve your situation through education or training without leaving your area?",
+          "isRequired": true,
+          "choices": [
+            "Yes, definitely",
+            "Possibly",
+            "Unlikely",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "one_change_education",
+          "title": "12. If one thing could improve education or training access for you or your household, what would it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_background",
+      "title": "Optional background",
+      "description": "These questions help interpret results without identifying you personally.",
+      "elements": [
+        {
+          "type": "dropdown",
+          "name": "state",
+          "title": "13. State",
+          "isRequired": false,
+          "choices": [
+            "Alabama",
+            "Alaska",
+            "Arizona",
+            "Arkansas",
+            "California",
+            "Colorado",
+            "Connecticut",
+            "Delaware",
+            "District of Columbia",
+            "Florida",
+            "Georgia",
+            "Hawaii",
+            "Idaho",
+            "Illinois",
+            "Indiana",
+            "Iowa",
+            "Kansas",
+            "Kentucky",
+            "Louisiana",
+            "Maine",
+            "Maryland",
+            "Massachusetts",
+            "Michigan",
+            "Minnesota",
+            "Mississippi",
+            "Missouri",
+            "Montana",
+            "Nebraska",
+            "Nevada",
+            "New Hampshire",
+            "New Jersey",
+            "New Mexico",
+            "New York",
+            "North Carolina",
+            "North Dakota",
+            "Ohio",
+            "Oklahoma",
+            "Oregon",
+            "Pennsylvania",
+            "Rhode Island",
+            "South Carolina",
+            "South Dakota",
+            "Tennessee",
+            "Texas",
+            "Utah",
+            "Vermont",
+            "Virginia",
+            "Washington",
+            "West Virginia",
+            "Wisconsin",
+            "Wyoming",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "age_range",
+          "title": "14. Age range",
+          "isRequired": false,
+          "choices": [
+            "Under 18",
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,223 @@
+// surveys/surveys_energy_public_lands_v1.jsonc
+// slug: energy-public-lands
+// version: v1 | 2026-03-19
+// title: Energy, Public Lands & Resource Use
+{
+  "title": "Energy, Public Lands & Resource Use",
+  "description": "Understand how people view energy development, land use, and long-term stewardship.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "energy-public-lands",
+    "estimated_minutes": 6,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "baseline",
+      "title": "Section 1: Overall direction",
+      "description": "Your general view of energy and land use.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "energy_direction",
+          "title": "1. How should we balance energy production and conservation?",
+          "isRequired": true,
+          "choices": [
+            "Prioritize energy production",
+            "Balance production and conservation",
+            "Prioritize conservation",
+            "Case-by-case decisions",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "economic_dependence",
+          "title": "2. How important is energy production to the economy?",
+          "isRequired": true,
+          "choices": [
+            "Critical",
+            "Very important",
+            "Somewhat important",
+            "Not very important",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "energy_mix",
+      "title": "Section 2: Energy mix",
+      "description": "Sources of energy going forward.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "energy_priorities",
+          "title": "3. Which energy sources should be prioritized? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Oil and gas",
+            "Coal",
+            "Wind",
+            "Solar",
+            "Nuclear",
+            "Hydropower",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "radiogroup",
+          "name": "transition_pace",
+          "title": "4. How quickly should energy systems evolve?",
+          "isRequired": true,
+          "choices": [
+            "Rapid transition",
+            "Gradual transition",
+            "Maintain current mix",
+            "Expand traditional energy",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public_lands",
+      "title": "Section 3: Public lands",
+      "description": "Use and control of public lands.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "land_use_priority",
+          "title": "5. What should be the primary use of public lands?",
+          "isRequired": true,
+          "choices": [
+            "Resource development",
+            "Recreation and tourism",
+            "Conservation and preservation",
+            "Multiple-use balance",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "land_control",
+          "title": "6. Who should primarily manage public lands?",
+          "isRequired": true,
+          "choices": [
+            "Federal government",
+            "State government",
+            "Shared management",
+            "Local control where possible",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "environment",
+      "title": "Section 4: Environmental impact",
+      "description": "Managing long-term effects.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "environmental_regulation",
+          "title": "7. How strict should environmental regulations be?",
+          "isRequired": true,
+          "choices": [
+            "Very strict",
+            "Balanced with economic needs",
+            "Moderate",
+            "Minimal regulation",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "restoration_priority",
+          "title": "8. How important is land restoration after development?",
+          "isRequired": true,
+          "choices": [
+            "Critical",
+            "Very important",
+            "Somewhat important",
+            "Not important",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "local_impact",
+      "title": "Section 5: Community impact",
+      "description": "Effects on local communities.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "jobs_vs_environment",
+          "title": "9. When tradeoffs exist, what should carry more weight?",
+          "isRequired": true,
+          "choices": [
+            "Job creation",
+            "Environmental protection",
+            "Balanced approach",
+            "Case-by-case",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "community_voice",
+          "title": "10. How much say should local communities have in projects?",
+          "isRequired": true,
+          "choices": [
+            "Primary decision-makers",
+            "Strong input",
+            "Advisory role",
+            "Limited involvement",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "future",
+      "title": "Section 6: Long-term direction",
+      "description": "Looking ahead.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "long_term_strategy",
+          "title": "11. What should the long-term strategy focus on?",
+          "isRequired": true,
+          "choices": [
+            "Maximizing resource development",
+            "Diversifying energy sources",
+            "Protecting land and ecosystems",
+            "Balanced multi-use strategy",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "one_change_energy",
+          "title": "12. If one decision would improve outcomes, what should it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

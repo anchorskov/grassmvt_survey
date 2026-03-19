@@ -1,0 +1,292 @@
+// surveys/surveys_work_and_wages_v1.jsonc
+// slug: work-and-wages
+// version: v1 | 2026-03-19
+// title: Work & Income Stability
+{
+  "title": "Work & Income Stability",
+  "description": "Understand how stable, predictable, and sufficient income is for daily life.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "work",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "employment_snapshot",
+      "title": "Section 1: Current work",
+      "description": "Your current employment situation.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "employment_status",
+          "title": "1. What best describes your current work situation?",
+          "isRequired": true,
+          "choices": [
+            "Full-time employment",
+            "Part-time employment",
+            "Self-employed or business owner",
+            "Multiple jobs",
+            "Unemployed",
+            "Retired",
+            "Student",
+            "Other",
+            "Prefer not to answer"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "radiogroup",
+          "name": "job_stability",
+          "title": "2. How stable is your current work situation?",
+          "isRequired": true,
+          "choices": [
+            "Very stable",
+            "Mostly stable",
+            "Uncertain",
+            "At risk",
+            "Not stable",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "income_reliability",
+      "title": "Section 2: Income reliability",
+      "description": "How predictable your income is.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "income_predictability",
+          "title": "3. How predictable is your income month to month?",
+          "isRequired": true,
+          "choices": [
+            "Very predictable",
+            "Mostly predictable",
+            "Somewhat unpredictable",
+            "Highly unpredictable",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "income_sufficiency",
+          "title": "4. Does your income cover your basic needs?",
+          "isRequired": true,
+          "choices": [
+            "Yes, comfortably",
+            "Yes, but tight",
+            "Barely",
+            "No",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "financial_buffer",
+      "title": "Section 3: Financial buffer",
+      "description": "Ability to handle disruption.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "emergency_buffer",
+          "title": "5. If your income stopped today, how long could you cover expenses?",
+          "isRequired": true,
+          "choices": [
+            "More than 6 months",
+            "3-6 months",
+            "1-3 months",
+            "Less than 1 month",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "recent_income_disruption",
+          "title": "6. Have you experienced a disruption in income in the past year?",
+          "isRequired": true,
+          "choices": [
+            "Yes, major disruption",
+            "Yes, minor disruption",
+            "No",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "work_conditions",
+      "title": "Section 4: Work conditions",
+      "description": "Quality and sustainability of work.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "hours_stability",
+          "title": "7. How consistent are your working hours?",
+          "isRequired": true,
+          "choices": [
+            "Very consistent",
+            "Mostly consistent",
+            "Somewhat inconsistent",
+            "Highly inconsistent",
+            "Not applicable"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "job_fit",
+          "title": "8. How well does your work match your skills and goals?",
+          "isRequired": true,
+          "choices": [
+            "Very well",
+            "Somewhat well",
+            "Not well",
+            "Not at all",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mobility",
+      "title": "Section 5: Opportunity and mobility",
+      "description": "Ability to improve your situation.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "better_job_access",
+          "title": "9. Are better job opportunities available where you live?",
+          "isRequired": true,
+          "choices": [
+            "Yes, many opportunities",
+            "Some opportunities",
+            "Very limited",
+            "No realistic opportunities",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "ability_to_transition",
+          "title": "10. If needed, could you transition to a better job?",
+          "isRequired": true,
+          "choices": [
+            "Yes, easily",
+            "Possibly",
+            "Difficult",
+            "Not realistic",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "future",
+      "title": "Section 6: Looking ahead",
+      "description": "Confidence in income stability.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "future_income_confidence",
+          "title": "11. How confident are you in your income over the next 1-2 years?",
+          "isRequired": true,
+          "choices": [
+            "Very confident",
+            "Somewhat confident",
+            "Uncertain",
+            "Worried",
+            "Very worried",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "one_change_income",
+          "title": "12. What would most improve your income stability?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_background",
+      "title": "Optional background",
+      "description": "Helps interpret results without identifying you personally.",
+      "elements": [
+        {
+          "type": "dropdown",
+          "name": "state",
+          "title": "13. State",
+          "isRequired": false,
+          "choices": [
+            "Alabama",
+            "Alaska",
+            "Arizona",
+            "Arkansas",
+            "California",
+            "Colorado",
+            "Connecticut",
+            "Delaware",
+            "District of Columbia",
+            "Florida",
+            "Georgia",
+            "Hawaii",
+            "Idaho",
+            "Illinois",
+            "Indiana",
+            "Iowa",
+            "Kansas",
+            "Kentucky",
+            "Louisiana",
+            "Maine",
+            "Maryland",
+            "Massachusetts",
+            "Michigan",
+            "Minnesota",
+            "Mississippi",
+            "Missouri",
+            "Montana",
+            "Nebraska",
+            "Nevada",
+            "New Hampshire",
+            "New Jersey",
+            "New Mexico",
+            "New York",
+            "North Carolina",
+            "North Dakota",
+            "Ohio",
+            "Oklahoma",
+            "Oregon",
+            "Pennsylvania",
+            "Rhode Island",
+            "South Carolina",
+            "South Dakota",
+            "Tennessee",
+            "Texas",
+            "Utah",
+            "Vermont",
+            "Virginia",
+            "Washington",
+            "West Virginia",
+            "Wisconsin",
+            "Wyoming",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

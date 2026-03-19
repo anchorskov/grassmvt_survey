@@ -1,0 +1,231 @@
+// surveys/surveys_military_force_ai_v1.jsonc
+// slug: military-force-ai
+// version: v1 | 2026-03-19
+// title: Use of Military Force & AI in Warfare
+{
+  "title": "Use of Military Force & AI in Warfare",
+  "description": "Understand how people think about military force, decision authority, accountability, and the role of AI in warfare.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "military-force-ai",
+    "estimated_minutes": 6,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "baseline_views",
+      "title": "Section 1: Baseline views",
+      "description": "A quick picture of how you think about military force.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "importance_national_security",
+          "title": "1. How important is national security to you personally?",
+          "isRequired": true,
+          "choices": [
+            "Very important",
+            "Important",
+            "Somewhat important",
+            "Not important",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "use_of_force_general",
+          "title": "2. Which statement is closest to your view?",
+          "isRequired": true,
+          "choices": [
+            "Military force should be used only in very limited situations",
+            "Military force should be available when necessary but used cautiously",
+            "Military force should be used more readily to protect national interests",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "authority_and_process",
+      "title": "Section 2: Authority and process",
+      "description": "Who should decide and under what conditions.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "who_should_authorize_force",
+          "title": "3. Who should authorize major military action first in most cases?",
+          "isRequired": true,
+          "choices": [
+            "Congress",
+            "The President",
+            "A shared process between Congress and the President",
+            "Military leadership with civilian approval",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "acceptable_reasons_force",
+          "title": "4. Which reasons justify military force? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Direct attack on the United States",
+            "Defense of U.S. troops or citizens abroad",
+            "Defense of treaty allies",
+            "Preventing a larger regional war",
+            "Stopping genocide or mass civilian killing",
+            "Protecting trade routes or critical infrastructure",
+            "Preventing nuclear escalation",
+            "Other",
+            "None of these",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        }
+      ]
+    },
+    {
+      "name": "costs_and_limits",
+      "title": "Section 3: Costs and limits",
+      "description": "Tradeoffs, duration, and acceptable risk.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "acceptable_duration",
+          "title": "5. If military action is taken, what duration feels most acceptable before formal public review or reauthorization is required?",
+          "isRequired": true,
+          "choices": [
+            "A few days",
+            "A few weeks",
+            "A few months",
+            "Longer if objectives are clear",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "civilian_risk_tolerance",
+          "title": "6. Which statement is closest to your view on civilian risk?",
+          "isRequired": true,
+          "choices": [
+            "Civilian harm must be avoided even if operations are limited",
+            "Civilian harm must be minimized but some risk may be unavoidable",
+            "Military objectives should take priority if the threat is serious enough",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ai_in_warfare",
+      "title": "Section 4: AI in warfare",
+      "description": "How much authority AI systems should have.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "ai_role_targeting",
+          "title": "7. What role should AI have in selecting or recommending military targets?",
+          "isRequired": true,
+          "choices": [
+            "No role",
+            "Advisory role only, with full human review",
+            "Strong recommendation role, but humans must approve",
+            "A limited autonomous role in narrow situations",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "human_in_loop",
+          "title": "8. Which rule feels most appropriate for lethal force decisions involving AI?",
+          "isRequired": true,
+          "choices": [
+            "A human must always make the final decision",
+            "A human should usually make the final decision, with rare exceptions",
+            "Autonomous systems may decide in high-speed battlefield situations",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "accountability_and_oversight",
+      "title": "Section 5: Accountability and oversight",
+      "description": "Who is responsible when systems fail.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "accountability_ai_error",
+          "title": "9. If an AI-assisted military system makes a serious mistake, who should bear the most responsibility?",
+          "isRequired": true,
+          "choices": [
+            "Civilian leadership",
+            "Military commanders",
+            "The operators using the system",
+            "The developers and contractors",
+            "Shared responsibility",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "oversight_measures",
+          "title": "10. Which safeguards matter most for AI in warfare? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Clear human approval requirements",
+            "Publicly defined rules of use",
+            "Independent oversight and auditing",
+            "Testing before deployment",
+            "Limits on autonomous targeting",
+            "Automatic shutdown or override options",
+            "Congressional review",
+            "Other",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        }
+      ]
+    },
+    {
+      "name": "public_trust_and_future",
+      "title": "Section 6: Trust and future direction",
+      "description": "How people think this should develop going forward.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "trust_military_ai_use",
+          "title": "11. How much do you trust the United States to use AI in warfare responsibly?",
+          "isRequired": true,
+          "choices": [
+            "A great deal",
+            "Some",
+            "A little",
+            "None",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "one_rule_for_ai_warfare",
+          "title": "12. If one rule had to be set for AI in warfare, what should it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

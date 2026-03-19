@@ -1,0 +1,226 @@
+// surveys/surveys_digital_privacy_identity_v1.jsonc
+// slug: digital-privacy-identity
+// version: v1 | 2026-03-19
+// title: Digital Privacy, AI Surveillance & Digital Identity
+{
+  "title": "Digital Privacy, AI Surveillance & Digital Identity",
+  "description": "Understand how people think about data privacy, AI-assisted monitoring, and digital identity systems.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "digital-privacy-identity",
+    "estimated_minutes": 6,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "baseline",
+      "title": "Section 1: Baseline views",
+      "description": "How you think about privacy and data.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "importance_privacy",
+          "title": "1. How important is personal data privacy to you?",
+          "isRequired": true,
+          "choices": [
+            "Very important",
+            "Important",
+            "Somewhat important",
+            "Not important",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "data_control",
+          "title": "2. Who should primarily control your personal data?",
+          "isRequired": true,
+          "choices": [
+            "The individual",
+            "Shared between individual and service providers",
+            "Companies providing services",
+            "Government systems",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ai_surveillance",
+      "title": "Section 2: AI-assisted surveillance",
+      "description": "Use of AI to monitor behavior, movement, or communication.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "ai_monitoring_acceptance",
+          "title": "3. How acceptable is AI-assisted monitoring in public spaces for safety purposes?",
+          "isRequired": true,
+          "choices": [
+            "Fully acceptable",
+            "Acceptable with strict limits",
+            "Somewhat acceptable",
+            "Not acceptable",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "acceptable_surveillance_uses",
+          "title": "4. In which situations is AI-assisted monitoring acceptable? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Crime prevention",
+            "Emergency response",
+            "Border security",
+            "Public event safety",
+            "Traffic and infrastructure management",
+            "Workplace monitoring",
+            "None of these",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "data_privacy",
+      "title": "Section 3: Data and privacy",
+      "description": "Ownership and access to personal data.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "data_collection_comfort",
+          "title": "5. How comfortable are you with companies collecting personal data to provide services?",
+          "isRequired": true,
+          "choices": [
+            "Very comfortable",
+            "Somewhat comfortable",
+            "Uncomfortable",
+            "Very uncomfortable",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "government_data_access",
+          "title": "6. When should government access to personal data be allowed?",
+          "isRequired": true,
+          "choices": [
+            "Only with a warrant",
+            "In emergencies with oversight",
+            "For public safety programs",
+            "Broad access for national security",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "digital_identity",
+      "title": "Section 4: Digital identity systems",
+      "description": "Use of digital ID for verification and services.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "digital_id_support",
+          "title": "7. Would you support a secure digital ID system for accessing services?",
+          "isRequired": true,
+          "choices": [
+            "Yes, strongly",
+            "Yes, with conditions",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "digital_id_conditions",
+          "title": "8. What conditions would be required for you to trust a digital ID system? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "User control over data",
+            "Strong privacy protections",
+            "Limited use cases",
+            "Transparency in how data is used",
+            "Independent oversight",
+            "Ability to opt out",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        }
+      ]
+    },
+    {
+      "name": "tradeoffs",
+      "title": "Section 5: Tradeoffs",
+      "description": "Balancing privacy, security, and convenience.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "privacy_vs_security",
+          "title": "9. Which is more important in most situations?",
+          "isRequired": true,
+          "choices": [
+            "Privacy",
+            "Security",
+            "A balance of both",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "convenience_tradeoff",
+          "title": "10. How willing are you to trade some privacy for convenience in digital services?",
+          "isRequired": true,
+          "choices": [
+            "Very willing",
+            "Somewhat willing",
+            "Not willing",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "future",
+      "title": "Section 6: Trust and future direction",
+      "description": "Confidence in how these systems will evolve.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "trust_systems_future",
+          "title": "11. How much do you trust institutions to manage data and identity systems responsibly?",
+          "isRequired": true,
+          "choices": [
+            "A great deal",
+            "Some",
+            "A little",
+            "None",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "one_rule_digital",
+          "title": "12. If one rule should guide digital privacy and identity systems, what should it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

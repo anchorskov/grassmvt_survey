@@ -133,7 +133,9 @@
     })
     .then((rawText) => {
       const surveys = JSON.parse(stripJsonc(rawText));
-      renderSurveys(surveys.filter((s) => s.scope === scope));
+      renderSurveys(
+        surveys.filter((s) => s.scope === scope && (s.status === 'active' || s.status === 'coming_soon'))
+      );
     })
     .catch(() => {
       renderError();

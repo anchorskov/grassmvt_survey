@@ -3,7 +3,7 @@
 
 A no-build static site intended for deployment from `/public` to Cloudflare Pages.
 
-See `AGENTS.md` for repo-specific guidance for coding agents and update workflows.
+See `AGENTS.md` for repo-specific agent guidance, including the survey build and seeding workflow in `survey_flow.txt`, the browse-path scaffold note in `survey_browse_paths.md`, and the rule to shut down test Wrangler processes when testing is done.
 
 ## Quick start
 

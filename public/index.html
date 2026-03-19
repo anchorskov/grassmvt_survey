@@ -19,9 +19,33 @@
           </p>
         </div>
         <div class="landing-hero__quicklinks" aria-label="Quick links">
-          <a class="button button--primary" href="/surveys/list/">Browse surveys</a>
+          <a class="button button--primary" href="/surveys/list/" data-survey-chooser-toggle>Browse surveys</a>
           <a class="button button--secondary" href="/surveys/results/">View results</a>
           <a class="button button--secondary" href="/townhall/">Join discussions</a>
+        </div>
+      </section>
+
+      <section
+        class="landing-path-chooser is-hidden"
+        id="landing-path-chooser"
+        aria-labelledby="landing-path-chooser-title"
+      >
+        <div class="landing-path-chooser__copy">
+          <p class="landing-eyebrow">Choose a survey path</p>
+          <h2 id="landing-path-chooser-title">Start with the right kind of survey</h2>
+          <p>
+            Normal Life surveys stay short and practical. Divisive surveys leave more room for tradeoffs and context.
+          </p>
+        </div>
+        <div class="landing-path-chooser__actions">
+          <a class="landing-path-chooser__card" href="/surveys/normal-life/">
+            <strong>Normal Life Surveys</strong>
+            <span>Short, fast, everyday issues.</span>
+          </a>
+          <a class="landing-path-chooser__card" href="/surveys/divisive/">
+            <strong>Divisive Surveys</strong>
+            <span>Deeper topics and tradeoffs.</span>
+          </a>
         </div>
       </section>
 

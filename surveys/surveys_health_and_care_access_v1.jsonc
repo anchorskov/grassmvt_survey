@@ -1,0 +1,335 @@
+// surveys/surveys_health_and_care_access_v1.jsonc
+// slug: health-and-care-access
+// version: v1 | 2026-03-19
+// title: Health Care Access & Cost
+{
+  "title": "Health Care Access & Cost",
+  "description": "Understand whether people can get the care they need without excessive cost, delay, or travel burdens.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "health-and-care-access",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "coverage_and_access",
+      "title": "Section 1: Coverage and access",
+      "description": "A quick picture of your current health care situation.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "insurance_status",
+          "title": "1. What best describes your current health coverage?",
+          "isRequired": true,
+          "choices": [
+            "Private insurance through work",
+            "Private insurance not through work",
+            "Medicare",
+            "Medicaid",
+            "VA or military coverage",
+            "Indian Health Service or tribal health coverage",
+            "Uninsured",
+            "Other",
+            "Not sure",
+            "Prefer not to answer"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "radiogroup",
+          "name": "care_access_now",
+          "title": "2. How would you describe your access to needed health care right now?",
+          "isRequired": true,
+          "choices": [
+            "Very good",
+            "Good",
+            "Mixed",
+            "Poor",
+            "Very poor",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "affordability",
+      "title": "Section 2: Affordability",
+      "description": "How costs affect your ability to use care.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "oop_cost_manageable",
+          "title": "3. How manageable are your out-of-pocket health care costs?",
+          "isRequired": true,
+          "choices": [
+            "Very manageable",
+            "Mostly manageable",
+            "Difficult",
+            "Very difficult",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "cost_change_year",
+          "title": "4. Compared to one year ago, your health care costs are:",
+          "isRequired": true,
+          "choices": [
+            "Much higher",
+            "Somewhat higher",
+            "About the same",
+            "Lower",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "delayed_or_skipped_care",
+      "title": "Section 3: Delayed or skipped care",
+      "description": "Whether cost or access caused you to put off care.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "delayed_or_skipped_items",
+          "title": "5. In the past 12 months, have you delayed or skipped any of the following because of cost, availability, or travel burden? Select all that apply.",
+          "isRequired": true,
+          "choices": [
+            "Primary care visit",
+            "Specialist visit",
+            "Prescription medication",
+            "Dental care",
+            "Vision care",
+            "Mental health care",
+            "A test or procedure",
+            "Urgent care follow-up",
+            "None of these"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "main_barrier_to_care",
+          "title": "6. What is the biggest barrier to getting care when you need it?",
+          "isRequired": true,
+          "choices": [
+            "Cost",
+            "Insurance coverage limits",
+            "Long wait times",
+            "Travel distance",
+            "Difficulty getting time off work",
+            "Childcare or family responsibilities",
+            "Not enough local providers",
+            "Other",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        }
+      ]
+    },
+    {
+      "name": "availability_and_travel",
+      "title": "Section 4: Availability and travel",
+      "description": "How easy it is to reach the care you need.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "appointment_ease",
+          "title": "7. How easy is it to get a routine appointment where you live?",
+          "isRequired": true,
+          "choices": [
+            "Very easy",
+            "Mostly easy",
+            "Difficult",
+            "Very difficult",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "travel_for_care",
+          "title": "8. How far do you usually need to travel for care you consider important?",
+          "isRequired": true,
+          "choices": [
+            "Within my local community",
+            "Within 30 minutes",
+            "30 to 60 minutes",
+            "More than 1 hour",
+            "More than 2 hours",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "household_impact",
+      "title": "Section 5: Household impact",
+      "description": "How health care affects family stability.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "household_stress",
+          "title": "9. How much stress has health care created for your household budget in the past year?",
+          "isRequired": true,
+          "choices": [
+            "A great deal",
+            "Some",
+            "A little",
+            "None",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "main_health_concern",
+          "title": "10. What concerns you most about health care going forward?",
+          "isRequired": true,
+          "choices": [
+            "Rising costs",
+            "Losing coverage",
+            "Not enough local providers",
+            "Long wait times",
+            "Prescription costs",
+            "Mental health access",
+            "Major medical debt",
+            "Quality of care",
+            "Other",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        }
+      ]
+    },
+    {
+      "name": "what_would_help",
+      "title": "Section 6: What would help most",
+      "description": "Which changes would make the biggest difference right now.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "helpful_changes",
+          "title": "11. Which changes would help you most right now? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Lower out-of-pocket costs",
+            "Lower prescription prices",
+            "Better insurance coverage",
+            "More local providers",
+            "Faster appointments",
+            "More dental and vision access",
+            "Better mental health access",
+            "Less travel for care",
+            "Other"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "comment",
+          "name": "one_change_health",
+          "title": "12. If one thing could improve health care for you or your household immediately, what would it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_background",
+      "title": "Optional background",
+      "description": "These questions help interpret results without identifying you personally.",
+      "elements": [
+        {
+          "type": "dropdown",
+          "name": "state",
+          "title": "13. State",
+          "isRequired": false,
+          "choices": [
+            "Alabama",
+            "Alaska",
+            "Arizona",
+            "Arkansas",
+            "California",
+            "Colorado",
+            "Connecticut",
+            "Delaware",
+            "District of Columbia",
+            "Florida",
+            "Georgia",
+            "Hawaii",
+            "Idaho",
+            "Illinois",
+            "Indiana",
+            "Iowa",
+            "Kansas",
+            "Kentucky",
+            "Louisiana",
+            "Maine",
+            "Maryland",
+            "Massachusetts",
+            "Michigan",
+            "Minnesota",
+            "Mississippi",
+            "Missouri",
+            "Montana",
+            "Nebraska",
+            "Nevada",
+            "New Hampshire",
+            "New Jersey",
+            "New Mexico",
+            "New York",
+            "North Carolina",
+            "North Dakota",
+            "Ohio",
+            "Oklahoma",
+            "Oregon",
+            "Pennsylvania",
+            "Rhode Island",
+            "South Carolina",
+            "South Dakota",
+            "Tennessee",
+            "Texas",
+            "Utah",
+            "Vermont",
+            "Virginia",
+            "Washington",
+            "West Virginia",
+            "Wisconsin",
+            "Wyoming",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "age_range",
+          "title": "14. Age range",
+          "isRequired": false,
+          "choices": [
+            "Under 18",
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

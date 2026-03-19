@@ -21,8 +21,11 @@ This file gives repo-specific instructions for coding agents working in `/home/a
 
 - `public/index.html`: landing page
 - `public/surveys/list/index.html`: survey list shell
+- `public/surveys/normal-life/index.html`: Normal Life survey browse shell
+- `public/surveys/divisive/index.html`: Divisive survey browse shell
 - `public/surveys/results/index.html`: results shell
 - `public/js/surveys-list.js`: survey list rendering and auth-aware loading
+- `public/js/survey-browser.js`: shared survey browse metadata helpers
 - `public/js/survey-results.js`: results page loading and rendering
 - `public/js/include-partials.js`: shared header/footer injection
 - `src/worker.js`: dynamic survey routes and API surface
@@ -31,6 +34,8 @@ This file gives repo-specific instructions for coding agents working in `/home/a
 
 - `/` is served from `public/index.html`.
 - `/surveys/list/` is a static page shell plus JS.
+- `/surveys/normal-life/` is a static page shell plus JS for the Normal Life path.
+- `/surveys/divisive/` is a static page shell plus JS for the Divisive path.
 - `/surveys/results/` is a static page shell plus JS.
 - `/surveys/<slug>` is worker-rendered and serves the SurveyJS app shell.
 - `/surveys/take/<slug>` is worker-rendered and serves the legacy markdown/template flow.
@@ -63,8 +68,11 @@ This file gives repo-specific instructions for coding agents working in `/home/a
 
 - Landing page actions are currently hard-coded in `public/index.html`.
 - Survey list data comes from both `/api/surveys/list` and `public/data/surveys.json`.
+- Path/category browse metadata is currently sourced from `public/data/surveys.json`.
 - Results pages resolve survey slug from query string or path and render client-side.
 - Some older survey take/resume flows still exist alongside newer SurveyJS routes.
+- Review `survey_flow.txt` before changing survey creation, seeding, or SurveyJS build behavior.
+- Do not leave test Wrangler or dev Worker processes running after verification is complete; stop them before finishing the task.
 
 ## Adding Surveys
 
@@ -183,7 +191,10 @@ This file gives repo-specific instructions for coding agents working in `/home/a
 - For migration changes:
   - check migration list before and after applying
 - For survey flow changes:
+  - review `survey_flow.txt` for the current survey build and seed process
   - verify landing, list, results, and worker-rendered survey routes still make sense together
+- For local worker or Wrangler testing:
+  - stop any test processes you started before handing the task back
 - If tests or browser checks were not run, say that clearly
 
 ## Known Gotchas
