@@ -351,7 +351,11 @@ const main = () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'survey-seed-'));
   const sqlFile = path.join(tempDir, `seed-surveys-${Date.now()}.sql`);
 
-  let sql = '-- Auto-generated seed file from JSONC sources\nBEGIN TRANSACTION;\n';
+  const useTransaction = dbTarget === 'local';
+  let sql = '-- Auto-generated seed file from JSONC sources\n';
+  if (useTransaction) {
+    sql += 'BEGIN TRANSACTION;\n';
+  }
 
   targets.forEach((source) => {
     const survey = loadSurvey(source);
@@ -372,7 +376,9 @@ const main = () => {
     );
   });
 
-  sql += '\nCOMMIT;\n';
+  if (useTransaction) {
+    sql += '\nCOMMIT;\n';
+  }
 
   fs.writeFileSync(sqlFile, sql);
   runWrangler({ dbName, local: dbTarget === 'local', sqlFile, envName });
