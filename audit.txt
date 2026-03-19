@@ -1,7 +1,8 @@
 ======================================================================
 PROJECT AUDIT: grassmvt_survey
 Date: 2026-03-19
-Scope: Full technical and structural audit (read-only)
+Updated: 2026-03-19 (post-fix deployment)
+Scope: Full technical and structural audit + remediation
 ======================================================================
 
 ======================================================================
@@ -187,7 +188,8 @@ Error handling patterns:
 - Most API handlers return jsonResponse with status codes (400, 403, 404, 500)
 - Worker-rendered pages return plain text errors (e.g., "Not Found", "Method Not Allowed")
 - Top-level catch sends generic error response
-- parseJsonBody swallows parse errors and returns {} -- callers must handle null/empty body
+- parseJsonBody logs parse errors and returns {_parseError:true} -- callers
+  can detect malformed input (FIXED 2026-03-19, previously returned silent {})
 - Some error paths lack consistent error codes (e.g., admin backfill checks
   user email directly: `user.email !== 'anchorskov@gmail.com'`)
 
@@ -285,11 +287,13 @@ Differences between local and remote seeding:
 - Both use the same SQL generation logic
 - dbTarget maps: local->wy_local, preview->wy_preview, prod->wy
 
-Seed script scope='public' issue:
-- Line in buildSql: "VALUES ('${slug}', 'public', ...)"
-- ALL surveys are seeded with scope='public' regardless of their intended scope
-- surveys.json has some surveys as scope='wy'
-- This means the D1 data does not reflect intended scope for wy-targeted surveys
+Seed script scope issue:
+- FIXED (2026-03-19): buildSql now accepts a scope parameter instead of
+  hardcoding 'public'. Four wy-scoped survey sources (abortion, wy-public-
+  school-funding-2026, wy-household-economic-outlook, wy-health-care-costs-
+  access-options) now have scope:'wy' in surveySources. The UPDATE statement
+  also sets scope, so re-seeding corrects existing D1 rows.
+- All four wy surveys re-seeded to production D1 on 2026-03-19.
 
 ======================================================================
 7. FRONTEND LOGIC
@@ -406,7 +410,7 @@ Mismatches across sources:
   | status             | No    | Yes      | Yes         | Yes |
   | flow_type/flow_meta| Yes   | Yes      | No          | Yes (section controls) |
 
-  * scope in D1 is always 'public' due to seed script bug
+  * scope in D1 was always 'public' due to seed script bug; FIXED 2026-03-19
 
 This means surveys.json is the SOLE source of truth for 6 critical browse
 metadata fields. Any survey not in surveys.json will lack this metadata.
@@ -502,11 +506,11 @@ Injection risks:
   but could theoretically fail on unusual characters in survey JSON content.
 
 Admin backfill endpoint:
-- /api/admin/backfill-aggregates at line ~8732 has a suspicious auth check:
-  it calls getSessionUser but the result is an object {status, user}, yet the
-  code checks `if (!user || user.email !== ...)`. Since getSessionUser returns
-  {status:'valid', user:{...}}, `user` here is the wrapper, not the user record.
-  This needs verification -- it may silently allow or deny incorrectly.
+- FIXED (2026-03-19): /api/admin/backfill-aggregates auth check now correctly
+  uses sessionResult.status === 'valid' and sessionResult.user.email instead
+  of the broken pattern that treated the wrapper object as the user. Previously,
+  remote requests were always rejected (safe failure) because the wrapper
+  object's .email was undefined. Now the guard works as intended.
 
 ======================================================================
 11. PERFORMANCE & SCALING
@@ -561,24 +565,30 @@ Client-side vs server-side filtering:
    surveys.json. Any survey not in surveys.json will lack display metadata.
    Any divergence between surveys.json and D1 will produce confusing UI states.
 
-2. SCOPE MISMATCH IN SEEDING
+2. SCOPE MISMATCH IN SEEDING -- FIXED (2026-03-19)
    File: scripts/seed-surveys-from-jsonc.mjs, buildSql function
-   All surveys are seeded with scope='public' regardless of intended scope.
-   surveys.json correctly marks some as scope='wy'. The client merge picks up
-   D1 scope when available, potentially showing wy surveys as public-scoped.
+   Was: All surveys seeded with scope='public' regardless of intended scope.
+   Fix: Added scope field to surveySources entries for 4 wy surveys. buildSql
+   now uses the supplied scope. All 4 wy surveys re-seeded to production.
+   Deployed to production: 2026-03-19.
 
-3. IN-MEMORY RATE LIMITING UNRELIABLE IN PRODUCTION
+3. IN-MEMORY RATE LIMITING (REVISED -- lower severity than originally stated)
    File: src/worker.js, localRateLimiters (line 41)
-   Cloudflare Workers run across many isolates. In-memory Maps reset on each
-   new isolate. Rate limits for Town Hall submissions and voter verification
-   attempts are effectively non-functional in a distributed production environment.
+   Investigation revealed all three rate limiters (Town Hall, voter issue,
+   voter attempt) have D1-backed primary paths. The in-memory Maps are only
+   a fallback when the rate_limit_* tables don't exist. Severity downgraded
+   from HIGH to LOW. The in-memory fallback is unreliable across isolates,
+   but the D1-backed path is the production default.
 
-4. DUPLICATE MIGRATION NUMBER 0015
+4. DUPLICATE MIGRATION NUMBER 0015 (ACCEPTED -- cannot safely rename)
    Files: db/migrations/0015_add_district_to_user_address_verification.sql,
           db/migrations/0015_add_senate_district.sql
    Two files share migration number 0015. One is a no-op marker, the other
-   performs real schema changes. Depending on which Wrangler processes first,
-   the schema could be in an inconsistent state on fresh databases.
+   performs real schema changes. Wrangler tracks migrations by full filename,
+   not by number prefix, so both are tracked independently and both have
+   already been applied in local and production. Renaming would cause Wrangler
+   to see the renamed file as a new unapplied migration, which would fail.
+   Risk is cosmetic only; no action needed.
 
 5. HARD-CODED ADMIN CHECK
    File: src/worker.js (multiple locations, e.g., backfill-aggregates)
@@ -590,16 +600,21 @@ Client-side vs server-side filtering:
    Remote/preview seeds do not use transactions. A failure mid-seed will leave
    D1 in partial state with some surveys updated and others not.
 
-7. ADMIN BACKFILL ENDPOINT AUTH CHECK POSSIBLY BROKEN
+7. ADMIN BACKFILL ENDPOINT AUTH CHECK -- FIXED (2026-03-19)
    File: src/worker.js (~line 8732)
-   The endpoint calls getSessionUser which returns {status, user} but the code
-   appears to check `user` as if it were the inner user object. The result may
-   be that the admin check always passes or always fails depending on the shape.
+   Was: getSessionUser returns {status, user} but code treated wrapper as user.
+   Result was that remote (non-localhost) requests were always rejected because
+   wrapper.email was undefined (safe failure mode, but wrong reason).
+   Fix: Now checks sessionResult.status === 'valid' && sessionResult.user.email.
+   Deployed to production: 2026-03-19.
 
-8. parseJsonBody SWALLOWS ERRORS
+8. parseJsonBody ERROR HANDLING -- FIXED (2026-03-19)
    File: src/worker.js (line 219)
-   Returns {} on any JSON parse failure. Callers that expect required fields
-   may proceed with undefined values rather than returning 400.
+   Was: Returned silent {} on any JSON parse failure.
+   Fix: Now logs console.warn with the error message and returns {_parseError:true}.
+   All 30+ existing callers continue to work unchanged (they destructure specific
+   fields), but malformed requests are now logged and optionally detectable.
+   Deployed to production: 2026-03-19.
 
 9. LEGACY FLOW COEXISTS WITHOUT SHARED AUTH
    Files: /surveys/take/<slug> routes, survey-take.js
@@ -640,17 +655,20 @@ Client-side vs server-side filtering:
 ======================================================================
 
 HIGH PRIORITY (must fix soon):
-- Fix in-memory rate limiting for production (replace localRateLimiters with
-  D1-backed rate limiting or Cloudflare Durable Objects)
-- Resolve duplicate migration 0015 (consolidate or renumber)
-- Fix scope seeding (seed script should use correct scope per survey)
-- Verify admin backfill endpoint auth check correctness
+- [DONE] Fix scope seeding -- scope:'wy' added to 4 survey sources, re-seeded
+  to production (2026-03-19)
+- [DONE] Fix admin backfill endpoint auth check -- now uses sessionResult.status
+  and sessionResult.user.email correctly (deployed 2026-03-19)
+- [REVISED] In-memory rate limiting -- investigation showed D1-backed primary
+  paths exist; in-memory is fallback only. Downgraded to LOW priority.
+- [ACCEPTED] Duplicate migration 0015 -- cannot rename without breaking Wrangler
+  tracking. Both files already applied. Cosmetic issue only.
 - Remove hard-coded admin email check; implement proper role-based admin auth
 
 MEDIUM PRIORITY:
 - Move critical browse metadata (path, display_order, estimated_minutes, featured)
   into D1 so /api/surveys/list is self-sufficient
-- Add proper error responses for malformed JSON bodies (instead of swallowing)
+- [DONE] Add error logging for malformed JSON bodies (deployed 2026-03-19)
 - Add transaction support for remote seeding (or implement atomic batch writes)
 - Consolidate stripJsonc into a shared utility
 - Add HEAD request handling for monitoring/health checks
