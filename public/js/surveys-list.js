@@ -15,6 +15,9 @@
   const comingSoonGrid = document.getElementById('survey-coming-soon-grid');
   const comingSoonIntro = document.getElementById('survey-coming-soon-intro');
   const comingSoonSection = document.getElementById('survey-coming-soon-section');
+  const bridgeGrid = document.getElementById('survey-bridge-grid');
+  const bridgeIntro = document.getElementById('survey-bridge-intro');
+  const bridgeSection = document.getElementById('survey-bridge-section');
   const authNote = document.getElementById('survey-auth-note');
   const pathLinks = Array.from(document.querySelectorAll('[data-survey-path-link]'));
 
@@ -26,6 +29,7 @@
   const pageTitle = browsePage.dataset.pageTitle || 'Browse surveys';
 
   const escapeHtml = browseApi.escapeHtml;
+  const suggestionState = new Map();
 
   const getStoredSession = () => {
     try {
@@ -164,6 +168,60 @@
     const featuredBadge = survey.featured
       ? '<span class="survey-browse-card__pill survey-browse-card__pill--featured">Featured</span>'
       : '';
+    const suggestionKey = survey.slug || survey.id || survey.title || '';
+    const suggestionFormState = suggestionState.get(suggestionKey) || {};
+    const suggestionExpanded = survey.status === 'coming_soon' && Boolean(suggestionFormState.expanded);
+    const suggestionSubmitting = Boolean(suggestionFormState.submitting);
+    const suggestionSuccess = suggestionFormState.successMessage
+      ? `<p class="survey-suggestion__message survey-suggestion__message--success">${escapeHtml(
+          suggestionFormState.successMessage
+        )}</p>`
+      : '';
+    const suggestionError = suggestionFormState.errorMessage
+      ? `<p class="survey-suggestion__message survey-suggestion__message--error">${escapeHtml(
+          suggestionFormState.errorMessage
+        )}</p>`
+      : '';
+    const suggestionBlock = survey.status === 'coming_soon'
+      ? `
+        <div class="survey-suggestion" data-suggestion-root data-suggestion-slug="${escapeHtml(suggestionKey)}">
+          <p class="survey-suggestion__prompt">Have a suggestion for this survey?</p>
+          <button
+            class="button button--small button--secondary"
+            type="button"
+            data-suggestion-toggle
+            aria-expanded="${suggestionExpanded ? 'true' : 'false'}"
+          >
+            Suggest questions
+          </button>
+          <form class="survey-suggestion__form ${suggestionExpanded ? '' : 'is-hidden'}" data-suggestion-form>
+            <input type="hidden" name="surveySlug" value="${escapeHtml(survey.slug || '')}" />
+            <input type="hidden" name="surveyTitle" value="${escapeHtml(survey.title || '')}" />
+            <label class="survey-suggestion__field">
+              <span>Name (optional)</span>
+              <input type="text" name="name" maxlength="120" value="${escapeHtml(suggestionFormState.name || '')}" />
+            </label>
+            <label class="survey-suggestion__field">
+              <span>Email (optional)</span>
+              <input type="email" name="email" maxlength="200" value="${escapeHtml(suggestionFormState.email || '')}" />
+            </label>
+            <label class="survey-suggestion__field">
+              <span>Suggestion</span>
+              <textarea name="suggestion" rows="4" maxlength="4000" required>${escapeHtml(
+                suggestionFormState.suggestion || ''
+              )}</textarea>
+            </label>
+            ${suggestionSuccess}
+            ${suggestionError}
+            <div class="card__actions survey-suggestion__actions">
+              <button class="button button--small" type="submit" ${suggestionSubmitting ? 'disabled' : ''}>
+                ${suggestionSubmitting ? 'Sending...' : 'Send suggestion'}
+              </button>
+            </div>
+          </form>
+        </div>
+      `
+      : '';
 
     return `
       <article class="card survey-browse-card">
@@ -184,6 +242,7 @@
           ${resultsLink}
           ${discussLink}
         </div>
+        ${suggestionBlock}
       </article>
     `;
   };
@@ -200,25 +259,44 @@
   };
 
   const renderBrowseSections = (surveys) => {
-    const activeSurveys = browseApi.filterSurveys(surveys, {
-      path: pagePath,
+    const primaryPaths = ['normal-life', 'divisive'];
+    const visiblePathForPage = pagePath === 'all' ? null : pagePath;
+    const activeBaseOptions = {
       statuses: ['active'],
-    });
-    const comingSoonSurveys = browseApi.filterSurveys(surveys, {
-      path: pagePath,
+    };
+    const comingSoonBaseOptions = {
       statuses: ['coming_soon'],
-    });
+    };
+    const activeSurveys = browseApi.filterSurveys(surveys, {
+      ...activeBaseOptions,
+      path: visiblePathForPage || 'all',
+    }).filter((survey) => pagePath !== 'all' || primaryPaths.includes(survey.path));
+    const comingSoonSurveys = browseApi.filterSurveys(surveys, {
+      ...comingSoonBaseOptions,
+      path: visiblePathForPage || 'all',
+    }).filter((survey) => pagePath !== 'all' || primaryPaths.includes(survey.path));
+    const bridgeSurveys = pagePath === 'all'
+      ? browseApi.filterSurveys(surveys, {
+          path: 'bridge',
+          statuses: ['active', 'coming_soon'],
+        })
+      : [];
 
     if (activeIntro) {
       activeIntro.textContent = pagePath === 'all'
-        ? 'All active surveys across both paths.'
+        ? 'Active surveys across the main browse paths.'
         : `Current ${pageTitle.toLowerCase()} ready to take now.`;
     }
 
     if (comingSoonIntro) {
       comingSoonIntro.textContent = pagePath === 'all'
-        ? 'Upcoming topics that are scaffolded but not yet live.'
+        ? 'Upcoming topics in the main browse paths that are scaffolded but not yet live.'
         : `Upcoming ${pageTitle.toLowerCase()} topics that are scaffolded but not yet live.`;
+    }
+
+    if (bridgeIntro && pagePath === 'all') {
+      bridgeIntro.textContent =
+        'Cross-cutting surveys that focus on understanding disagreement, tradeoffs, or shared ground without forcing them into a single path.';
     }
 
     const activeEmptyMessage = pagePath === 'normal-life'
@@ -234,6 +312,20 @@
       emptyMessage: activeEmptyMessage,
     });
 
+    if (bridgeSection && bridgeGrid) {
+      if (pagePath !== 'all' || !bridgeSurveys.length) {
+        bridgeSection.classList.add('is-hidden');
+        bridgeGrid.innerHTML = '';
+      } else {
+        renderSection({
+          grid: bridgeGrid,
+          section: bridgeSection,
+          surveys: bridgeSurveys,
+          emptyMessage: 'No bridge surveys are available right now.',
+        });
+      }
+    }
+
     if (!comingSoonSurveys.length && pagePath !== 'all') {
       comingSoonSection.classList.add('is-hidden');
       comingSoonGrid.innerHTML = '';
@@ -248,17 +340,142 @@
     });
   };
 
+  const updateSuggestionState = (key, nextState) => {
+    if (!key) {
+      return;
+    }
+    suggestionState.set(key, {
+      ...(suggestionState.get(key) || {}),
+      ...nextState,
+    });
+  };
+
+  const collectRenderedSurveys = async () => {
+    const [apiResponse, staticSurveys] = await Promise.all([
+      fetch('/api/surveys/list', { credentials: 'same-origin', cache: 'no-store' }),
+      browseApi.loadCatalog(),
+    ]);
+    const apiSurveys = apiResponse.ok ? await apiResponse.json() : [];
+    return browseApi.mergeSurveyData(
+      Array.isArray(apiSurveys) ? apiSurveys : [],
+      staticSurveys
+    );
+  };
+
+  const rerenderSurveys = async () => {
+    try {
+      const merged = await collectRenderedSurveys();
+      renderBrowseSections(merged);
+    } catch (error) {
+      renderErrorState('Surveys are unavailable right now.');
+    }
+  };
+
+  browsePage.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-suggestion-toggle]');
+    if (!toggle) {
+      return;
+    }
+    const root = toggle.closest('[data-suggestion-root]');
+    const key = root?.dataset.suggestionSlug || '';
+    if (!key) {
+      return;
+    }
+    const existing = suggestionState.get(key) || {};
+    updateSuggestionState(key, {
+      expanded: !existing.expanded,
+      successMessage: existing.expanded ? '' : existing.successMessage || '',
+      errorMessage: existing.expanded ? '' : existing.errorMessage || '',
+    });
+    rerenderSurveys();
+  });
+
+  browsePage.addEventListener('submit', async (event) => {
+    const form = event.target.closest('[data-suggestion-form]');
+    if (!form) {
+      return;
+    }
+    event.preventDefault();
+    const formData = new FormData(form);
+    const surveySlug = String(formData.get('surveySlug') || '').trim();
+    const surveyTitle = String(formData.get('surveyTitle') || '').trim();
+    const name = String(formData.get('name') || '').trim();
+    const email = String(formData.get('email') || '').trim();
+    const suggestion = String(formData.get('suggestion') || '').trim();
+    const key = surveySlug || surveyTitle;
+
+    if (!suggestion) {
+      updateSuggestionState(key, {
+        expanded: true,
+        name,
+        email,
+        suggestion,
+        successMessage: '',
+        errorMessage: 'Suggestion text is required.',
+      });
+      rerenderSurveys();
+      return;
+    }
+
+    updateSuggestionState(key, {
+      expanded: true,
+      name,
+      email,
+      suggestion,
+      submitting: true,
+      successMessage: '',
+      errorMessage: '',
+    });
+    await rerenderSurveys();
+
+    try {
+      const response = await fetch('/api/survey-suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          surveySlug,
+          surveyTitle,
+          name,
+          email,
+          suggestion,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || 'Unable to send suggestion right now.');
+      }
+      updateSuggestionState(key, {
+        expanded: true,
+        name: '',
+        email: '',
+        suggestion: '',
+        submitting: false,
+        successMessage: 'Thanks. Your suggestion was sent.',
+        errorMessage: '',
+      });
+      await rerenderSurveys();
+      return;
+    } catch (error) {
+      updateSuggestionState(key, {
+        expanded: true,
+        name,
+        email,
+        suggestion,
+        submitting: false,
+        successMessage: '',
+        errorMessage: error?.message || 'Unable to send suggestion right now.',
+      });
+      await rerenderSurveys();
+      return;
+    }
+  });
+
   const loadSurveys = async () => {
     try {
-      const [apiResponse, staticSurveys] = await Promise.all([
-        fetch('/api/surveys/list', { credentials: 'same-origin', cache: 'no-store' }),
-        browseApi.loadCatalog(),
-      ]);
-      const apiSurveys = apiResponse.ok ? await apiResponse.json() : [];
-      const merged = browseApi.mergeSurveyData(
-        Array.isArray(apiSurveys) ? apiSurveys : [],
-        staticSurveys
-      );
+      const merged = await collectRenderedSurveys();
       renderBrowseSections(merged);
     } catch (error) {
       renderErrorState('Surveys are unavailable right now.');

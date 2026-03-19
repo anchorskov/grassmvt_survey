@@ -81,6 +81,10 @@ const surveySources = {
     slug: 'energy-public-lands',
     file: 'surveys/surveys_energy_public_lands_v1.jsonc',
   },
+  'trust-institutions-shared-truth-v1': {
+    slug: 'trust-institutions-shared-truth',
+    file: 'surveys/surveys_trust-institutions-shared-truth_v1.jsonc',
+  },
 };
 
 const parseArgs = (argv) => {

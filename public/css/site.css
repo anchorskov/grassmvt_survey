@@ -972,6 +972,74 @@ main {
   color: #26412f;
 }
 
+.survey-suggestion {
+  display: grid;
+  gap: 0.7rem;
+  padding-top: 0.2rem;
+  border-top: 1px solid #e6ddd1;
+}
+
+.survey-suggestion__prompt {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #3a2a1a;
+}
+
+.survey-suggestion__form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.1rem;
+  padding: 0.9rem;
+  border: 1px solid #e6ddd1;
+  border-radius: 16px;
+  background: #fbf7f0;
+}
+
+.survey-suggestion__field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+  color: #3a2a1a;
+}
+
+.survey-suggestion__field span {
+  font-weight: 600;
+}
+
+.survey-suggestion__field input,
+.survey-suggestion__field textarea {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #cfbea9;
+  border-radius: 10px;
+  background: #fffdf9;
+  color: #1f150d;
+  font: inherit;
+}
+
+.survey-suggestion__field textarea {
+  resize: vertical;
+  min-height: 7rem;
+}
+
+.survey-suggestion__message {
+  margin: 0;
+  font-size: 0.94rem;
+}
+
+.survey-suggestion__message--success {
+  color: #26412f;
+}
+
+.survey-suggestion__message--error {
+  color: #8a2d1f;
+}
+
+.survey-suggestion__actions {
+  margin-top: 0;
+}
+
 @media (max-width: 720px) {
   .survey-path-picker__grid {
     grid-template-columns: 1fr;

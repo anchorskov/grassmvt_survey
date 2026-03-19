@@ -18,7 +18,7 @@ import {
   TOWNHALL_STATEMENT_QUALITY_MESSAGE,
   validateTownhallStatementQuality,
 } from './lib/townhall-moderation.js';
-import { sendEmail } from './server/email/resend.js';
+import { sendEmail, sendSupportEmail } from './server/email/resend.js';
 
 const escapeHtml = (value = '') =>
   value
@@ -616,6 +616,51 @@ const sendPasswordResetEmail = async (env, { to, resetUrl, replyTo }) => {
   const text = `Use this link to reset your password: ${resetUrl}`;
   const html = `Use this link to reset your password:<br />${resetUrl}`;
   return sendEmail(env, { to, subject, text, html, replyTo });
+};
+
+const sendSurveySuggestionEmail = async (
+  env,
+  {
+    surveySlug,
+    surveyTitle,
+    suggestion,
+    name,
+    email,
+  }
+) => {
+  const normalizedSlug = truncateValue((surveySlug || '').trim(), 120);
+  const normalizedTitle = truncateValue((surveyTitle || '').trim(), 200);
+  const normalizedSuggestion = truncateValue((suggestion || '').trim(), 4000);
+  const normalizedName = truncateValue((name || '').trim(), 120);
+  const normalizedEmail = truncateValue((email || '').trim(), 200);
+
+  const subject = `Survey suggestion: ${normalizedTitle || normalizedSlug || 'Unknown survey'}`;
+  const text = [
+    'A new survey suggestion was submitted.',
+    '',
+    `Survey title: ${normalizedTitle || '(missing)'}`,
+    `Survey slug: ${normalizedSlug || '(missing)'}`,
+    `Name: ${normalizedName || '(not provided)'}`,
+    `Email: ${normalizedEmail || '(not provided)'}`,
+    '',
+    'Suggestion:',
+    normalizedSuggestion,
+  ].join('\n');
+  const html = `
+    <p>A new survey suggestion was submitted.</p>
+    <p><strong>Survey title:</strong> ${escapeHtml(normalizedTitle || '(missing)')}</p>
+    <p><strong>Survey slug:</strong> ${escapeHtml(normalizedSlug || '(missing)')}</p>
+    <p><strong>Name:</strong> ${escapeHtml(normalizedName || '(not provided)')}</p>
+    <p><strong>Email:</strong> ${escapeHtml(normalizedEmail || '(not provided)')}</p>
+    <p><strong>Suggestion:</strong></p>
+    <p>${escapeHtml(normalizedSuggestion).replace(/\n/g, '<br />')}</p>
+  `;
+
+  return sendSupportEmail(env, {
+    subject,
+    text,
+    html,
+  });
 };
 
 const getWebAuthnRpId = (request, env) => {
@@ -6558,6 +6603,69 @@ export default {
       } catch (error) {
         return jsonResponse({ error: error.message }, { status: 500 });
       }
+    }
+
+    if (url.pathname === '/api/survey-suggestions') {
+      if (request.method !== 'POST') {
+        return jsonResponse(
+          { ok: false, code: 'METHOD_NOT_ALLOWED', message: 'POST required.' },
+          { status: 405, headers: { Allow: 'POST' } }
+        );
+      }
+
+      const body = await parseJsonBody(request);
+      const surveySlug = truncateValue((body.surveySlug || '').toString().trim(), 120);
+      const surveyTitle = truncateValue((body.surveyTitle || '').toString().trim(), 200);
+      const suggestion = truncateValue((body.suggestion || '').toString().trim(), 4000);
+      const name = truncateValue((body.name || '').toString().trim(), 120);
+      const email = truncateValue((body.email || '').toString().trim(), 200);
+
+      if (!suggestion) {
+        return jsonResponse(
+          { ok: false, code: 'SUGGESTION_REQUIRED', message: 'Suggestion text is required.' },
+          { status: 400 }
+        );
+      }
+
+      if (!surveySlug || !surveyTitle) {
+        return jsonResponse(
+          { ok: false, code: 'SURVEY_CONTEXT_REQUIRED', message: 'Survey context is required.' },
+          { status: 400 }
+        );
+      }
+
+      if (email && !isValidEmail(email)) {
+        return jsonResponse(
+          { ok: false, code: 'INVALID_EMAIL', message: 'Email address is invalid.' },
+          { status: 400 }
+        );
+      }
+
+      const emailResult = await sendSurveySuggestionEmail(env, {
+        surveySlug,
+        surveyTitle,
+        suggestion,
+        name,
+        email,
+      });
+
+      if (!emailResult.ok) {
+        console.error('[SurveySuggestions] Email send failed:', {
+          code: emailResult.code || null,
+          status: emailResult.status || null,
+          surveySlug,
+        });
+        return jsonResponse(
+          { ok: false, code: 'SEND_FAILED', message: 'Unable to send suggestion right now.' },
+          { status: 502 }
+        );
+      }
+
+      return jsonResponse({
+        ok: true,
+        message: 'Thanks. Your suggestion was sent.',
+        stubbed: Boolean(emailResult.stubbed),
+      });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/geo') {

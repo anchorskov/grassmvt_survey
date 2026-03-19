@@ -1,0 +1,230 @@
+// surveys/surveys_trust-institutions-shared-truth_v1.jsonc
+{
+  "title": "Trust in Institutions & Shared Truth",
+  "description": "Understand how people view trust, information sources, and how we determine what is true.",
+
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "bridge",
+    "category_slug": "trust-shared-truth",
+    "estimated_minutes": 6,
+    "featured": true
+  },
+
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+
+  "pages": [
+    {
+      "name": "baseline",
+      "title": "Section 1: General trust",
+      "description": "How much trust exists in key systems.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "trust_overall",
+          "title": "1. How much trust do you have in major institutions overall?",
+          "isRequired": true,
+          "choices": [
+            "A great deal",
+            "Some",
+            "A little",
+            "None",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "direction_trust",
+          "title": "2. Is trust in institutions increasing or decreasing?",
+          "isRequired": true,
+          "choices": [
+            "Increasing",
+            "Staying the same",
+            "Decreasing",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "institutions",
+      "title": "Section 2: Trust by institution",
+      "description": "Confidence across different institutions.",
+      "elements": [
+        {
+          "type": "matrix",
+          "name": "institution_trust_matrix",
+          "title": "3. How much do you trust the following?",
+          "isRequired": true,
+          "columns": [
+            { "value": "high", "text": "High trust" },
+            { "value": "moderate", "text": "Moderate trust" },
+            { "value": "low", "text": "Low trust" },
+            { "value": "none", "text": "No trust" },
+            { "value": "ns", "text": "Not sure" }
+          ],
+          "rows": [
+            "Local government",
+            "State government",
+            "Federal government",
+            "Courts and legal system",
+            "Law enforcement",
+            "News media",
+            "Social media platforms",
+            "Large corporations",
+            "Small businesses",
+            "Educational institutions"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "information_sources",
+      "title": "Section 3: Information sources",
+      "description": "Where information comes from.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "info_sources",
+          "title": "4. Where do you get most of your information? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Local news",
+            "National news",
+            "Social media",
+            "Podcasts",
+            "Friends and family",
+            "Direct research (documents, data)",
+            "Community meetings",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "radiogroup",
+          "name": "confidence_info",
+          "title": "5. How confident are you in the accuracy of the information you receive?",
+          "isRequired": true,
+          "choices": [
+            "Very confident",
+            "Somewhat confident",
+            "Not very confident",
+            "Not confident at all",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "truth_process",
+      "title": "Section 4: Determining truth",
+      "description": "How people evaluate what is true.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "truth_methods",
+          "title": "6. What helps you determine what is true? Select up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Multiple independent sources",
+            "Direct evidence or data",
+            "Trusted individuals",
+            "Personal experience",
+            "Expert analysis",
+            "Consensus across sources",
+            "Not sure",
+            "Other"
+          ],
+          "showOtherItem": true
+        },
+        {
+          "type": "radiogroup",
+          "name": "agreement_possible",
+          "title": "7. Do you believe people can still agree on basic facts?",
+          "isRequired": true,
+          "choices": [
+            "Yes, mostly",
+            "Sometimes",
+            "Rarely",
+            "No",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "misinformation",
+      "title": "Section 5: Misinformation and influence",
+      "description": "Perception of false or misleading information.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "misinformation_level",
+          "title": "8. How much misinformation exists today?",
+          "isRequired": true,
+          "choices": [
+            "A great deal",
+            "Some",
+            "A little",
+            "None",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "misinformation_source",
+          "title": "9. Where does most misinformation come from?",
+          "isRequired": true,
+          "choices": [
+            "Media organizations",
+            "Social media platforms",
+            "Government sources",
+            "Individuals sharing content",
+            "Foreign influence",
+            "Multiple sources",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "future",
+      "title": "Section 6: Rebuilding trust",
+      "description": "What could improve shared understanding.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "trust_rebuild",
+          "title": "10. What would most improve trust?",
+          "isRequired": true,
+          "choices": [
+            "Greater transparency",
+            "Independent oversight",
+            "Better access to information",
+            "Accountability for false information",
+            "Stronger local engagement",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "one_change_trust",
+          "title": "11. If one step would improve shared understanding, what should it be?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

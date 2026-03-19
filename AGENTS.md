@@ -36,6 +36,7 @@ This file gives repo-specific instructions for coding agents working in `/home/a
 - `/surveys/list/` is a static page shell plus JS.
 - `/surveys/normal-life/` is a static page shell plus JS for the Normal Life path.
 - `/surveys/divisive/` is a static page shell plus JS for the Divisive path.
+- `bridge` is supported as browse metadata, but is currently surfaced as a cross-cutting section on `/surveys/list/`, not a dedicated public route.
 - `/surveys/results/` is a static page shell plus JS.
 - `/surveys/<slug>` is worker-rendered and serves the SurveyJS app shell.
 - `/surveys/take/<slug>` is worker-rendered and serves the legacy markdown/template flow.
@@ -69,6 +70,7 @@ This file gives repo-specific instructions for coding agents working in `/home/a
 - Landing page actions are currently hard-coded in `public/index.html`.
 - Survey list data comes from both `/api/surveys/list` and `public/data/surveys.json`.
 - Path/category browse metadata is currently sourced from `public/data/surveys.json`.
+- `normal-life` and `divisive` have dedicated browse pages; `bridge` is reserved for the compatibility browse hub unless a later change explicitly adds a route.
 - Results pages resolve survey slug from query string or path and render client-side.
 - Some older survey take/resume flows still exist alongside newer SurveyJS routes.
 - Review `survey_flow.txt` before changing survey creation, seeding, or SurveyJS build behavior.

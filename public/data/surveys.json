@@ -298,5 +298,20 @@
     "display_order": 30,
     "estimated_minutes": 8,
     "featured": false
+  },
+  {
+    "id": "trust-institutions-shared-truth",
+    "slug": "trust-institutions-shared-truth",
+    "scope": "public",
+    "title": "Trust in Institutions & Shared Truth",
+    "description": "Understand how people view trust, information sources, and how we determine what is true.",
+    "landing_blurb": "A bridge survey on trust, information sources, and whether people can still agree on basic facts.",
+    "path": "bridge",
+    "status": "active",
+    "category_slug": "trust-shared-truth",
+    "display_order": 10,
+    "estimated_minutes": 6,
+    "featured": true,
+    "href": "/surveys/trust-institutions-shared-truth"
   }
 ]

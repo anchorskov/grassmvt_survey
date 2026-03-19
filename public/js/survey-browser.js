@@ -4,6 +4,7 @@
   const PATH_LABELS = {
     'normal-life': 'Normal Life',
     divisive: 'Divisive',
+    bridge: 'Bridge',
     all: 'All surveys',
   };
 
