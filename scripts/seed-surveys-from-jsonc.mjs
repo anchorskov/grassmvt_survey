@@ -12,18 +12,22 @@ const surveySources = {
   'abortion-v2': {
     slug: 'abortion',
     file: 'surveys/surveys_abortion_v2.jsonc',
+    scope: 'wy',
   },
   'wy-public-school-funding-2026-v2': {
     slug: 'wy-public-school-funding-2026',
     file: 'surveys/surveys_wy_public_school_funding_2026_v2.jsonc',
+    scope: 'wy',
   },
   'wy-household-economic-outlook-v1': {
     slug: 'wy-household-economic-outlook',
     file: 'surveys/surveys_wy_household_economic_outlook_v1.jsonc',
+    scope: 'wy',
   },
   'wy-health-care-costs-access-options-v1': {
     slug: 'wy-health-care-costs-access-options',
     file: 'surveys/surveys_wy_health_care_costs_access_options_v1.jsonc',
+    scope: 'wy',
   },
   'cost-of-living-v1': {
     slug: 'cost-of-living',
@@ -208,6 +212,7 @@ const loadSurvey = (source) => {
   const jsonHash = sha256Hex(jsonText);
   return {
     slug: source.slug,
+    scope: source.scope || 'public',
     title: parsed.title || source.slug,
     flowType,
     flowMeta,
@@ -218,6 +223,7 @@ const loadSurvey = (source) => {
 
 const buildSql = ({
   slug,
+  scope,
   title,
   version,
   flowType,
@@ -230,13 +236,15 @@ const buildSql = ({
 }) => {
   const publishedAt = publish ? "datetime('now')" : 'NULL';
   const flowMetaValue = flowMeta ? `'${flowMeta.replace(/'/g, "''")}'` : 'NULL';
+  const safeScope = scope === 'wy' ? 'wy' : 'public';
   return `
 -- Seed survey ${slug} version ${version}
 INSERT OR IGNORE INTO surveys (slug, scope, title, status, flow_type, flow_meta, created_at)
-VALUES ('${slug.replace(/'/g, "''")}', 'public', '${title.replace(/'/g, "''")}', 'active', '${flowType}', ${flowMetaValue}, datetime('now'));
+VALUES ('${slug.replace(/'/g, "''")}', '${safeScope}', '${title.replace(/'/g, "''")}', 'active', '${flowType}', ${flowMetaValue}, datetime('now'));
 
 UPDATE surveys
 SET title = '${title.replace(/'/g, "''")}',
+    scope = '${safeScope}',
     flow_type = '${flowType}',
     flow_meta = ${flowMetaValue}
 WHERE slug = '${slug.replace(/'/g, "''")}';
@@ -365,6 +373,7 @@ const main = () => {
     const survey = loadSurvey(source);
     sql += buildSql({
       slug: survey.slug,
+      scope: survey.scope,
       title: survey.title,
       version,
       flowType: survey.flowType,

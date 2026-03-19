@@ -1,6 +1,20 @@
 {
   "entries": [
     {
+      "page": "admin-tools",
+      "section": "verified-voter-link",
+      "title": "Verified voter link",
+      "summary": "Use this flow to issue a one-time link that helps a specific account complete or repair verified voter status.",
+      "body": "Target email is required and should match the account you want to help. Notes are optional and are useful for explaining why the link was issued. Expires in minutes is optional and sets how long the link stays valid before it can no longer be used. After submission, the system either sends an email automatically or returns a manual link if email sending is not available."
+    },
+    {
+      "page": "admin-tools",
+      "section": "users-list",
+      "title": "Users list",
+      "summary": "Use this section to review account verification state before or after issuing a link.",
+      "body": "Choose a filter first: Verified shows accounts that already have verified voter status, Unverified shows accounts that still need work, and All shows both. Load users fetches the current list from the server. The table helps you confirm email status, verification method, verified scope, Wyoming voter match fields, and district data before deciding what admin action is needed."
+    },
+    {
       "page": "survey-results",
       "section": "filters",
       "title": "Results filters",

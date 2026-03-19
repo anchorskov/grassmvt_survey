@@ -1,0 +1,672 @@
+======================================================================
+PROJECT AUDIT: grassmvt_survey
+Date: 2026-03-19
+Scope: Full technical and structural audit (read-only)
+======================================================================
+
+======================================================================
+1. SYSTEM OVERVIEW
+======================================================================
+
+Architecture:
+- Cloudflare Worker (src/worker.js, ~8,800 lines) serves as the entire backend
+- Static assets served from public/ via Cloudflare ASSETS binding
+- D1 database (SQLite-compatible) for persistent storage
+- SurveyJS for modern survey rendering (survey-core + survey-js-ui)
+- Legacy markdown/template flow coexists alongside SurveyJS
+- Auth via Lucia + @noble/hashes (scrypt) + SimpleWebAuthn for passkeys
+- Email via Resend (src/server/email/resend.js)
+- Town Hall discussion system built into the same Worker
+
+Data Flow (survey definition to user):
+  1. JSONC files authored in surveys/
+  2. Registered in scripts/seed-surveys-from-jsonc.mjs (surveySources map)
+  3. Seeded into D1 via Wrangler d1 execute (surveys + survey_versions + townhall_topics)
+  4. Worker serves /api/surveys/<slug> which returns JSON from survey_versions
+  5. SurveyJS client (src/surveyjs-app.js, bundled to public/js/surveyjs-bundle.js) renders survey
+  6. Responses posted to /api/surveys/<slug>/responses, stored in responses + response_answers
+  7. Aggregates updated in response_aggregates and aggregate_rollups
+  8. Results served via /api/results/* endpoints, rendered by public/js/survey-results.js
+
+Key Components:
+- src/worker.js: All routes, all API handlers, auth, Town Hall, aggregation, rendering
+- scripts/seed-surveys-from-jsonc.mjs: Survey seeding pipeline
+- public/data/surveys.json: Static metadata catalog (21 entries)
+- public/js/survey-browser.js: Shared browse/filter/merge helpers (window.SurveyBrowse)
+- public/js/surveys-list.js: Survey list page logic
+- public/js/survey-results.js: Results page logic
+- public/js/homepage.js: Landing page dynamic behavior
+- src/surveyjs-app.js: SurveyJS runtime initialization and submission
+- src/lib/townhall-moderation.js: Heuristic-based statement moderation
+
+======================================================================
+2. SURVEY DATA MODEL
+======================================================================
+
+Where survey data lives:
+
+A) D1 Database (primary):
+   - surveys: slug, scope, title, status, flow_type, flow_meta
+   - survey_versions: version, json_text, json_hash, published_at
+   - responses + response_answers: user responses
+   - response_aggregates + aggregate_rollups: pre-computed results
+
+B) JSONC Files (surveys/):
+   - 19 active JSONC files, all present and referenced in seed script
+   - Source of truth for survey content (SurveyJS JSON)
+   - Contains x_meta for flow metadata
+
+C) public/data/surveys.json (static metadata):
+   - 21 entries with browse metadata: path, category_slug, display_order,
+     estimated_minutes, featured, landing_blurb, status, scope
+   - Used as fallback/enrichment by frontend JS
+
+Source of Truth Analysis:
+- Survey content (questions/pages): JSONC -> D1 survey_versions (clear chain)
+- Survey status: Dual source - D1 surveys.status AND surveys.json status
+- Browse metadata (path, category_slug, display_order, estimated_minutes, featured):
+  ONLY in surveys.json -- NOT stored in D1 at all
+- Title/description: Stored in both D1 and surveys.json; API uses D1  
+- D1 surveys.scope is always seeded as 'public' by the seed script, even for
+  surveys that are 'wy' in surveys.json
+
+Duplication and Drift Risks:
+- CRITICAL: The /api/surveys/list endpoint does NOT return path, category_slug,
+  display_order, estimated_minutes, or featured. These fields come ONLY from
+  surveys.json via the client-side merge in survey-browser.js.
+- If a survey is added to D1 via seeding but not added to surveys.json,
+  it will appear in the API list without path or browse metadata. It will
+  sort to the end, show no path badge, no estimated minutes, and not be featured.
+- surveys.json has 21 entries; seed script has 19 sources. The two extras in
+  surveys.json are: "system-responsiveness" (coming_soon, no JSONC) and
+  "survey-process" (archived, no JSONC). This is intentional but creates a
+  situation where surveys.json contains survey metadata for surveys that may
+  not exist in D1.
+- The seed script hard-codes scope='public' for ALL surveys. surveys.json has
+  scope='wy' for 3 surveys. The client merge uses D1 scope when available,
+  so wy-scoped surveys may appear as 'public' in some contexts.
+
+======================================================================
+3. BROWSE SYSTEM
+======================================================================
+
+Implementation:
+- public/js/survey-browser.js defines PATH_LABELS for: 'normal-life', 'divisive',
+  'bridge', and 'all'. It exposes filterSurveys() which can filter by path.
+- public/js/surveys-list.js orchestrates the browse experience:
+  - Fetches /api/surveys/list (D1 data) and /data/surveys.json (static catalog)
+  - Merges via browseApi.mergeSurveyData()
+  - Path filtering happens CLIENT-SIDE using the path field from surveys.json
+  - The API has NO awareness of paths
+
+Where path filtering happens:
+- Entirely on the client. The API /api/surveys/list returns no path information.
+  All path assignment comes from surveys.json.
+
+Dedicated browse pages:
+- /surveys/list/ -> data-survey-path="all" (shows all paths + bridge section)
+- /surveys/normal-life/ -> presumably data-survey-path="normal-life"
+- /surveys/divisive/ -> presumably data-survey-path="divisive"
+
+Places that assume only two paths:
+- Homepage (public/index.html): Path chooser only shows Normal Life and Divisive.
+  No bridge card. Lines 47-57 hard-code two path cards.
+- /surveys/list/index.html: Path picker grid only shows Normal Life and Divisive
+  cards (lines 36-47). Bridge is handled as a separate section below.
+- surveys-list.js renderBrowseSections(): primaryPaths = ['normal-life', 'divisive'].
+  Bridge surveys are filtered separately and displayed only when pagePath === 'all'.
+
+Bridge path support:
+- surveys.json has one bridge survey: trust-institutions-shared-truth
+- survey-browser.js recognizes 'bridge' in PATH_LABELS
+- surveys-list.js handles bridge as a special section on the "all" view only
+- Bridge surveys are intentionally EXCLUDED from the active/coming-soon grids
+  when viewing a specific path (normal-life or divisive)
+- No dedicated /surveys/bridge/ route exists (per AGENTS.md design)
+
+Risks of adding more bridge surveys:
+- Works within current architecture for the "all" view
+- Bridge surveys will never appear on normal-life or divisive browse pages
+- If a bridge survey is added to D1 but not to surveys.json, it will have no
+  path assigned and will be orphaned in the browse UI
+
+======================================================================
+4. ROUTING & ENDPOINTS
+======================================================================
+
+Static asset routes (served by Cloudflare ASSETS binding):
+- / -> public/index.html
+- /surveys/list/ -> public/surveys/list/index.html
+- /surveys/normal-life/ -> public/surveys/normal-life/index.html
+- /surveys/divisive/ -> public/surveys/divisive/index.html
+- /surveys/results/ -> served via worker (fetches public/surveys/results/index.html)
+- /townhall/ -> public/townhall/
+- /account/ -> public/account/
+
+Worker-rendered routes:
+- GET /surveys/<slug> -> SurveyJS app shell (worker-rendered HTML)
+- GET /surveys/take/<slug> -> Legacy survey form (worker-rendered)
+- GET /surveys/resume -> Redirect to next survey via token
+- GET /surveys/complete/<token> -> Summary page (worker-rendered)
+- GET /receipt/<id> -> Submission receipt (worker-rendered)
+- GET /account/location -> Served from ASSETS
+- GET /account/districts -> Served from ASSETS
+
+API routes:
+- GET  /api/auth/* -> Auth endpoints (me, exists, turnstile, oauth, passkey, etc.)
+- POST /api/auth/* -> Auth mutations (signup, login, logout, password-reset, etc.)
+- GET  /api/surveys/list -> List all published surveys with user response status
+- GET  /api/surveys/<slug> -> Get survey JSON, version, hash
+- POST /api/surveys/<slug>/responses -> Submit/update SurveyJS response
+- POST /api/surveys/<slug>/submit -> Legacy form submission
+- GET  /api/responses/mine -> Get user's existing response for a version
+- POST /api/survey-suggestions -> Email survey suggestions
+- GET  /api/results/meta -> Survey metadata for results page
+- GET  /api/results/summary -> Aggregated results with tier/geo filtering
+- GET  /api/results/geo-options -> Available geo filter options
+- GET  /api/results/district-context -> District voter count + legislator info
+- GET  /api/geo -> Country detection
+- POST /api/location/* -> Address validation, save, verify
+- POST /api/location/verify-voter -> Voter verification
+- GET  /api/verify-voter/status -> Verification status
+- POST /api/verify-voter/complete -> Complete voter verification
+- GET  /api/townhall/* -> Town Hall topics, statements, reactions
+- POST /api/townhall/* -> Town Hall submit, react, moderate
+- GET  /api/choices/* -> Reference data (states, districts)
+- POST /api/scope/* -> Scope session management
+- POST /api/dev/* -> Development-only endpoints (seed, whoami, cookies, seed-results)
+- GET  /api/admin/* -> Admin endpoints (users, verify-voter)
+- POST /api/admin/backfill-aggregates -> Backfill aggregate data
+
+HEAD request handling:
+- NO explicit HEAD handling anywhere in the worker. All routes check for
+  specific HTTP methods (GET, POST, DELETE). HEAD requests will fall through
+  to the static asset handler or return 404.
+
+Error handling patterns:
+- Most API handlers return jsonResponse with status codes (400, 403, 404, 500)
+- Worker-rendered pages return plain text errors (e.g., "Not Found", "Method Not Allowed")
+- Top-level catch sends generic error response
+- parseJsonBody swallows parse errors and returns {} -- callers must handle null/empty body
+- Some error paths lack consistent error codes (e.g., admin backfill checks
+  user email directly: `user.email !== 'anchorskov@gmail.com'`)
+
+Inconsistencies:
+- /api/surveys/<slug>/submit uses formData; /api/surveys/<slug>/responses uses JSON
+- The admin backfill-aggregates endpoint at line 8732 checks getSessionUser but
+  destructures incorrectly (expects user directly, gets {status, user} object)
+- Dev endpoints (seed-surveyjs, seed-results) use isLocalRequest guard but no
+  proper auth, making them accessible to anyone who can reach localhost
+
+======================================================================
+5. SURVEY FLOW
+======================================================================
+
+Modern SurveyJS flow:
+1. User navigates to /surveys/<slug>
+2. Worker renders HTML shell with <div id="surveyjs-root" data-slug="...">
+3. surveyjs-bundle.js (built from src/surveyjs-app.js) loads
+4. Fetches GET /api/surveys/<slug> -> returns surveyJson, versionId, versionHash
+5. Creates SurveyJS Model, checks for existing response via /api/responses/mine
+6. If existing response found, prefills answers (editing mode)
+7. Handles sectioned flow if x_meta.sectionExitEnabled or x_meta.flow === 'sectioned'
+8. On complete, POSTs to /api/surveys/<slug>/responses with answersJson + meta
+9. Worker validates session, finds or creates response record
+10. Stores answers in response_answers, updates aggregates
+11. Shows thank-you modal with receipt ID and campaign promotion
+
+Legacy flow:
+1. User navigates to /surveys/take/<slug>
+2. Worker renders full HTML form with question_json from survey_questions table
+3. Form submits to /api/surveys/<slug>/submit as formData
+4. Worker stores submission in survey_submissions + survey_answers
+5. Creates/uses survey token for receipt tracking
+6. Redirects to next survey or completion page
+
+Validation:
+- Modern flow: Requires authenticated session (requireSessionUser)
+- Modern flow: Validates versionId exists, optionally validates versionHash
+- Modern flow: Validates answers is an object
+- Legacy flow: Validates selected_key against hard-coded set (policy_1..policy_5)
+- Legacy flow: No authentication required (uses token-based tracking)
+
+Response editing:
+- Modern flow: Detects existing response via user_id + survey_version_id
+- On edit: increments edit_count, replaces all answer rows, recomputes aggregates
+- Unique constraint: idx_responses_user_surveyver_unique prevents duplicates
+- Old answers fetched to compute aggregate delta (only adjusts changed choices)
+
+Result storage:
+- Raw: responses + response_answers tables
+- Aggregated: response_aggregates (question/choice counts per tier/geo)
+- Rollups: aggregate_rollups (total response counts per tier/geo)
+- Results suppressed below MIN_PUBLISH_N (10 responses)
+- Two tiers: Tier 1 (all responses), Tier 2 (verified address)
+- Multiple geo contexts: all, state, state_house, state_senate, us_house
+
+======================================================================
+6. SEEDING SYSTEM
+======================================================================
+
+How JSONC files become DB records (scripts/seed-surveys-from-jsonc.mjs):
+1. JSONC file loaded from surveys/ directory
+2. Comments stripped via custom stripJsonc parser
+3. JSON parsed, x_meta extracted for flow metadata
+4. Content canonicalized via stableStringify (sorted keys)
+5. SHA-256 hash computed for version identity
+6. SQL generated:
+   - INSERT OR IGNORE into surveys (creates if new)
+   - UPDATE surveys (always updates title, flow_type, flow_meta)
+   - INSERT into survey_versions with ON CONFLICT DO UPDATE
+   - INSERT OR IGNORE into townhall_topics (creates if new)
+   - UPDATE townhall_topics (always updates linked fields)
+7. SQL written to temp file, executed via wrangler d1 execute
+8. Temp file deleted
+
+Versioning consistency:
+- Version number passed via --version CLI arg; same version used for ALL surveys
+  in a batch seed (--slug=all). This means all surveys share the same version
+  number per seed run, which is correct but requires discipline.
+- ON CONFLICT(survey_id, version) handles re-seeding same version
+- Hash changes detected by content comparison
+
+Risks of partial or inconsistent seeds:
+- Local seeds use BEGIN TRANSACTION; remote/preview seeds do NOT use transactions.
+  A failure mid-seed on remote targets will leave partial state.
+- Each survey generates a separate SQL INSERT/UPDATE block. If wrangler execution
+  fails after some surveys but before others, D1 will have mixed state.
+- The seed script generates a random UUID for townhall_topics.id on every run.
+  INSERT OR IGNORE prevents duplicates, but the UPDATE always runs and may
+  overwrite topic metadata that was customized after initial seed.
+
+Differences between local and remote seeding:
+- Local: wraps in BEGIN TRANSACTION / COMMIT
+- Remote: no transaction wrapper (Wrangler limitation or deliberate choice)
+- Both use the same SQL generation logic
+- dbTarget maps: local->wy_local, preview->wy_preview, prod->wy
+
+Seed script scope='public' issue:
+- Line in buildSql: "VALUES ('${slug}', 'public', ...)"
+- ALL surveys are seeded with scope='public' regardless of their intended scope
+- surveys.json has some surveys as scope='wy'
+- This means the D1 data does not reflect intended scope for wy-targeted surveys
+
+======================================================================
+7. FRONTEND LOGIC
+======================================================================
+
+Key JS files:
+
+survey-browser.js (231 lines):
+  - Defines PATH_LABELS, STATUS_LABELS
+  - loadCatalog(): Fetches /data/surveys.json, strips JSONC comments, normalizes
+  - mergeSurveyData(): Merges API results with static catalog, API takes precedence
+    for title/description/status, static catalog provides path/category/display metadata
+  - filterSurveys(): Filters by path and status
+  - Exports to window.SurveyBrowse global
+
+surveys-list.js (495 lines):
+  - Main browse page orchestration
+  - Loads auth state, scope session, surveys
+  - Renders cards with status badges, path badges, response status
+  - Handles survey suggestion form submission
+  - Manages bridge section visibility (only on 'all' view)
+
+survey-results.js (730 lines):
+  - Results page with survey selector, tier/geo filtering
+  - District context panel with legislator info
+  - User district panel for verified users
+  - Merges API surveys with static list for selector population
+  - Bar chart rendering for question results
+
+homepage.js (361 lines):
+  - Card-based landing page rendering from template
+  - Auth-aware state: signed-out, signed-in, needs-address, resume survey
+  - Fetches /api/auth/me and /api/surveys/list for personalization
+
+surveys-render.js (143 lines):
+  - Older, simpler survey list rendering
+  - Fetches ONLY from /data/surveys.json (no API merge)
+  - Filters by scope (wy/public) from sessionStorage
+
+survey-take.js (165 lines):
+  - Legacy form submission handler for /surveys/take/<slug>
+  - Uses sessionStorage for name/email/token persistence
+  - Submits via FormData to /api/surveys/<slug>/submit
+
+Duplication and fragility:
+- stripJsonc() is duplicated in 4 files: survey-browser.js, survey-results.js,
+  surveys-render.js, and the seed script. Any JSONC parsing bug must be fixed
+  in all four locations.
+- escapeHtml() is duplicated in at least 5 files: worker.js, survey-browser.js,
+  surveyjs-app.js, survey-results.js, homepage.js
+- Survey list population logic exists in: surveys-list.js, survey-results.js,
+  homepage.js, and surveys-render.js -- each with slightly different merge behavior
+- surveys-render.js reads ONLY from surveys.json with no API merge, creating
+  a fully disconnected data path
+
+Tight coupling:
+- survey-browser.js must be loaded before surveys-list.js (depends on window.SurveyBrowse)
+- homepage.js depends on window.AuthUI which may not be loaded yet (retries with setTimeout)
+- All browse pages depend on surveys.json for path/category/display metadata
+- surveys-render.js is completely independent and may show stale or different data
+
+======================================================================
+8. METADATA CONSISTENCY
+======================================================================
+
+Required fields analysis:
+
+path:
+  - Defined: surveys.json (all 21 entries have it)
+  - NOT in D1 surveys table
+  - NOT returned by /api/surveys/list
+  - Consumed: survey-browser.js, surveys-list.js, homepage.js
+
+status:
+  - Defined: surveys.json AND D1 surveys.status
+  - D1 values: seed script always writes 'active'
+  - surveys.json values: active, coming_soon, archived
+  - API merge: D1 status overrides surveys.json when survey exists in API
+  - Risk: surveys in surveys.json with status=coming_soon will show as coming_soon
+    from static data but may not exist in D1 at all
+
+category_slug:
+  - Defined: surveys.json only
+  - NOT in D1
+  - NOT returned by API
+  - Consumed: normalizeCatalogEntry sets it, but no active use observed in rendering
+
+featured:
+  - Defined: surveys.json only
+  - NOT in D1
+  - Consumed: surveys-list.js shows featured badge on cards
+
+estimated_minutes:
+  - Defined: surveys.json only
+  - NOT in D1
+  - Consumed: surveys-list.js shows "X min" pill on cards
+
+display_order:
+  - Defined: surveys.json only
+  - NOT in D1
+  - Consumed: survey-browser.js sorts merged list by displayOrder
+
+Mismatches across sources:
+
+  | Field              | JSONC | D1 (API) | surveys.json | UI Rendering |
+  |--------------------|-------|----------|-------------|--------------|
+  | path               | No    | No       | Yes         | Yes (required for browse) |
+  | category_slug      | No    | No       | Yes         | Set but unused |
+  | display_order      | No    | No       | Yes         | Yes (sort order) |
+  | estimated_minutes  | No    | No       | Yes         | Yes (card pill) |
+  | featured           | No    | No       | Yes         | Yes (card badge) |
+  | landing_blurb      | No    | No       | Yes         | Yes (card description) |
+  | scope              | No    | Yes*     | Yes         | Yes (filter) |
+  | status             | No    | Yes      | Yes         | Yes |
+  | flow_type/flow_meta| Yes   | Yes      | No          | Yes (section controls) |
+
+  * scope in D1 is always 'public' due to seed script bug
+
+This means surveys.json is the SOLE source of truth for 6 critical browse
+metadata fields. Any survey not in surveys.json will lack this metadata.
+
+======================================================================
+9. UX STRUCTURE
+======================================================================
+
+Current layout:
+- / (homepage): Hero, path chooser, account panel, action cards, how-it-works
+- /surveys/list/ -> Full browse page (all paths, bridge section, coming soon)
+- /surveys/normal-life/ -> Filtered browse (normal-life only)
+- /surveys/divisive/ -> Filtered browse (divisive only)
+- /surveys/<slug> -> SurveyJS survey (worker-rendered shell)
+- /surveys/results/ -> Results page with survey selector + tier/geo filtering
+- /townhall/ -> Discussion topics and statements
+- /account/ -> User account management
+
+Consistency:
+- Homepage and /surveys/list/ both show path chooser with only two paths
+  (normal-life, divisive). Bridge is handled as a special section.
+- /surveys/list/ has explicit bridge section (#survey-bridge-section) which
+  renders when pagePath='all' and bridge surveys exist
+- The pattern is consistent: homepage -> pick path -> browse filtered surveys
+
+Scalability concerns:
+- Adding a new path requires changes in:
+  1. surveys.json (new entries)
+  2. survey-browser.js PATH_LABELS (already has 'bridge')
+  3. Homepage path chooser cards (hard-coded in index.html)
+  4. /surveys/list/ path picker cards (hard-coded HTML)
+  5. surveys-list.js primaryPaths array and rendering logic
+  6. Potentially a new browse page (public/surveys/<new-path>/index.html)
+- This is manageable but not data-driven; each new path requires code changes
+
+Bridge placement:
+- Currently works: shown on /surveys/list/ "all" view as a separate section
+- Not shown on homepage path chooser (by design per AGENTS.md)
+- Not shown on dedicated path pages (normal-life, divisive)
+- Pattern is defensible for a single bridge survey but would need reconsideration
+  if bridge grows to many surveys
+
+======================================================================
+10. SECURITY & VALIDATION
+======================================================================
+
+Input validation:
+- parseJsonBody swallows errors -> returns {} on malformed JSON. This means
+  most handlers proceed with empty/undefined fields rather than rejecting bad input.
+- truncateValue used for string fields in several places (good)
+- Email validation via isValidEmail helper
+- Slug parameters use decodeURIComponent (some injection risk if not escaped in SQL,
+  but parameterized queries via .bind() are used throughout - GOOD)
+- escapeHtml used in server-rendered HTML (GOOD)
+- Form submissions validated for required fields
+
+API protections:
+- Turnstile CAPTCHA enforced for auth routes in production
+- Production safety check: refuses to start without TURNSTILE_SECRET_KEY
+- enforceTurnstileBypassPolicy prevents TURNSTILE_BYPASS in production
+- Origin header checking via requireSameOrigin (POST requests)
+- Session-based auth via Lucia for protected endpoints
+- Rate limiting on: password reset, email verification, voter verification, Town Hall
+
+Auth assumptions:
+- Survey responses require authenticated session (modern flow)
+- Legacy /surveys/take/<slug> does NOT require auth (uses token tracking)
+- Admin endpoints check: isLocalRequest OR email === 'anchorskov@gmail.com'
+  This is a hard-coded admin check. If the admin email changes, code must change.
+- Dev endpoints (seed-surveyjs, seed-results, whoami, cookies) guarded by isLocalRequest
+  which checks hostname === 'localhost' || '127.0.0.1'. This is appropriate for dev
+  but could be bypassed via Host header manipulation in some proxy configurations.
+- Passkey step-up verification required for verified voter submissions
+
+Rate limiting concerns:
+- localRateLimiters use in-memory Maps. On Cloudflare Workers, each request may
+  hit a different isolate. In-memory rate limits are NOT reliable in production.
+  Workers can be recycled at any time, resetting all maps.
+- D1-backed rate limiting exists for some flows (password reset, email verification)
+  which is more reliable but still subject to D1 consistency guarantees.
+
+CORS:
+- No explicit CORS preflight (OPTIONS) handling. Access-Control-Expose-Headers is
+  set for specific response headers but no Access-Control-Allow-Origin is set.
+  This is fine for same-origin deployment but would break any cross-origin API use.
+
+Injection risks:
+- SQL: Parameterized queries used consistently via .bind() (GOOD)
+- XSS: escapeHtml used in server-rendered content (GOOD)
+- An exception: the seed script builds SQL via string concatenation
+  (buildSql function), but this runs offline as a CLI tool, not in the Worker.
+  The seed script uses single-quote escaping which is the minimum viable defense
+  but could theoretically fail on unusual characters in survey JSON content.
+
+Admin backfill endpoint:
+- /api/admin/backfill-aggregates at line ~8732 has a suspicious auth check:
+  it calls getSessionUser but the result is an object {status, user}, yet the
+  code checks `if (!user || user.email !== ...)`. Since getSessionUser returns
+  {status:'valid', user:{...}}, `user` here is the wrapper, not the user record.
+  This needs verification -- it may silently allow or deny incorrectly.
+
+======================================================================
+11. PERFORMANCE & SCALING
+======================================================================
+
+Potential bottlenecks:
+
+1. /api/surveys/list executes a complex JOIN across surveys, survey_versions,
+   townhall_topics, and responses. The subquery for latest published version
+   runs for every survey row. With many surveys, this could slow down.
+
+2. Response submission writes to responses, then loops through all answer entries
+   writing response_answers one at a time. For surveys with many questions (e.g., 30+),
+   this generates 30+ individual DB writes per submission. Could benefit from batching.
+
+3. Aggregate updates on submission loop through all geoContexts (up to ~5) and
+   all changed answers, each generating a separate DB operation. This compounds
+   with the per-answer writes above.
+
+4. /api/admin/backfill-aggregates processes ALL responses in a single request.
+   For any significant number of responses, this will hit Worker execution time
+   limits (Workers have a 30-second limit on free plan, 5-minute on paid).
+
+5. Worker.js is a single ~8,800-line file. While this doesn't affect runtime
+   performance, it impacts maintainability and makes it harder to identify
+   performance issues or refactor hot paths.
+
+Redundant queries:
+- Both survey-results.js and surveys-list.js fetch /api/surveys/list independently.
+  The results page also fetches surveys.json separately. On the results page, both
+  data sources are loaded to populate the survey selector.
+- homepage.js fetches /api/auth/me twice: once via AuthUI.fetchAuthState() and
+  once directly via fetch('/api/auth/me').
+- The /api/surveys/list endpoint parses json_text for every survey to extract
+  description, even though description could be stored as a column.
+
+Client-side vs server-side filtering:
+- ALL survey path filtering happens client-side. The API returns all published
+  surveys regardless of path. For a small catalog (19-21 surveys) this is fine,
+  but at scale (100+ surveys), returning all surveys for every browse page view
+  would be wasteful.
+- Results geo filtering is properly server-side via aggregate queries.
+
+======================================================================
+12. KNOWN RISKS (IMPORTANT)
+======================================================================
+
+1. DUAL SOURCE OF TRUTH FOR BROWSE METADATA
+   Files: public/data/surveys.json, src/worker.js (/api/surveys/list)
+   The API does not return path, category_slug, display_order, estimated_minutes,
+   featured, or landing_blurb. These critical browse fields exist ONLY in
+   surveys.json. Any survey not in surveys.json will lack display metadata.
+   Any divergence between surveys.json and D1 will produce confusing UI states.
+
+2. SCOPE MISMATCH IN SEEDING
+   File: scripts/seed-surveys-from-jsonc.mjs, buildSql function
+   All surveys are seeded with scope='public' regardless of intended scope.
+   surveys.json correctly marks some as scope='wy'. The client merge picks up
+   D1 scope when available, potentially showing wy surveys as public-scoped.
+
+3. IN-MEMORY RATE LIMITING UNRELIABLE IN PRODUCTION
+   File: src/worker.js, localRateLimiters (line 41)
+   Cloudflare Workers run across many isolates. In-memory Maps reset on each
+   new isolate. Rate limits for Town Hall submissions and voter verification
+   attempts are effectively non-functional in a distributed production environment.
+
+4. DUPLICATE MIGRATION NUMBER 0015
+   Files: db/migrations/0015_add_district_to_user_address_verification.sql,
+          db/migrations/0015_add_senate_district.sql
+   Two files share migration number 0015. One is a no-op marker, the other
+   performs real schema changes. Depending on which Wrangler processes first,
+   the schema could be in an inconsistent state on fresh databases.
+
+5. HARD-CODED ADMIN CHECK
+   File: src/worker.js (multiple locations, e.g., backfill-aggregates)
+   Admin authorization checks compare user.email against a hard-coded string
+   ('anchorskov@gmail.com'). Should use a proper role-based system.
+
+6. NO TRANSACTION WRAPPING FOR REMOTE SEEDS
+   File: scripts/seed-surveys-from-jsonc.mjs, main function
+   Remote/preview seeds do not use transactions. A failure mid-seed will leave
+   D1 in partial state with some surveys updated and others not.
+
+7. ADMIN BACKFILL ENDPOINT AUTH CHECK POSSIBLY BROKEN
+   File: src/worker.js (~line 8732)
+   The endpoint calls getSessionUser which returns {status, user} but the code
+   appears to check `user` as if it were the inner user object. The result may
+   be that the admin check always passes or always fails depending on the shape.
+
+8. parseJsonBody SWALLOWS ERRORS
+   File: src/worker.js (line 219)
+   Returns {} on any JSON parse failure. Callers that expect required fields
+   may proceed with undefined values rather than returning 400.
+
+9. LEGACY FLOW COEXISTS WITHOUT SHARED AUTH
+   Files: /surveys/take/<slug> routes, survey-take.js
+   The legacy flow uses token-based tracking without proper user authentication.
+   Responses from this flow are stored in different tables (survey_submissions/
+   survey_answers) than the modern flow (responses/response_answers). The two
+   systems share no response linkage or aggregate integration.
+
+10. stripJsonc DUPLICATED IN FOUR FILES
+    Files: survey-browser.js, survey-results.js, surveys-render.js,
+           scripts/seed-surveys-from-jsonc.mjs
+    A bug in any copy could produce different parsing behavior across
+    client and server, leading to hard-to-diagnose data issues.
+
+11. surveys-render.js READS ONLY FROM surveys.json
+    File: public/js/surveys-render.js
+    This file completely ignores the API and D1 data. If it is still used
+    anywhere, it shows stale or inconsistent survey listings.
+
+12. WORKER FILE SIZE
+    File: src/worker.js (~8,800 lines)
+    Extremely large single-file Worker containing auth, survey, Town Hall,
+    aggregation, admin, location, and rendering logic. High cognitive load
+    for maintenance and high risk of unintended side effects.
+
+13. NO HEAD REQUEST HANDLING
+    File: src/worker.js
+    No explicit HEAD request support. Monitoring tools, CDNs, or health checks
+    using HEAD requests will either hit the static asset handler or get 404.
+
+14. HOMEPAGE FETCHES AUTH TWICE
+    File: public/js/homepage.js
+    Calls AuthUI.fetchAuthState() and then separately fetches /api/auth/me.
+    Doubles the auth request load on every homepage visit for logged-in users.
+
+======================================================================
+13. RECOMMENDED PRIORITIES
+======================================================================
+
+HIGH PRIORITY (must fix soon):
+- Fix in-memory rate limiting for production (replace localRateLimiters with
+  D1-backed rate limiting or Cloudflare Durable Objects)
+- Resolve duplicate migration 0015 (consolidate or renumber)
+- Fix scope seeding (seed script should use correct scope per survey)
+- Verify admin backfill endpoint auth check correctness
+- Remove hard-coded admin email check; implement proper role-based admin auth
+
+MEDIUM PRIORITY:
+- Move critical browse metadata (path, display_order, estimated_minutes, featured)
+  into D1 so /api/surveys/list is self-sufficient
+- Add proper error responses for malformed JSON bodies (instead of swallowing)
+- Add transaction support for remote seeding (or implement atomic batch writes)
+- Consolidate stripJsonc into a shared utility
+- Add HEAD request handling for monitoring/health checks
+- Split worker.js into modular files (auth, surveys, townhall, results, admin)
+- Remove or gate legacy survey flow if no longer needed
+
+LOW PRIORITY:
+- Deduplicate escapeHtml across frontend files
+- Batch response_answers writes in submission handler
+- Add server-side path filtering to /api/surveys/list
+- Optimize homepage to avoid double auth fetch
+- Add CORS preflight handling if cross-origin API use is planned
+- Remove surveys-render.js if no longer used
+- Store survey description as a D1 column to avoid parsing json_text on list
+- Consider extracting surveys.json metadata into D1 columns for single source of truth
+
+======================================================================
+END OF AUDIT
+======================================================================

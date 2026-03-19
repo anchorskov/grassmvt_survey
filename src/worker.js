@@ -220,7 +220,8 @@ const parseJsonBody = async (request) => {
   try {
     return await request.json();
   } catch (error) {
-    return {};
+    console.warn('[parseJsonBody] Malformed or empty JSON body:', error.message);
+    return { _parseError: true };
   }
 };
 
@@ -8731,8 +8732,8 @@ export default {
       // Only allow from localhost or with proper auth
       if (!isLocalRequest(url)) {
         // Check for admin session
-        const user = await getSessionUser(request, env);
-        if (!user || user.email !== 'anchorskov@gmail.com') {
+        const sessionResult = await getSessionUser(request, env);
+        if (sessionResult.status !== 'valid' || sessionResult.user.email !== 'anchorskov@gmail.com') {
           return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
         }
       }
