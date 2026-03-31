@@ -76,6 +76,7 @@
   const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
   const PASSKEY_NUDGE_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
   const AUTH_RETURN_KEY = 'auth_return_to';
+  const DEFAULT_POST_LOGIN_PATH = '/surveys/list/';
 
   const storeAuthReturnTo = () => {
     try {
@@ -89,6 +90,27 @@
       // Ignore storage failures
     }
   };
+
+  const readAuthReturnTo = () => {
+    try {
+      const value = localStorage.getItem(AUTH_RETURN_KEY) || '';
+      return value.startsWith('/') ? value : '';
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const consumeAuthReturnTo = () => {
+    const value = readAuthReturnTo();
+    try {
+      localStorage.removeItem(AUTH_RETURN_KEY);
+    } catch (error) {
+      // Ignore storage failures
+    }
+    return value;
+  };
+
+  const getPostLoginRedirect = () => consumeAuthReturnTo() || DEFAULT_POST_LOGIN_PATH;
 
   const showError = (message, allowHtml = false) => {
     if (!errorEl) {
@@ -571,7 +593,7 @@
         return;
       }
       closeModal();
-      window.location.href = '/surveys/list/';
+      window.location.href = getPostLoginRedirect();
     });
   }
 
@@ -579,7 +601,7 @@
     passkeyNudgeSkip.addEventListener('click', () => {
       dismissPasskeyNudge();
       closeModal();
-      window.location.href = '/surveys/list/';
+      window.location.href = getPostLoginRedirect();
     });
   }
 
@@ -656,7 +678,7 @@
       }
     }
     closeModal();
-    window.location.href = '/surveys/list/';
+    window.location.href = getPostLoginRedirect();
   };
 
   if (form) {
@@ -909,7 +931,7 @@
     
     logDebug('Login successful, redirecting');
     closeModal();
-    window.location.href = '/surveys/list/';
+    window.location.href = getPostLoginRedirect();
   };
   
   if (passkeyButton) {

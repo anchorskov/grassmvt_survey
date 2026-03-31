@@ -8093,17 +8093,87 @@ export default {
         }
       }
       const bodyHtml = `
+        <section class="survey-auth-banner is-hidden" id="survey-auth-banner" aria-live="polite"></section>
         <h1 id="surveyjs-title">Survey</h1>
         ${townhallLinkHtml}
         <p class="helper-text is-hidden" id="surveyjs-editing"></p>
         <p class="helper-text" id="surveyjs-status">Loading survey...</p>
         <div id="surveyjs-root" data-slug="${escapeHtml(slug)}"></div>
         <script src="/js/surveyjs-bundle.js"></script>
+        <script src="/js/turnstile-loader.js" defer></script>
+        <script src="/js/auth/turnstile-client.js" defer></script>
+        <script src="/js/auth-shared.js" defer></script>
+        <script src="/js/login-modal.js" defer></script>
+        <script src="/js/signup-modal.js" defer></script>
+        <script src="/js/password-reset-modal.js" defer></script>
       `;
 
       const page = await renderPage(env, url, {
         title: 'Survey',
-        headHtml: '<link rel="stylesheet" href="/css/surveyjs.css" />',
+        headHtml: `
+          <link rel="stylesheet" href="/css/surveyjs.css" />
+          <style>
+            .survey-auth-banner {
+              max-width: 72rem;
+              margin: 0 auto 1.5rem;
+            }
+
+            .survey-auth-banner__body {
+              background: linear-gradient(135deg, #fffbe6 0%, #fff4c7 100%);
+              border: 1px solid #d2e7e2;
+              border-left: 0.5rem solid #1f6f5c;
+              border-radius: 1rem;
+              box-shadow: 0 10px 25px rgba(18, 52, 46, 0.08);
+              padding: 1rem 1.25rem;
+            }
+
+            .survey-auth-banner__eyebrow {
+              color: #1f6f5c;
+              font-size: 0.78rem;
+              font-weight: 700;
+              letter-spacing: 0.08em;
+              margin: 0 0 0.35rem;
+              text-transform: uppercase;
+            }
+
+            .survey-auth-banner__title {
+              font-size: clamp(1.2rem, 2vw, 1.6rem);
+              margin: 0 0 0.5rem;
+            }
+
+            .survey-auth-banner__copy {
+              margin: 0;
+              max-width: 48rem;
+            }
+
+            .survey-auth-banner__actions {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 0.75rem;
+              margin-top: 1rem;
+            }
+
+            @media (max-width: 640px) {
+              .survey-auth-banner {
+                margin-bottom: 1rem;
+              }
+
+              .survey-auth-banner__body {
+                border-radius: 0.85rem;
+                padding: 1rem;
+              }
+
+              .survey-auth-banner__actions {
+                flex-direction: column;
+              }
+
+              .survey-auth-banner__actions .button {
+                text-align: center;
+                width: 100%;
+              }
+            }
+          </style>
+        `,
         bodyHtml,
       });
       return new Response(page, {

@@ -196,6 +196,21 @@
     "placeholder_href": "/how-surveys-work/"
   },
   {
+    "id": "wy-time-change",
+    "slug": "wy-time-change",
+    "scope": "wy",
+    "title": "Wyoming Time Change Survey",
+    "description": "Measure what people in Wyoming think about ending the twice-yearly clock change and which time standard they prefer.",
+    "landing_blurb": "A short Wyoming survey on ending the clock change, year-round time preference, and how much the change affects daily life.",
+    "path": "normal-life",
+    "status": "active",
+    "category_slug": "time-change",
+    "display_order": 115,
+    "estimated_minutes": 3,
+    "featured": false,
+    "href": "/surveys/wy-time-change"
+  },
+  {
     "id": "abortion",
     "slug": "abortion",
     "scope": "wy",
@@ -224,6 +239,21 @@
     "estimated_minutes": 7,
     "featured": true,
     "href": "/surveys/wy-public-school-funding-2026"
+  },
+  {
+    "id": "wy-public-land-sales",
+    "slug": "wy-public-land-sales",
+    "scope": "wy",
+    "title": "Wyoming Public Land Sales Survey",
+    "description": "Measure what Wyoming voters think about public land sales, exchanges, leases, public access, housing pressure, and local control.",
+    "landing_blurb": "A divisive Wyoming survey on public land sales, access, housing pressure, leasing, and how much local control should matter.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "public-land-sales",
+    "display_order": 25,
+    "estimated_minutes": 8,
+    "featured": true,
+    "href": "/surveys/wy-public-land-sales"
   },
   {
     "id": "military-force-ai",

@@ -20,6 +20,7 @@
   const passkeyNudgeAdd = document.getElementById('login-passkey-add');
   const passkeyNudgeSkip = document.getElementById('login-passkey-skip');
   const AUTH_RETURN_KEY = 'auth_return_to';
+  const DEFAULT_POST_AUTH_PATH = '/surveys/list/';
   let turnstileWidgetId = null;
   let lastTurnstileToken = '';
   let turnstileConfig = { siteKey: '', bypass: false };
@@ -97,6 +98,27 @@
       // Ignore storage failures
     }
   };
+
+  const readAuthReturnTo = () => {
+    try {
+      const value = localStorage.getItem(AUTH_RETURN_KEY) || '';
+      return value.startsWith('/') ? value : '';
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const consumeAuthReturnTo = () => {
+    const value = readAuthReturnTo();
+    try {
+      localStorage.removeItem(AUTH_RETURN_KEY);
+    } catch (error) {
+      // Ignore storage failures
+    }
+    return value;
+  };
+
+  const getPostAuthRedirect = () => consumeAuthReturnTo() || DEFAULT_POST_AUTH_PATH;
 
   const mapOauthError = (value) => {
     const errors = {
@@ -482,6 +504,29 @@
     return true;
   };
 
+  const redirectAuthenticatedUser = async ({ allowPasskeyNudge = false } = {}) => {
+    if (window.AuthUI && typeof window.AuthUI.fetchAuthState === 'function') {
+      await window.AuthUI.fetchAuthState();
+    }
+    if (!window.AuthUI || !window.AuthUI.state || window.AuthUI.state.addressVerified !== true) {
+      if (!window.location.pathname.startsWith('/account/location')) {
+        window.location.href = '/account/location';
+      }
+      return true;
+    }
+    if (allowPasskeyNudge) {
+      const nudged = await maybeShowPasskeyNudge();
+      if (nudged) {
+        return true;
+      }
+      if (window.PasskeyPrompt && typeof window.PasskeyPrompt.queueAfterPasswordLogin === 'function') {
+        window.PasskeyPrompt.queueAfterPasswordLogin();
+      }
+    }
+    window.location.href = getPostAuthRedirect();
+    return true;
+  };
+
   const submitAuth = async (payload) => {
     const response = await fetch(`/api/auth/${authMode}`, {
       method: 'POST',
@@ -539,6 +584,7 @@
         form.classList.add('is-hidden');
       }
       await fetchAuthState();
+      await redirectAuthenticatedUser();
     });
   }
 
@@ -552,6 +598,7 @@
         form.classList.add('is-hidden');
       }
       await fetchAuthState();
+      await redirectAuthenticatedUser();
     });
   }
 
@@ -652,22 +699,13 @@
         new CustomEvent('auth:changed', { detail: { authenticated: !!authenticated } })
       );
       if (authMode === 'login' && authenticated) {
-        if (!window.AuthUI || !window.AuthUI.state || window.AuthUI.state.addressVerified !== true) {
-          if (!window.location.pathname.startsWith('/account/location')) {
-            window.location.href = '/account/location';
-          }
-          return;
-        }
-        const nudged = await maybeShowPasskeyNudge();
-        if (nudged) {
-          return;
-        }
-        if (window.PasskeyPrompt && typeof window.PasskeyPrompt.queueAfterPasswordLogin === 'function') {
-          window.PasskeyPrompt.queueAfterPasswordLogin();
-        }
+        await redirectAuthenticatedUser({ allowPasskeyNudge: true });
+        return;
       }
       if (authMode === 'signup' && authenticated) {
-        showError('Account created. Add a passkey from your account page.');
+        showError('Account created. Redirecting...');
+        await redirectAuthenticatedUser();
+        return;
       }
       if (authMode === 'signup' && !authenticated) {
         showError('Account created. Please sign in.');
@@ -861,6 +899,7 @@
     logDebug('Login successful');
     // Reset button state even on success for clean UI
     resetButton();
+    await redirectAuthenticatedUser({ allowPasskeyNudge: true });
   };
 
   if (passkeyButton && authMode === 'login') {

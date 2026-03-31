@@ -29,6 +29,16 @@ const surveySources = {
     file: 'surveys/surveys_wy_health_care_costs_access_options_v1.jsonc',
     scope: 'wy',
   },
+  'wy-public-land-sales-v1': {
+    slug: 'wy-public-land-sales',
+    file: 'surveys/surveys_wy_public_land_sales_v1.jsonc',
+    scope: 'wy',
+  },
+  'wy-time-change-v1': {
+    slug: 'wy-time-change',
+    file: 'surveys/surveys_wy_time_change_v1.jsonc',
+    scope: 'wy',
+  },
   'cost-of-living-v1': {
     slug: 'cost-of-living',
     file: 'surveys/surveys_cost_of_living_v1.jsonc',

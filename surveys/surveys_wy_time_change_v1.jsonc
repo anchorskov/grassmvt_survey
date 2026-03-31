@@ -1,0 +1,99 @@
+// surveys/surveys_wy_time_change_v1.jsonc
+// slug: wy-time-change
+// version: v1 | 2026-03-31
+// title: Wyoming Time Change Survey
+{
+  "title": "Wyoming Time Change Survey",
+  "description": "This survey measures what people in Wyoming think about ending the twice-yearly clock change and what time standard they would prefer.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "time-change",
+    "estimated_minutes": 3,
+    "featured": false
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey measures what people in Wyoming think about ending the twice-yearly clock change and what time standard they would prefer.</p><h3>How responses will be used</h3><p>Results will be published in aggregate. Exact question wording and response options will be published with the results. No personal identifiers will be published.</p><h3>Definitions</h3><ul><li><strong>Daylight Saving Time:</strong> the clock setting used in summer, one hour ahead.</li><li><strong>Standard Time:</strong> the clock setting used in winter.</li><li><strong>Permanent time:</strong> staying on one time year-round, with no spring or fall clock change.</li></ul>"
+        }
+      ]
+    },
+    {
+      "name": "questions",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "stop_clock_changes",
+          "title": "Should Wyoming stop changing clocks twice a year?",
+          "isRequired": true,
+          "choices": [
+            "Yes",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "preferred_time_standard",
+          "title": "If Wyoming ends the time change, which option do you prefer?",
+          "isRequired": true,
+          "choices": [
+            "Permanent Daylight Saving Time",
+            "Permanent Standard Time",
+            "Keep changing clocks twice a year",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "daylight_preference",
+          "title": "Which matters more to you personally?",
+          "isRequired": true,
+          "choices": [
+            "More daylight in the evening",
+            "More daylight in the morning",
+            "A balanced mix of both",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "daily_life_impact",
+          "title": "How much does the time change affect your daily life?",
+          "isRequired": true,
+          "choices": [
+            "A lot",
+            "Some",
+            "Very little",
+            "Not at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "best_reason_time_change",
+          "title": "In your own words, what is the best reason to keep or end the time change?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

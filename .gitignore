@@ -19,3 +19,4 @@ wrangler/.wrangler/
 Thumbs.db
 docs
 scripts/admin_create_verified_user.sh
+.codex

@@ -15,6 +15,8 @@
   const continueButton = document.getElementById('district-continue');
   const saveButton = document.getElementById('district-save');
   const backButton = document.getElementById('district-back');
+  const AUTH_RETURN_KEY = 'auth_return_to';
+  const DEFAULT_POST_VERIFY_PATH = '/surveys/list/';
 
   // FIPS to state name lookup
   const FIPS_TO_STATE = {
@@ -58,6 +60,18 @@
     el.textContent = message;
     el.classList.remove('is-hidden');
   };
+
+  const consumeAuthReturnTo = () => {
+    try {
+      const value = localStorage.getItem(AUTH_RETURN_KEY) || '';
+      localStorage.removeItem(AUTH_RETURN_KEY);
+      return value.startsWith('/') ? value : '';
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const getPostVerifyRedirect = () => consumeAuthReturnTo() || DEFAULT_POST_VERIFY_PATH;
 
   const fetchAuthState = async () => {
     const response = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
@@ -175,9 +189,10 @@
         showMessage(districtErrorEl, 'Unable to save confirmations. Please try again.');
         return;
       }
-      showMessage(districtResultEl, 'District confirmations saved! Redirecting to surveys...');
+      showMessage(districtResultEl, 'District confirmations saved. Redirecting...');
+      const redirectTarget = getPostVerifyRedirect();
       setTimeout(() => {
-        window.location.href = '/surveys/list/';
+        window.location.href = redirectTarget;
       }, 1200);
     } catch (error) {
       showMessage(districtErrorEl, 'Unable to save confirmations. Please try again.');
@@ -254,8 +269,9 @@
         if (wySection) {
           wySection.classList.add('is-hidden');
         }
+        const redirectTarget = getPostVerifyRedirect();
         setTimeout(() => {
-          window.location.href = '/surveys/list/';
+          window.location.href = redirectTarget;
         }, 2500);
         return;
       }
@@ -271,7 +287,7 @@
   // Continue button - goes to surveys
   if (continueButton) {
     continueButton.addEventListener('click', () => {
-      window.location.href = '/surveys/list/';
+      window.location.href = getPostVerifyRedirect();
     });
   }
 

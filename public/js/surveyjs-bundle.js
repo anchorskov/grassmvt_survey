@@ -86514,7 +86514,10 @@
       var titleId = "surveyjs-title";
       var containerId = "surveyjs-root";
       var editingId = "surveyjs-editing";
+      var authBannerId = "survey-auth-banner";
       var minStateSearchLength = 2;
+      var authReturnKey = "auth_return_to";
+      var browseDraftKeyPrefix = "surveyjs_browse_draft:";
       var escapeHtml = (value = "") => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
       var getSlugFromPath = () => {
         const parts = window.location.pathname.split("/").filter(Boolean);
@@ -86549,6 +86552,121 @@
         }
         if (title) {
           document.title = `${title} | Grassroots Movement`;
+        }
+      };
+      var getBrowseDraftKey = (slug) => `${browseDraftKeyPrefix}${slug}`;
+      var readBrowseDraft = (slug) => {
+        try {
+          const raw = sessionStorage.getItem(getBrowseDraftKey(slug));
+          if (!raw) {
+            return null;
+          }
+          const parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== "object") {
+            return null;
+          }
+          if (!parsed.answersJson || typeof parsed.answersJson !== "object") {
+            return null;
+          }
+          return parsed;
+        } catch (error) {
+          return null;
+        }
+      };
+      var writeBrowseDraft = (slug, answersJson = {}) => {
+        try {
+          sessionStorage.setItem(
+            getBrowseDraftKey(slug),
+            JSON.stringify({
+              savedAt: (/* @__PURE__ */ new Date()).toISOString(),
+              answersJson
+            })
+          );
+        } catch (error) {
+        }
+      };
+      var clearBrowseDraft = (slug) => {
+        try {
+          sessionStorage.removeItem(getBrowseDraftKey(slug));
+        } catch (error) {
+        }
+      };
+      var storeAuthReturnTo = () => {
+        try {
+          const { pathname, search, hash } = window.location;
+          if (pathname.startsWith("/auth/")) {
+            return;
+          }
+          localStorage.setItem(authReturnKey, `${pathname}${search || ""}${hash || ""}`);
+        } catch (error) {
+        }
+      };
+      var formatDraftTimestamp = (value = "") => {
+        if (!value) {
+          return "";
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+          return "";
+        }
+        return date.toLocaleString();
+      };
+      var renderBrowseModeBanner = (authenticated) => {
+        const banner = document.getElementById(authBannerId);
+        if (!banner) {
+          return;
+        }
+        if (authenticated) {
+          banner.innerHTML = "";
+          banner.classList.add("is-hidden");
+          return;
+        }
+        banner.innerHTML = `
+    <div class="survey-auth-banner__body">
+      <p class="survey-auth-banner__eyebrow">Browse mode</p>
+      <h2 class="survey-auth-banner__title">Sign in to save your response</h2>
+      <p class="survey-auth-banner__copy">
+        You can read every question now, but answers are only recorded for signed-in users.
+        Voter-verified totals only include verified registered voters.
+      </p>
+      <div class="survey-auth-banner__actions">
+        <a class="button button--primary" href="/auth/login/" data-auth-open="login">Sign in to save</a>
+        <a class="button button--secondary" href="/auth/signup/" data-auth-open="signup">Create account</a>
+      </div>
+    </div>
+  `.trim();
+        banner.classList.remove("is-hidden");
+      };
+      var bindBrowseModeActions = (slug, getAnswers) => {
+        if (document.body.dataset.surveyAuthBound === "true") {
+          return;
+        }
+        document.body.dataset.surveyAuthBound = "true";
+        document.addEventListener("click", (event) => {
+          const authTarget = event.target.closest("[data-auth-open]");
+          if (!authTarget) {
+            return;
+          }
+          storeAuthReturnTo();
+          writeBrowseDraft(slug, getAnswers());
+        });
+      };
+      var fetchSurveyAuthState = async () => {
+        try {
+          const response = await fetch("/api/auth/me", {
+            credentials: "include",
+            cache: "no-store"
+          });
+          if (!response.ok) {
+            return { authenticated: false };
+          }
+          const data = await response.json();
+          return {
+            authenticated: !!data.authenticated,
+            addressVerified: !!data.user?.address_verified
+          };
+        } catch (error) {
+          return { authenticated: false };
         }
       };
       var showThankYouModal = (responseId) => {
@@ -86661,6 +86779,8 @@
         }
         setStatus("Loading survey...");
         try {
+          const authState = await fetchSurveyAuthState();
+          renderBrowseModeBanner(authState.authenticated);
           const response = await fetch(`/api/surveys/${encodeURIComponent(slug)}`, {
             credentials: "same-origin"
           });
@@ -86675,28 +86795,76 @@
           setStatus("");
           const model = new import_survey_core.Model(data.surveyJson);
           let editingMeta = null;
+          let hasSavedResponse = false;
+          const browseDraft = readBrowseDraft(slug);
+          bindBrowseModeActions(slug, () => model.data || {});
           const surveyMeta = data.surveyJson?.x_meta || {};
           const enableSectionControls = surveyMeta.sectionExitEnabled === true || surveyMeta.flow === "sectioned";
           if (enableSectionControls) {
             model.showNavigationButtons = "none";
           }
-          try {
-            const mineResponse = await fetch(
-              `/api/responses/mine?surveyVersionId=${encodeURIComponent(data.versionId)}`,
-              { credentials: "include" }
-            );
-            if (mineResponse.ok) {
-              const mineData = await mineResponse.json();
-              if (mineData.exists && mineData.answersJson) {
-                model.data = mineData.answersJson;
-                editingMeta = mineData;
-                const updatedAt = mineData.updatedAt || mineData.submittedAt;
-                const editText = updatedAt ? `Editing mode. Last saved ${new Date(updatedAt).toLocaleString()}.` : "Editing mode.";
-                setEditingNotice(editText);
+          if (authState.authenticated) {
+            try {
+              const mineResponse = await fetch(
+                `/api/responses/mine?surveyVersionId=${encodeURIComponent(data.versionId)}`,
+                { credentials: "include" }
+              );
+              if (mineResponse.ok) {
+                const mineData = await mineResponse.json();
+                if (mineData.exists && mineData.answersJson) {
+                  model.data = mineData.answersJson;
+                  editingMeta = mineData;
+                  hasSavedResponse = true;
+                  clearBrowseDraft(slug);
+                  const updatedAt = mineData.updatedAt || mineData.submittedAt;
+                  const editText = updatedAt ? `Editing mode. Last saved ${new Date(updatedAt).toLocaleString()}.` : "Editing mode.";
+                  setEditingNotice(editText);
+                }
               }
+            } catch (error) {
             }
-          } catch (error) {
           }
+          if (!hasSavedResponse && browseDraft?.answersJson) {
+            model.data = browseDraft.answersJson;
+            const restoredAt = formatDraftTimestamp(browseDraft.savedAt);
+            if (authState.authenticated) {
+              setEditingNotice(
+                restoredAt ? `Unsaved draft restored from ${restoredAt}. Submit when ready.` : "Unsaved draft restored. Submit when ready."
+              );
+            } else {
+              setEditingNotice(
+                restoredAt ? `Unsaved browse-mode answers restored from ${restoredAt}. Sign in to save them.` : "Unsaved browse-mode answers restored. Sign in to save them."
+              );
+            }
+          }
+          model.onValueChanged.add((sender) => {
+            writeBrowseDraft(slug, sender.data || {});
+          });
+          const promptForSignIn = (answersJson, message) => {
+            authState.authenticated = false;
+            renderBrowseModeBanner(false);
+            storeAuthReturnTo();
+            writeBrowseDraft(slug, answersJson || {});
+            setStatus(message || "Browse mode: sign in or create an account to save this response.");
+            if (window.AuthModals && typeof window.AuthModals.open === "function") {
+              window.AuthModals.open("login");
+              return;
+            }
+            window.location.href = "/auth/login/";
+          };
+          window.addEventListener("auth:changed", (event) => {
+            const authenticated = !!event.detail?.authenticated;
+            authState.authenticated = authenticated;
+            renderBrowseModeBanner(authenticated);
+          });
+          model.onCompleting.add((sender, options) => {
+            if (authState.authenticated) {
+              return;
+            }
+            options.allow = false;
+            options.allowComplete = false;
+            promptForSignIn(sender.data || {}, "Browse mode: sign in or create an account to save this response.");
+          });
           model.onChoicesSearch.add((sender, options) => {
             if (!options.question || options.question.name !== "state") {
               return;
@@ -86720,34 +86888,47 @@
             });
           }
           model.onComplete.add(async (sender) => {
-            setStatus("Submitting response...");
-            const payload = {
-              surveyVersionId: data.versionId,
-              answersJson: sender.data || {},
-              meta: buildMeta(sender.data || {})
-            };
-            const submit = await fetch(
-              `/api/surveys/${encodeURIComponent(slug)}/responses`,
-              {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify(payload)
+            try {
+              setStatus("Submitting response...");
+              const payload = {
+                surveyVersionId: data.versionId,
+                answersJson: sender.data || {},
+                meta: buildMeta(sender.data || {})
+              };
+              const submit = await fetch(
+                `/api/surveys/${encodeURIComponent(slug)}/responses`,
+                {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  credentials: "same-origin",
+                  body: JSON.stringify(payload)
+                }
+              );
+              if (submit.status === 401) {
+                promptForSignIn(
+                  sender.data || {},
+                  "Your session ended. Sign in again to save this response."
+                );
+                return;
               }
-            );
-            if (!submit.ok) {
-              throw new Error("Unable to submit response.");
+              if (!submit.ok) {
+                throw new Error("Unable to submit response.");
+              }
+              const submitData = await submit.json();
+              if (!submitData.ok) {
+                throw new Error("Unable to submit response.");
+              }
+              clearBrowseDraft(slug);
+              container.innerHTML = "";
+              setStatus("");
+              showThankYouModal(submitData.responseId);
+              if (submitData.updatedAt) {
+                setEditingNotice(`Saved. Last updated ${new Date(submitData.updatedAt).toLocaleString()}.`);
+              }
+              editingMeta = submitData;
+            } catch (error) {
+              setStatus(error.message || "Unable to submit response.");
             }
-            const submitData = await submit.json();
-            if (!submitData.ok) {
-              throw new Error("Unable to submit response.");
-            }
-            container.innerHTML = "";
-            setStatus("");
-            showThankYouModal(submitData.responseId);
-            if (submitData.updatedAt) {
-              setEditingNotice(`Saved. Last updated ${new Date(submitData.updatedAt).toLocaleString()}.`);
-            }
-            editingMeta = submitData;
           });
           (0, import_survey_js_ui.renderSurvey)(model, container);
         } catch (error) {

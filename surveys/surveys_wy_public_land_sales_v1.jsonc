@@ -1,0 +1,473 @@
+// surveys/surveys_wy_public_land_sales_v1.jsonc
+// slug: wy-public-land-sales
+// version: v1 | 2026-03-25
+// title: Wyoming Public Land Sales Survey
+{
+  "title": "Wyoming Public Land Sales Survey",
+  "description": "Measure what Wyoming voters think about selling, exchanging, leasing, or otherwise converting public land for housing, growth, access, and local control.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "public-land-sales",
+    "estimated_minutes": 8,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey is designed to measure what Wyoming voters believe about selling, exchanging, leasing, or otherwise converting public land for housing, community expansion, infrastructure, conservation, and economic development. The goal is clarity, not persuasion.</p><h3>How responses will be used</h3><p>Results will be published in aggregate. Exact question wording and response options will be published with the results. A short background note and revision log will be published so everyone can see what changed and why. Where possible, Wyoming results may be shown by district.</p><h3>Definitions used in this survey</h3><ul><li><strong>Public land:</strong> Land owned by the federal or state government and managed for public purposes.</li><li><strong>Sale:</strong> Permanent transfer of land into private or non-public ownership.</li><li><strong>Exchange:</strong> Trading one parcel for another.</li><li><strong>Lease or permit:</strong> Allowing use of public land for a set time without transferring ownership.</li><li><strong>Community expansion:</strong> Using land for housing, roads, utilities, schools, or other local growth needs.</li><li><strong>Public access:</strong> The ability of the public to use land for recreation, hunting, fishing, camping, and other lawful purposes.</li></ul><h3>Background, plain language</h3><p>In 2025, a Senate proposal tied to the federal budget debate was widely described as requiring the sale of between 0.5% and 0.75% of certain BLM and Forest Service lands across western states. Some leaders argued that limited sales near communities could help address growth and housing needs. Others argued that public lands should remain public except in rare, clearly justified cases.</p><p>In Jackson, a Forest Service administrative parcel has moved forward for workforce housing under a long-term permit rather than an outright sale. In places such as Midwest, growth can also be shaped by surrounding public land, state trust land requirements, mineral activity, and infrastructure costs.</p><p><strong>Important note:</strong> This survey distinguishes between sale, exchange, lease, and permit. These are not the same thing.</p>"
+        }
+      ]
+    },
+    {
+      "name": "lead_question",
+      "title": "Section 1: Lead question",
+      "description": "Start with the 2025 land-sale proposal and your closest overall view.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "sale_requirement_view",
+          "title": "In 2025, a Senate proposal tied to the \"One Big Beautiful Bill\" was described as requiring the sale of between 0.5% and 0.75% of certain BLM and Forest Service lands across western states. Which statement is closest to your view?",
+          "choices": [
+            "I would support a blanket sale requirement of that size",
+            "I would support it only if limited to isolated parcels near existing communities",
+            "I would oppose any blanket sale requirement, even at that percentage",
+            "I would need much stronger local review and parcel-by-parcel approval before supporting anything like that",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "baseline_views",
+      "title": "Section 2: Baseline views",
+      "description": "Your general view of public lands and what matters most.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "public_lands_importance",
+          "title": "How important is the future of Wyoming public lands to you personally?",
+          "choices": [
+            "Very important",
+            "Important",
+            "Somewhat important",
+            "Not important",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "overall_public_lands_view",
+          "title": "Which statement is closest to your overall view?",
+          "choices": [
+            "Public lands should remain public in almost all cases",
+            "Public lands should usually remain public, but rare exceptions may make sense",
+            "Public lands should be more available for sale or exchange near communities",
+            "Public lands should be managed more like other assets and sold when useful",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "top_public_lands_priorities",
+          "title": "What matters most to you when thinking about public lands? Pick up to 3.",
+          "choices": [
+            "Public access for hunting, fishing, hiking, and camping",
+            "Protecting wildlife habitat and open space",
+            "Local control and community planning",
+            "Housing availability and affordability",
+            "Economic development and job creation",
+            "Fair return to taxpayers",
+            "Keeping land in public hands for future generations",
+            "Reducing federal land holdings",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 3,
+          "hasOther": true,
+          "otherText": "Other (write-in)"
+        }
+      ]
+    },
+    {
+      "name": "budget_debate",
+      "title": "Section 3: Federal land sales and the budget debate",
+      "description": "How you view the 2025 debate and future federal-sale rules.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "heard_about_2025_proposal",
+          "title": "Before today, how much had you heard about the 2025 proposal to include public land sales in the \"One Big Beautiful Bill\"?",
+          "choices": [
+            "A lot",
+            "Some",
+            "Not much",
+            "Nothing at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "view_of_2025_proposal",
+          "title": "Based on what you know now, which statement is closest to your view of that proposal?",
+          "choices": [
+            "I supported it",
+            "I opposed it",
+            "I supported only very narrow, local exceptions",
+            "I need more information",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "future_sale_main_rule",
+          "title": "If Congress considers future public land sales, what should be the main rule?",
+          "choices": [
+            "No broad sale authority at all",
+            "Only small, case-by-case sales approved locally",
+            "Sales allowed near existing communities for housing and infrastructure",
+            "Sales allowed when they raise revenue or reduce federal holdings",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "budget_balance_with_sale_proceeds",
+          "title": "Should proceeds from federal public land sales ever be used to help balance the federal budget?",
+          "choices": [
+            "Yes",
+            "Yes, but only in rare cases",
+            "No",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "limited_exceptions",
+      "title": "Section 4: Local growth and limited exceptions",
+      "description": "How public land should be handled when communities face growth constraints.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "growth_constraint_preference",
+          "title": "Some Wyoming communities are bordered by federal or state-managed land, making housing, roads, or utility expansion more complicated. Which approach do you prefer?",
+          "choices": [
+            "Public land should remain public, even if growth is slower",
+            "Public land should remain public, but exchanges or leases may be appropriate in limited cases",
+            "Isolated parcels near towns should sometimes be sold or exchanged for housing or infrastructure",
+            "Local communities should have more authority to acquire adjacent public parcels",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "what_should_come_first",
+          "title": "If a public parcel next to a community is considered for transfer or development, what should come first? Pick up to 2.",
+          "choices": [
+            "A local public vote",
+            "County or town approval",
+            "State legislative approval",
+            "Federal agency review without additional state or local approvals",
+            "Wildlife and access impact review",
+            "Appraisal and public disclosure of value",
+            "A public hearing and comment period",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 2
+        },
+        {
+          "type": "radiogroup",
+          "name": "preferred_step_before_sale",
+          "title": "Which option would you prefer before any public parcel is permanently sold?",
+          "choices": [
+            "Keep it public and do nothing",
+            "Use a temporary lease or permit instead",
+            "Use a land exchange instead of a sale",
+            "Allow a direct sale if fair value is paid",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "case_examples",
+      "title": "Section 5: Jackson and Midwest case examples",
+      "description": "How specific local examples affect your view.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "jackson_permit_view",
+          "title": "In Jackson, a Forest Service administrative parcel is being used under a long-term permit for workforce housing rather than being sold. Which statement is closest to your view?",
+          "choices": [
+            "This is a reasonable use of public land for a local need",
+            "This is acceptable only for housing tied directly to public employees",
+            "This goes too far and public land should not be used this way",
+            "I support this kind of project only with strong local oversight",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "housing_eligibility_under_permit",
+          "title": "If public land is used for workforce housing under a lease or permit, who should be eligible to live there?",
+          "choices": [
+            "Only federal employees tied to the land's purpose",
+            "Public employees only",
+            "A mix of public employees and other local workers",
+            "Any income-qualified local residents",
+            "This should not happen at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "midwest_growth_pressure_view",
+          "title": "Some communities, such as Midwest, may face growth pressures where nearby public land, trust land, mineral activity, and infrastructure costs make expansion more difficult. Which statement is closest to your view?",
+          "choices": [
+            "Public lands and trust lands should stay focused on their existing purposes, even if local growth is harder",
+            "Local communities should be able to request case-by-case leases or exchanges to meet housing or infrastructure needs",
+            "Isolated public parcels near towns should sometimes be sold if a strong local need is shown",
+            "Public land should be easier to convert when it supports economic development or community growth",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "biggest_concern_with_local_projects",
+          "title": "What is your biggest concern, if any, with projects like Jackson or similar proposals near constrained communities?",
+          "choices": [
+            "Loss of public access",
+            "Setting a precedent for wider privatization",
+            "Weak public input or oversight",
+            "These projects should be limited to truly high-cost or land-constrained communities",
+            "Public land should serve its original purpose only",
+            "I do not have a major concern",
+            "Not sure"
+          ],
+          "hasOther": true,
+          "otherText": "Other (write-in)"
+        }
+      ]
+    },
+    {
+      "name": "public_access",
+      "title": "Section 6: Public access, hunting, recreation, and heritage",
+      "description": "How much access and outdoor use should shape land-transfer decisions.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "concern_about_access_loss",
+          "title": "How concerned are you that selling or converting public land could reduce public access over time?",
+          "choices": [
+            "Very concerned",
+            "Concerned",
+            "Somewhat concerned",
+            "Not concerned",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "access_tradeoff_view",
+          "title": "Which statement is closest to your view?",
+          "choices": [
+            "Once public land is sold, public access is too hard to protect, so sales should be extremely rare",
+            "Access can be protected with easements and conditions, so some sales are acceptable",
+            "Access concerns are overstated if local communities benefit",
+            "Access should not control these decisions",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "importance_of_protecting_access",
+          "title": "How important is it to you that hunting, fishing, camping, and general public access be protected before any land transfer is approved?",
+          "choices": [
+            "Extremely important",
+            "Very important",
+            "Somewhat important",
+            "Not important",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "decision_trust",
+      "title": "Section 7: Decision-making and trust",
+      "description": "Who should decide and what would make the process feel fair.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "strongest_decision_voice",
+          "title": "Who should have the strongest voice in decisions about public land sales or exchanges near communities?",
+          "choices": [
+            "Local voters",
+            "County and town governments",
+            "The Wyoming Legislature",
+            "Federal land agencies",
+            "A shared process among all of these",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "what_builds_trust",
+          "title": "What would make you most likely to trust a public land decision? Pick up to 3.",
+          "choices": [
+            "Clear maps of the parcel",
+            "Independent appraisal and fair value disclosure",
+            "Public hearings close to the affected community",
+            "Wildlife and access impact analysis",
+            "A local advisory vote",
+            "A required replacement parcel or exchange",
+            "Limits on resale or development",
+            "Strong public access protections",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 3,
+          "hasOther": true,
+          "otherText": "Other (write-in)"
+        },
+        {
+          "type": "radiogroup",
+          "name": "fairest_overall_approach",
+          "title": "Which approach feels most fair overall?",
+          "choices": [
+            "Keep public lands in public hands except for extremely rare cases",
+            "Allow limited local exceptions with strong public safeguards",
+            "Make it easier to transfer lands that serve housing or growth needs",
+            "Reduce public ownership more broadly over time",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "open_comment",
+      "title": "Section 8: Open comment",
+      "description": "Optional written comments in your own words.",
+      "elements": [
+        {
+          "type": "comment",
+          "name": "when_should_land_be_sold_or_exchanged",
+          "title": "In your own words, when, if ever, should public land be sold or exchanged?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "comment",
+          "name": "most_important_principle",
+          "title": "In your own words, what principle matters most to you on this issue: access, stewardship, local control, housing, economic growth, or something else?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_background",
+      "title": "Optional demographics",
+      "description": "These questions help interpret results without identifying you personally.",
+      "elements": [
+        {
+          "type": "dropdown",
+          "name": "state",
+          "title": "State",
+          "defaultValue": "Wyoming",
+          "choices": [
+            "Alabama",
+            "Alaska",
+            "Arizona",
+            "Arkansas",
+            "California",
+            "Colorado",
+            "Connecticut",
+            "Delaware",
+            "District of Columbia",
+            "Florida",
+            "Georgia",
+            "Hawaii",
+            "Idaho",
+            "Illinois",
+            "Indiana",
+            "Iowa",
+            "Kansas",
+            "Kentucky",
+            "Louisiana",
+            "Maine",
+            "Maryland",
+            "Massachusetts",
+            "Michigan",
+            "Minnesota",
+            "Mississippi",
+            "Missouri",
+            "Montana",
+            "Nebraska",
+            "Nevada",
+            "New Hampshire",
+            "New Jersey",
+            "New Mexico",
+            "New York",
+            "North Carolina",
+            "North Dakota",
+            "Ohio",
+            "Oklahoma",
+            "Oregon",
+            "Pennsylvania",
+            "Rhode Island",
+            "South Carolina",
+            "South Dakota",
+            "Tennessee",
+            "Texas",
+            "Utah",
+            "Vermont",
+            "Virginia",
+            "Washington",
+            "West Virginia",
+            "Wisconsin",
+            "Wyoming",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "age_range",
+          "title": "Age range",
+          "choices": [
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "public_land_use_frequency",
+          "title": "Do you regularly use public land for recreation, hunting, fishing, ranching, or work?",
+          "choices": [
+            "Yes",
+            "No",
+            "Sometimes",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}
