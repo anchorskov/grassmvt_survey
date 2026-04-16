@@ -86,6 +86,10 @@ This file gives repo-specific instructions for coding agents working in `/home/a
   - verify the survey appears in `/api/surveys/list`
   - verify a matching `townhall_topics` row is created or updated
   - verify survey results and Town Hall links behave correctly
+- **After any survey add, remove, or update, ask the user whether to seed production D1.**
+  - Deploying code does not update D1 survey rows — seeding is a separate step.
+  - A survey will not appear or function in production until seeded with `--db=prod`.
+  - Similarly, removing or retiring a survey locally does not affect production D1 until the change is applied there.
 - Important files for survey addition:
   - `surveys/`
   - `scripts/seed-surveys-from-jsonc.mjs`

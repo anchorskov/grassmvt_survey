@@ -113,6 +113,9 @@ Town Hall statements pass through `src/lib/townhall-moderation.js` before save. 
 3. Seed into D1 with the seed script
 4. Add entry to `public/data/surveys.json`
 5. Verify `/api/surveys/list` includes it, `/surveys/<slug>` renders, and a `townhall_topics` row exists
+6. **Remind the user to seed production D1** — local seeding does not update production. The survey will not work in production until seeded there separately.
+
+> **Important:** Deploying code (`wrangler deploy`) does not seed D1. After any survey add, remove, or update, always ask the user whether to run the seed script against `--db=prod` before finishing the task.
 
 Do not include state dropdown, Wyoming House/Senate district questions, or other district selectors in Wyoming survey questions — district info comes from the user's address verification, not survey answers.
 
