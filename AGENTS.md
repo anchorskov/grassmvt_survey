@@ -147,6 +147,7 @@ This file gives repo-specific instructions for coding agents working in `/home/a
 - Add a top-of-file path comment when the file type supports comments.
 - Prefer ASCII unless the file already requires something else.
 - Keep changes scoped and minimal.
+- When working in this repo, do not create a temporary branch or pull request unless the user explicitly asks for it.
 - Do not use `nano`.
 - If a task depends on exact markup or styles, inspect the real files first.
 

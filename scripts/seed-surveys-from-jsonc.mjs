@@ -29,9 +29,19 @@ const surveySources = {
     file: 'surveys/surveys_wy_health_care_costs_access_options_v1.jsonc',
     scope: 'wy',
   },
+  'cowboy-care-v1': {
+    slug: 'cowboy-care',
+    file: 'surveys/surveys_cowboy_care_v1.jsonc',
+    scope: 'wy',
+  },
   'wy-public-land-sales-v1': {
     slug: 'wy-public-land-sales',
     file: 'surveys/surveys_wy_public_land_sales_v1.jsonc',
+    scope: 'wy',
+  },
+  'grizzly-bear-delisting-v1': {
+    slug: 'grizzly-bear-delisting',
+    file: 'surveys/surveys_grizzly_bear_delisting_v1.jsonc',
     scope: 'wy',
   },
   'wy-time-change-v1': {
@@ -98,6 +108,11 @@ const surveySources = {
   'trust-institutions-shared-truth-v1': {
     slug: 'trust-institutions-shared-truth',
     file: 'surveys/surveys_trust-institutions-shared-truth_v1.jsonc',
+  },
+  'security-feedback-v1': {
+    slug: 'security-feedback',
+    file: 'surveys/surveys_security_feedback_v1.jsonc',
+    scope: 'public',
   },
 };
 

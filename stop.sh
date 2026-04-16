@@ -1,58 +1,64 @@
-#!/bin/bash
-# stop.sh
+#!/usr/bin/env bash
+# stop.sh — stop local dev servers and verify ports are clear
+# Kills any processes using ports 8787 (wrangler) and 4321 (astro dev)
+# Also kills lingering astro/wrangler processes by name
 
-# stop.sh - Stop wrangler dev server(s)
+PORTS=(8787 4321 8788)
+FOUND=0
 
-PID_FILE=".wrangler-dev.pid"
-LOG_FILE=".wrangler-dev.log"
-
-echo "🛑 Stopping wrangler dev server..."
-
-# Try to stop using PID file first
-if [ -f "$PID_FILE" ]; then
-  PID=$(cat "$PID_FILE")
-  if kill -0 "$PID" 2>/dev/null; then
-    echo "   Killing process PID: $PID"
-    kill -9 "$PID" 2>/dev/null
-    sleep 1
-    
-    # Verify it's gone
-    if ! kill -0 "$PID" 2>/dev/null; then
-      echo "   ✅ Process stopped successfully"
-    else
-      echo "   ⚠️  Process still running, forcing harder..."
-      pkill -9 -f "wrangler dev"
-    fi
-  else
-    echo "   ℹ️  PID $PID not running"
+kill_port() {
+  local port=$1
+  local pids
+  pids=$(lsof -ti tcp:"$port" 2>/dev/null || true)
+  if [ -n "$pids" ]; then
+    echo "  Killing process(es) on port $port: $pids"
+    echo "$pids" | xargs kill -9 2>/dev/null || true
+    FOUND=1
   fi
-  
-  # Clean up PID file
-  rm -f "$PID_FILE"
-else
-  echo "   ℹ️  No PID file found, searching for wrangler processes..."
-fi
+}
 
-# Force kill any remaining wrangler processes
-echo "   Killing any remaining wrangler processes..."
-pkill -9 -f "wrangler dev" 2>/dev/null || true
-pkill -9 -f "npx.*wrangler" 2>/dev/null || true
+kill_by_name() {
+  local name=$1
+  local pids
+  pids=$(pgrep -f "$name" 2>/dev/null || true)
+  if [ -n "$pids" ]; then
+    echo "  Killing $name process(es): $pids"
+    echo "$pids" | xargs kill -9 2>/dev/null || true
+    FOUND=1
+  fi
+}
+
+echo "Stopping dev servers..."
+
+for port in "${PORTS[@]}"; do
+  kill_port "$port"
+done
+
+kill_by_name "astro build"
+kill_by_name "wrangler dev"
+
+if [ "$FOUND" -eq 0 ]; then
+  echo "  No dev server processes found."
+fi
 
 sleep 1
 
-# Verify all wrangler processes are stopped
-if pgrep -f "wrangler dev" > /dev/null 2>&1; then
-  echo "❌ Failed to stop wrangler server"
-  exit 1
+echo ""
+echo "Port check:"
+ALL_CLEAR=1
+for port in "${PORTS[@]}"; do
+  if lsof -ti tcp:"$port" &>/dev/null; then
+    echo "  port $port — STILL IN USE (pid $(lsof -ti tcp:$port))"
+    ALL_CLEAR=0
+  else
+    echo "  port $port — clear"
+  fi
+done
+
+echo ""
+if [ "$ALL_CLEAR" -eq 1 ]; then
+  echo "All ports clear. Safe to run ./dev.sh"
 else
-  echo "✅ All wrangler servers stopped"
+  echo "Some ports still occupied. Wait a moment and re-run ./stop.sh"
+  exit 1
 fi
-
-# Optional: show last lines of log if it exists
-if [ -f "$LOG_FILE" ]; then
-  echo ""
-  echo "📝 Last log entries:"
-  tail -3 "$LOG_FILE"
-fi
-
-exit 0

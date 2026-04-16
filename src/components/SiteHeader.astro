@@ -6,26 +6,51 @@
     <a class="site-brand font-serif font-bold text-lg text-white hover:text-wy-sandstone transition-colors" href="/">
       Grassroots Movement
     </a>
-    <nav class="site-nav flex flex-wrap items-center gap-1 text-sm" aria-label="Primary">
-      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors" href="/surveys/list/">Surveys</a>
-      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors" href="/townhall/">Town Hall</a>
-      <button class="site-nav__link site-nav__button px-3 py-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer" type="button" data-auth-open id="auth-open">
-        Account
-      </button>
-      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors is-hidden" href="/admin/" id="admin-link">Admin</a>
-      <span class="auth-badge is-hidden text-wy-sandstone text-xs font-semibold" id="auth-badge">Signed in</span>
+    <div class="flex items-center gap-2">
+      {/* Log out — shown only when signed in */}
       <button
-        class="site-nav__link site-nav__button px-3 py-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer is-hidden"
+        class="site-nav__link site-nav__button px-3 py-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-sm is-hidden"
         type="button"
         id="auth-quick-logout"
       >
         Log out
       </button>
-      <a class="site-nav__link px-3 py-1.5 rounded bg-wy-ember hover:bg-wy-ember-dark transition-colors font-semibold" href="/donate/">Donate</a>
-      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors" href="/security/">Security</a>
-      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors" href="https://volunteers.grassrootsmvt.org/" rel="external">Volunteers</a>
-    </nav>
+      {/* Hamburger — always visible */}
+      <button
+        class="flex flex-col justify-center items-center w-9 h-9 rounded hover:bg-white/10 transition-colors"
+        type="button"
+        id="hamburger-btn"
+        aria-label="Open navigation menu"
+        aria-expanded="false"
+        aria-controls="site-nav"
+      >
+        <span class="block w-5 h-0.5 bg-white transition-all"></span>
+        <span class="block w-5 h-0.5 bg-white transition-all mt-1"></span>
+        <span class="block w-5 h-0.5 bg-white transition-all mt-1"></span>
+      </button>
+    </div>
   </div>
+
+  {/* Nav drawer — opened by hamburger */}
+  <nav
+    class="site-nav is-hidden flex-col text-sm border-t border-white/10"
+    aria-label="Primary"
+    id="site-nav"
+  >
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-1">
+      <a class="site-nav__link px-3 py-2 rounded hover:bg-white/10 transition-colors" href="/surveys/list/">Surveys</a>
+      <a class="site-nav__link px-3 py-2 rounded hover:bg-white/10 transition-colors" href="/townhall/">Town Hall</a>
+      <button class="site-nav__link site-nav__button px-3 py-2 rounded hover:bg-white/10 transition-colors cursor-pointer text-left" type="button" data-auth-open id="auth-open">
+        Account
+      </button>
+      <a class="site-nav__link px-3 py-2 rounded hover:bg-white/10 transition-colors is-hidden" href="/admin/" id="admin-link">Admin</a>
+      <a class="site-nav__link px-3 py-2 rounded bg-wy-ember hover:bg-wy-ember-dark transition-colors font-semibold" href="/donate/">Donate</a>
+      <a class="site-nav__link px-3 py-2 rounded hover:bg-white/10 transition-colors" href="/security/">Security</a>
+      <a class="site-nav__link px-3 py-2 rounded hover:bg-white/10 transition-colors" href="https://volunteers.grassrootsmvt.org/" rel="external">Volunteers</a>
+    </div>
+  </nav>
+
+  {/* User info bar — shown when address is verified */}
   <div class="user-info-bar is-hidden bg-wy-charcoal/80 border-t border-white/10 text-xs text-wy-dust px-4 py-1.5" id="user-info-bar">
     <div class="max-w-6xl mx-auto flex gap-3">
       <span class="user-info__email" id="user-info-email"></span>
@@ -35,8 +60,60 @@
   </div>
 </header>
 
+<style is:global>
+  /* Override site.css .site-header which sets --header-bg (light beige) */
+  header.site-header {
+    background: var(--color-wy-charcoal, #2b2b2b);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+  header.site-header .site-brand {
+    color: #fff;
+  }
+  header.site-header .site-brand:hover {
+    color: var(--color-wy-sandstone, #c68a4a);
+    text-decoration: none;
+  }
+  header.site-header .site-nav__link {
+    color: #fff;
+  }
+  header.site-header .site-nav__link:hover,
+  header.site-header .site-nav__link:focus {
+    color: #fff;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.1);
+  }
+</style>
+
 <script>
 (function() {
+  /* ── Hamburger toggle ── */
+  const hamburgerBtn = document.getElementById('hamburger-btn');
+  const siteNav = document.getElementById('site-nav');
+  if (hamburgerBtn && siteNav) {
+    hamburgerBtn.addEventListener('click', function() {
+      const isOpen = !siteNav.classList.contains('is-hidden');
+      if (isOpen) {
+        siteNav.classList.add('is-hidden');
+        siteNav.classList.remove('flex');
+        hamburgerBtn.setAttribute('aria-expanded', 'false');
+      } else {
+        siteNav.classList.remove('is-hidden');
+        siteNav.classList.add('flex');
+        hamburgerBtn.setAttribute('aria-expanded', 'true');
+      }
+    });
+    /* Close drawer when a nav item is clicked */
+    siteNav.addEventListener('click', function(e) {
+      const item = e.target.closest('a, button');
+      if (item) {
+        siteNav.classList.add('is-hidden');
+        siteNav.classList.remove('flex');
+        hamburgerBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  /* ── User info bar (address + districts) — auth badge/logout handled by auth-shared.js ── */
   const FIPS_TO_STATE = {
     '01': 'Alabama', '02': 'Alaska', '04': 'Arizona', '05': 'Arkansas', '06': 'California',
     '08': 'Colorado', '09': 'Connecticut', '10': 'Delaware', '11': 'District of Columbia',
@@ -59,20 +136,14 @@
       const data = await res.json();
       if (!data.authenticated || !data.user) return;
 
+      const user = data.user;
+      const addr = user.address_verification || {};
+      if (!user.address_verified) return;
+
       const bar = document.getElementById('user-info-bar');
       const emailEl = document.getElementById('user-info-email');
       const districtsEl = document.getElementById('user-info-districts');
-      const adminLink = document.getElementById('admin-link');
       if (!bar || !emailEl || !districtsEl) return;
-
-      const user = data.user;
-      const addr = user.address_verification || {};
-
-      if (adminLink && user.is_admin) {
-        adminLink.classList.remove('is-hidden');
-      }
-
-      if (!user.address_verified) return;
 
       emailEl.textContent = user.email || '';
 

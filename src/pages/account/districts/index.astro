@@ -10,7 +10,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     <p class="helper-text" id="voter-status"></p>
 
     <section class="survey-form" aria-live="polite">
-      <h2>Your Detected Districts</h2>
+      <h2>Your Detected Districts <button class="section-help-trigger" type="button" aria-label="Help: detected districts" aria-expanded="false" data-help-page="account-districts" data-help-section="detected-districts">?</button></h2>
       <p class="helper-text">Please confirm each district is correct by clicking Yes or No.</p>
 
       <div class="district-row" id="row-state">
@@ -62,7 +62,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     </section>
 
     <section class="survey-form is-hidden" id="wy-voter-section" aria-live="polite">
-      <h2>Wyoming Voter Verification (Optional)</h2>
+      <h2>Wyoming Voter Verification (Optional) <button class="section-help-trigger" type="button" aria-label="Help: Wyoming voter verification" aria-expanded="false" data-help-page="account-districts" data-help-section="wy-voter">?</button></h2>
       <p class="helper-text">If you are a registered Wyoming voter, verify for enhanced credibility.</p>
       <form id="wy-voter-form">
         <div class="form-row">

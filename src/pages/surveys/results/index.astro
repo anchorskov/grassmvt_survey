@@ -3,8 +3,8 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 ---
 <BaseLayout title="Survey Results | Grassroots Movement">
-  <style>
-    /* inline styles for results page */
+  <style is:global>
+    /* inline styles for results page — is:global required: bars are injected by survey-results.js */
     .results-selector {
       margin-bottom: 1.5rem;
       padding: 1rem;
@@ -40,13 +40,17 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
       align-items: center;
       padding: 0.25rem 0.5rem;
       border-radius: 4px;
-      background: var(--color-surface-alt, #f0f0f0);
+      background: #f1ece1; /* wy-bone */
+      color: #2b2b2b;      /* wy-charcoal */
       font-size: 0.75rem;
       font-weight: 500;
     }
-    .results-badge--tier { background: #e0f2fe; color: #0369a1; }
-    .results-badge--geo { background: #fef3c7; color: #92400e; }
-    .results-badge--n { background: #d1fae5; color: #065f46; }
+    /* tier — charcoal chip, high contrast anchor */
+    .results-badge--tier { background: #2b2b2b; color: #fff; }
+    /* geo — warm sandstone tint, rust text */
+    .results-badge--geo  { background: #f5e6d0; color: #8a3d23; }
+    /* n count — sage tint, dark sage text */
+    .results-badge--n    { background: #e8ede4; color: #4a5c3a; }
     .results-controls {
       display: flex;
       flex-wrap: wrap;
@@ -60,6 +64,12 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
+    }
+    .results-controls__hint {
+      margin: 0;
+      font-size: 0.75rem;
+      color: var(--color-text-muted, #666);
+      font-style: italic;
     }
     .results-section-heading {
       display: flex;
@@ -152,14 +162,75 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     .user-district-panel {
       margin-bottom: 1.5rem;
       padding: 1rem;
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
+      background: #f1ece1; /* wy-bone */
+      border: 1px solid #d4c9b5;
       border-radius: 8px;
     }
-    .user-district-panel h4 { margin: 0 0 0.5rem; font-size: 0.875rem; color: #1e40af; }
-    .user-district-links { margin: 0; font-size: 0.875rem; }
-    .user-district-link { color: #2563eb; text-decoration: underline; cursor: pointer; }
-    .user-district-link:hover { color: #1d4ed8; }
+    .user-district-panel h4 { margin: 0 0 0.75rem; font-size: 0.875rem; color: #2b2b2b; font-weight: 700; }
+    /* rep cards row */
+    .ud-cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .ud-card {
+      flex: 1 1 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.75rem;
+      background: #fff;
+      border: 1px solid #d4c9b5;
+      border-radius: 6px;
+    }
+    .ud-card--active {
+      border-color: #8a3d23; /* wy-rust */
+      background: #fdf6ef;
+    }
+    .ud-card__label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #8a3d23; /* wy-rust */
+    }
+    .ud-card__rep {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      flex: 1;
+    }
+    .ud-rep-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #2b2b2b;
+    }
+    .ud-rep-name--unknown {
+      font-weight: 400;
+      font-style: italic;
+      color: #888;
+    }
+    .ud-rep-meta {
+      font-size: 0.75rem;
+      color: #666;
+    }
+    .ud-card__btn {
+      margin-top: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      background: #2b2b2b; /* wy-charcoal */
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      align-self: flex-start;
+    }
+    .ud-card--active .ud-card__btn {
+      background: #8a3d23; /* wy-rust — active state */
+    }
+    .ud-card__btn:hover { opacity: 0.85; }
     .results-loading { text-align: center; padding: 3rem; color: var(--color-text-muted, #666); }
     .results-error { padding: 2rem; text-align: center; background: #fef2f2; border-radius: 8px; color: #991b1b; }
     @media (max-width: 600px) {
@@ -183,7 +254,6 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
   </main>
 
   <Fragment slot="scripts">
-    <script is:inline src="/js/section-help.js"></script>
     <script is:inline src="/js/survey-results.js"></script>
   </Fragment>
 </BaseLayout>

@@ -373,5 +373,20 @@
     "estimated_minutes": 6,
     "featured": true,
     "href": "/surveys/trust-institutions-shared-truth"
+  },
+  {
+    "id": "security-feedback",
+    "slug": "security-feedback",
+    "scope": "public",
+    "title": "Platform Trust and Security Feedback",
+    "description": "Help us understand what builds trust, what feels acceptable, and what feels like a step too far.",
+    "landing_blurb": "Share your reaction to how this platform handles privacy, verification, and data — and where you think the line is.",
+    "path": "normal-life",
+    "status": "active",
+    "category_slug": "trust",
+    "display_order": 200,
+    "estimated_minutes": 4,
+    "featured": false,
+    "href": "/surveys/security-feedback"
   }
 ]

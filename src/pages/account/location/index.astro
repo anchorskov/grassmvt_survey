@@ -8,14 +8,14 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     <p class="helper-text mb-6">Verify your USA address to unlock location-based surveys.</p>
 
     <section class="survey-form" aria-live="polite">
-      <h2>Connection</h2>
+      <h2>Connection <button class="section-help-trigger" type="button" aria-label="Help: connection check" aria-expanded="false" data-help-page="account-location" data-help-section="connection">?</button></h2>
       <p class="helper-text" id="geo-status">Detecting location...</p>
       <p class="helper-text">Country: <span id="geo-country">--</span></p>
       <p class="form-error is-hidden" id="geo-warning" role="alert"></p>
     </section>
 
     <section class="survey-form" aria-live="polite">
-      <h2>Verify USA Address</h2>
+      <h2>Verify USA Address <button class="section-help-trigger" type="button" aria-label="Help: address verification" aria-expanded="false" data-help-page="account-location" data-help-section="address-verify">?</button></h2>
       <p class="helper-text" id="address-note"></p>
       <form id="address-form">
         <fieldset id="address-fieldset">
@@ -57,7 +57,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     </section>
 
     <section class="survey-form is-hidden" id="device-section" aria-live="polite">
-      <h2>Device Check</h2>
+      <h2>Device Check <button class="section-help-trigger" type="button" aria-label="Help: device check" aria-expanded="false" data-help-page="account-location" data-help-section="device-check">?</button></h2>
       <p class="helper-text">We compare your device location to the address you entered.</p>
       <p class="helper-text" id="device-note"></p>
       <button class="button button--primary" type="button" id="device-submit">Share device location now</button>

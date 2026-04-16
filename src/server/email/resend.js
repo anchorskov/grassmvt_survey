@@ -6,7 +6,7 @@ const shouldStubEmail = (env) => (env.ENVIRONMENT || '').toLowerCase() === 'loca
 // Default sender if EMAIL_FROM env var is not set
 const DEFAULT_EMAIL_FROM = 'Grassroots Movement <verify@grassrootsmvt.org>';
 
-export const sendEmail = async (env, { to, subject, html, text, replyTo }) => {
+export const sendEmail = async (env, { to, subject, html, text, replyTo, from }) => {
   if (!to || !subject || (!html && !text)) {
     return { ok: false, code: 'INVALID_PAYLOAD' };
   }
@@ -18,8 +18,8 @@ export const sendEmail = async (env, { to, subject, html, text, replyTo }) => {
     return { ok: false, code: 'MISSING_RESEND_API_KEY' };
   }
 
-  // Use env.EMAIL_FROM if set, otherwise use default
-  const fromAddress = env.EMAIL_FROM || DEFAULT_EMAIL_FROM;
+  // Use explicit from param, then env.EMAIL_FROM, then default
+  const fromAddress = from || env.EMAIL_FROM || DEFAULT_EMAIL_FROM;
   // Use explicit replyTo param, or env.EMAIL_REPLY_TO, or undefined
   const effectiveReplyTo = replyTo || env.EMAIL_REPLY_TO || undefined;
 
@@ -104,5 +104,52 @@ export const sendSupportEmail = async (env, { subject, html, text }) => {
     subject,
     html,
     text,
+  });
+};
+
+export const sendFeedbackEmail = async (env, { message, senderEmail, page }) => {
+  const to = env.FEEDBACK_EMAIL_TO || 'jimmy@grassrootsmvt.org';
+  const safePage = (page || '').trim().slice(0, 200);
+  const safeSenderEmail = (senderEmail || '').trim().slice(0, 200);
+  const safeMessage = (message || '').trim().slice(0, 2000);
+
+  const subject = safePage
+    ? `Platform feedback — ${safePage}`
+    : 'Platform feedback';
+
+  const lines = [
+    'New feedback submitted via grassrootsmvt.org.',
+    '',
+    safePage ? `Page: ${safePage}` : null,
+    safeSenderEmail ? `Reply to: ${safeSenderEmail}` : 'Reply to: (not provided)',
+    '',
+    'Message:',
+    safeMessage,
+  ].filter((l) => l !== null);
+
+  const text = lines.join('\n');
+
+  const escHtml = (s) =>
+    String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  const html = `
+    <p>New feedback submitted via grassrootsmvt.org.</p>
+    ${safePage ? `<p><strong>Page:</strong> ${escHtml(safePage)}</p>` : ''}
+    <p><strong>Reply to:</strong> ${escHtml(safeSenderEmail || '(not provided)')}</p>
+    <p><strong>Message:</strong></p>
+    <p style="white-space:pre-wrap;">${escHtml(safeMessage)}</p>
+  `;
+
+  return sendEmail(env, {
+    from: 'Grassroots Feedback <feedbackgrmvt@grassrootsmvt.org>',
+    to,
+    subject,
+    text,
+    html,
+    replyTo: safeSenderEmail || undefined,
   });
 };

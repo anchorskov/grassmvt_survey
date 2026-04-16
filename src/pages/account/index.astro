@@ -13,7 +13,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     </section>
 
     <section id="account-passkeys" class="survey-form is-hidden" aria-live="polite">
-      <h2>Security</h2>
+      <h2>Security <button class="section-help-trigger" type="button" aria-label="Help: passkeys" aria-expanded="false" data-help-page="account" data-help-section="passkeys">?</button></h2>
       <p class="helper-text" id="passkey-count"></p>
       <div class="form-row">
         <label for="passkey-nickname">Passkey nickname (optional)</label>
@@ -23,12 +23,12 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       <p class="form-error is-hidden" id="passkey-error" role="alert"></p>
       <p class="helper-text is-hidden" id="passkey-success" role="status"></p>
 
-      <h2>Registered passkeys</h2>
+      <h2>Registered passkeys <button class="section-help-trigger" type="button" aria-label="Help: registered passkeys" aria-expanded="false" data-help-page="account" data-help-section="passkey-list">?</button></h2>
       <ul id="passkey-list" class="passkey-list"></ul>
     </section>
 
     <section id="admin-panel" class="survey-form is-hidden" aria-live="polite">
-      <h2>Admin Tools</h2>
+      <h2>Admin Tools <button class="section-help-trigger" type="button" aria-label="Help: admin tools" aria-expanded="false" data-help-page="account" data-help-section="admin-tools">?</button></h2>
       <p class="helper-text">Issue verified voter upgrade links to bypass regular verification.</p>
       <div class="form-row">
         <label for="admin-target-email">Target user email</label>

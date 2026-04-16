@@ -1,0 +1,297 @@
+// surveys/surveys_cowboy_care_v1.jsonc
+// slug: cowboy-care
+// version: v1 | 2026-04-10
+// title: Cowboy Care Survey
+{
+  "title": "Cowboy Care Survey",
+  "description": "This survey measures what Wyoming residents believe health care in Wyoming should look like, including cost, coverage, provider access, provider protections, and the possible role of a Wyoming-run system called Cowboy Care.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "cowboy-care",
+    "estimated_minutes": 6,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey measures what Wyoming residents believe health care in Wyoming should look like, including cost, coverage, provider access, provider protections, and the possible role of a Wyoming-run system called Cowboy Care. The goal is clarity, not persuasion.</p><h3>Definition used in this survey</h3><p><strong>Cowboy Care:</strong> For this survey, Cowboy Care means a Wyoming-run health coverage system where every Wyoming resident is covered, access is based on need rather than ability to pay, providers are paid through the system, and funding may come from wage-based contributions and other public or private payments.</p><h3>How responses will be used</h3><ul><li>Results will be published in aggregate.</li><li>Exact question wording and response options will be published with results.</li><li>A revision log will show what changed and why.</li><li>Individual responses remain private.</li></ul><h3>Instructions</h3><p>Please answer as honestly as you can. If you are unsure, choose Not sure where it is offered.</p>"
+        }
+      ]
+    },
+    {
+      "name": "current_system",
+      "title": "Section 1: The current system",
+      "description": "Current cost pressure, current hardship, and which direction feels closest to your view.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "current_health_care_costs",
+          "title": "How would you describe health care costs for Wyoming families today?",
+          "choices": [
+            "Much too high",
+            "Somewhat too high",
+            "About right",
+            "Somewhat low",
+            "Much too low",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "current_system_hardship",
+          "title": "Which part of the current system causes the most hardship?",
+          "choices": [
+            "Monthly premiums",
+            "Deductibles",
+            "Copays or coinsurance",
+            "Prescription drug costs",
+            "Surprise bills",
+            "Travel or lack of nearby providers",
+            "Difficulty understanding coverage",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other (write in)"
+        },
+        {
+          "type": "radiogroup",
+          "name": "closest_system_view",
+          "title": "Which statement is closest to your view?",
+          "choices": [
+            "Wyoming should keep the current insurance system with smaller reforms",
+            "Wyoming should create a public option alongside private insurance",
+            "Wyoming should move to a universal Wyoming-run system like Cowboy Care",
+            "Wyoming should use a hybrid system with basic universal coverage and optional private plans",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "support_for_cowboy_care",
+      "title": "Section 2: Support for Cowboy Care",
+      "description": "Your overall support, which goals matter most, and the role private insurance should play.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "cowboy_care_support",
+          "title": "Based on the description above, do you support or oppose Cowboy Care?",
+          "choices": [
+            "Strongly support",
+            "Somewhat support",
+            "Neither support nor oppose",
+            "Somewhat oppose",
+            "Strongly oppose",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "cowboy_care_priority_goals",
+          "title": "If Wyoming created Cowboy Care, which goals matter most to you? Pick up to 3.",
+          "choices": [
+            "Every resident covered",
+            "Lower family costs",
+            "No one denied care because of income",
+            "Protect rural hospitals and clinics",
+            "Reduce paperwork and billing complexity",
+            "Keep freedom to choose a doctor where available",
+            "Strengthen mental health access",
+            "Strengthen emergency and hospital care"
+          ],
+          "maxSelectedChoices": 3,
+          "hasOther": true,
+          "otherText": "Other (write in)"
+        },
+        {
+          "type": "radiogroup",
+          "name": "private_insurance_role",
+          "title": "What role should private insurance have if Cowboy Care is adopted?",
+          "choices": [
+            "No role, the state system should replace it",
+            "Private insurance should offer supplemental coverage only",
+            "Private insurance should compete alongside Cowboy Care",
+            "Private insurance should remain the primary system",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "funding",
+      "title": "Section 3: Funding",
+      "description": "How a universal system should be paid for, if Wyoming creates one.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "preferred_funding_sources",
+          "title": "How should Wyoming pay for a universal health coverage system, if it creates one? Pick up to 2.",
+          "choices": [
+            "Wage-based contributions",
+            "Employer contributions",
+            "Redirect current public health spending where allowed",
+            "Higher taxes not tied to wages",
+            "Patient premiums based on income",
+            "A mix of several funding sources",
+            "Wyoming should not create such a system",
+            "Not sure"
+          ],
+          "maxSelectedChoices": 2
+        },
+        {
+          "type": "radiogroup",
+          "name": "fairest_funding_approach",
+          "title": "Which funding approach feels fairest to you?",
+          "choices": [
+            "Everyone pays something based on wages",
+            "Employers should pay most of the cost",
+            "State government should cover most of the cost from existing revenue",
+            "Individuals should keep buying private coverage",
+            "A mixed approach",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "providers_and_malpractice",
+      "title": "Section 4: Providers and malpractice",
+      "description": "Provider protections, malpractice handling, and whether lower billing burden changes your view.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "malpractice_approach_for_providers",
+          "title": "If Wyoming creates Cowboy Care, what should happen with malpractice costs for approved providers?",
+          "choices": [
+            "Keep the current private malpractice system",
+            "Create a state-backed malpractice pool",
+            "Provide state malpractice coverage for participating providers",
+            "Limit malpractice exposure under clear state standards",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "billing_complexity_support_effect",
+          "title": "Would you be more likely to support Cowboy Care if it reduced billing complexity for doctors, clinics, and hospitals?",
+          "choices": [
+            "Much more likely",
+            "Somewhat more likely",
+            "No difference",
+            "Somewhat less likely",
+            "Much less likely",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tradeoffs",
+      "title": "Section 5: Tradeoffs",
+      "description": "Which tradeoff feels more acceptable, and what concerns matter most.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "acceptable_tradeoff",
+          "title": "Which tradeoff would you accept more easily?",
+          "choices": [
+            "A wage-based contribution in exchange for universal coverage and lower out-of-pocket costs",
+            "Keeping the current private system even if premiums and deductibles stay high",
+            "A hybrid system with both state coverage and private options",
+            "None of these",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "biggest_cowboy_care_concerns",
+          "title": "What concerns you most about Cowboy Care? Pick up to 2.",
+          "choices": [
+            "Cost to taxpayers",
+            "Cost to employers",
+            "Government control",
+            "Provider shortages",
+            "Wait times",
+            "Quality of care",
+            "Loss of private insurance choice",
+            "Legal or administrative complexity",
+            "I do not have major concerns"
+          ],
+          "maxSelectedChoices": 2,
+          "hasOther": true,
+          "otherText": "Other (write in)"
+        }
+      ]
+    },
+    {
+      "name": "bottom_line",
+      "title": "Section 6: Bottom line",
+      "description": "Your bottom-line view and open comments in your own words.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "pursue_universal_goal",
+          "title": "If Wyoming could guarantee health coverage for every resident regardless of ability to pay, would you want the state to pursue that goal?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only if costs are controlled",
+            "Only if private options remain available",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "support_requirements",
+          "title": "In your own words, what would Cowboy Care need to do right for you to support it?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "comment",
+          "name": "current_system_biggest_concern",
+          "title": "In your own words, what is your biggest concern with the current health insurance system in Wyoming?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_demographics",
+      "title": "Optional demographics",
+      "description": "These questions help interpret results without identifying you personally.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "age_range",
+          "title": "Age range",
+          "isRequired": false,
+          "choices": [
+            "Under 18",
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

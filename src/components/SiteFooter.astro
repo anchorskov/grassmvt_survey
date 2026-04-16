@@ -8,8 +8,55 @@
     <a class="hover:text-white transition-colors" href="/credits/">Credits</a>
     <span aria-hidden="true">&middot;</span>
     <span>Powered by Cloudflare Pages</span>
+    <span aria-hidden="true">&middot;</span>
+    <button
+      class="hover:text-white transition-colors bg-transparent border-none p-0 cursor-pointer text-wy-dust text-sm font-inherit"
+      type="button"
+      data-feedback-open
+    >Feedback</button>
   </div>
 </footer>
+
+<!-- Feedback modal -->
+<div class="auth-modal is-hidden" id="feedback-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
+  <div class="auth-modal__backdrop" data-feedback-close></div>
+  <div class="auth-modal__panel" role="document">
+    <button class="auth-modal__close" type="button" data-feedback-close aria-label="Close">&times;</button>
+    <div class="auth-modal__content">
+      <h2 id="feedback-modal-title">Send feedback</h2>
+      <p class="helper-text">Share a thought, report a problem, or suggest an improvement. Goes directly to Jimmy.</p>
+      <form class="survey-form" id="feedback-modal-form" novalidate>
+        <div class="form-row">
+          <label for="feedback-modal-message">Message</label>
+          <textarea
+            id="feedback-modal-message"
+            name="message"
+            maxlength="2000"
+            required
+            rows="5"
+            placeholder="What's on your mind?"
+          ></textarea>
+          <p class="helper-text" style="text-align:right">
+            <span id="feedback-modal-counter">0 / 2000</span>
+          </p>
+        </div>
+        <div class="form-row">
+          <label for="feedback-modal-email">Your email <span class="helper-text" style="font-weight:normal">(optional — for a reply)</span></label>
+          <input
+            id="feedback-modal-email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            placeholder="you@example.com"
+          />
+        </div>
+        <p class="form-error is-hidden" id="feedback-modal-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="feedback-modal-success" role="status"></p>
+        <button class="button button--primary" type="submit" id="feedback-modal-submit">Send feedback</button>
+      </form>
+    </div>
+  </div>
+</div>
 
 <!-- Auth modals — present on every page so header/inline triggers work anywhere -->
 <div class="auth-modal is-hidden" id="login-modal" aria-hidden="true" role="dialog" aria-modal="true">

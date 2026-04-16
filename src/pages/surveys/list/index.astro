@@ -19,7 +19,10 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
     <section class="survey-path-picker" aria-labelledby="survey-path-picker-title">
       <div class="survey-path-picker__header">
-        <h2 id="survey-path-picker-title">Choose a survey path</h2>
+        <h2 id="survey-path-picker-title">
+          Choose a survey path
+          <button class="section-help-trigger" type="button" aria-label="Help: survey paths" aria-expanded="false" data-help-page="survey-list" data-help-section="survey-paths">?</button>
+        </h2>
         <p class="helper-text" id="survey-auth-note">
           Browse topics now. <button class="link-button" type="button" data-auth-open="login">Sign in</button> when
           you are ready to save progress or edit responses.
@@ -41,7 +44,10 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
     <section class="survey-listings__section" id="survey-active-section" aria-labelledby="survey-active-title">
       <div class="survey-listings__header">
-        <h2 id="survey-active-title">Active surveys</h2>
+        <h2 id="survey-active-title">
+          Active surveys
+          <button class="section-help-trigger" type="button" aria-label="Help: active surveys" aria-expanded="false" data-help-page="survey-list" data-help-section="active-surveys">?</button>
+        </h2>
         <p class="helper-text" id="survey-active-intro"></p>
       </div>
       <div id="survey-active-grid" class="grid"></div>
@@ -49,14 +55,20 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
     <section class="survey-listings__section is-hidden" id="survey-bridge-section" aria-labelledby="survey-bridge-title">
       <div class="survey-listings__header">
-        <h2 id="survey-bridge-title">Bridge surveys</h2>
+        <h2 id="survey-bridge-title">
+          Bridge surveys
+          <button class="section-help-trigger" type="button" aria-label="Help: bridge surveys" aria-expanded="false" data-help-page="survey-list" data-help-section="bridge-surveys">?</button>
+        </h2>
       </div>
       <div id="survey-bridge-grid" class="grid"></div>
     </section>
 
     <section class="survey-listings__section is-hidden" id="survey-coming-section" aria-labelledby="survey-coming-title">
       <div class="survey-listings__header">
-        <h2 id="survey-coming-title">Coming soon</h2>
+        <h2 id="survey-coming-title">
+          Coming soon
+          <button class="section-help-trigger" type="button" aria-label="Help: coming soon surveys" aria-expanded="false" data-help-page="survey-list" data-help-section="coming-soon">?</button>
+        </h2>
       </div>
       <div id="survey-coming-grid" class="grid"></div>
     </section>

@@ -76,7 +76,7 @@
   const PASSKEY_NUDGE_KEY = 'passkey_nudge_dismissed_at';
   const PASSKEY_NUDGE_SUPPRESS_MS = 30 * 24 * 60 * 60 * 1000;
   const AUTH_RETURN_KEY = 'auth_return_to';
-  const DEFAULT_POST_LOGIN_PATH = '/surveys/list/';
+  const DEFAULT_POST_LOGIN_PATH = '/';
 
   const storeAuthReturnTo = () => {
     try {

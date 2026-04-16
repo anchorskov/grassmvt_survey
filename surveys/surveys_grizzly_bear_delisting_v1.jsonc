@@ -1,0 +1,386 @@
+// surveys/surveys_grizzly_bear_delisting_v1.jsonc
+// slug: grizzly-bear-delisting
+// version: v1 | 2026-04-10
+// title: Grizzly Bear Delisting Survey
+{
+  "title": "Grizzly Bear Delisting Survey",
+  "description": "A Wyoming survey exploring views on grizzly bear delisting, wildlife management, public safety, livestock conflict, hunting, habitat, and who should control the decision.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "completeText": "Submit survey",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "grizzly-bear-delisting",
+    "estimated_minutes": 7,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey measures what people believe Wyoming should do about grizzly bear delisting, management, safety, livestock loss, hunting, habitat, and long-term recovery. The goal is clarity, not persuasion.</p><h3>Plain-language definitions</h3><ul><li><strong>Delisting:</strong> For this survey, delisting means removing Greater Yellowstone grizzly bears from federal Endangered Species Act protection and returning primary management authority to the states.</li><li><strong>Connectivity:</strong> Natural movement or exchange between grizzly populations, which can affect long-term genetic health.</li><li><strong>Conflict-based removal:</strong> Removing individual bears after repeated livestock or public-safety conflicts.</li></ul><h3>How responses will be used</h3><ul><li>Results will be published in aggregate.</li><li>Exact wording and response options will be published with results.</li><li>A revision log will show what changed and why.</li><li>Individual responses remain private.</li></ul><h3>Before you begin</h3><p>This is not a test of expertise. If you are still forming a view, answer as best you can and use Not sure where it fits.</p>"
+        }
+      ]
+    },
+    {
+      "name": "baseline_view",
+      "title": "Section 1: Baseline view",
+      "description": "Start with your current familiarity, overall position, and main concern.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "issue_familiarity",
+          "title": "How familiar are you with the issue of grizzly bear delisting in Wyoming?",
+          "choices": [
+            "Very familiar",
+            "Somewhat familiar",
+            "Not very familiar",
+            "Not familiar at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "current_view",
+          "title": "Which statement is closest to your current view?",
+          "choices": [
+            "Grizzly bears in Greater Yellowstone should be delisted now",
+            "Grizzly bears should remain federally protected for now",
+            "Delisting should happen only after more safeguards are in place",
+            "I do not have a clear view yet",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "primary_concern",
+          "title": "Which concern matters most to you in this issue?",
+          "choices": [
+            "Human safety",
+            "Livestock and property loss",
+            "Long-term species recovery",
+            "Hunting and state management",
+            "Tribal and cultural concerns",
+            "Habitat and connectivity",
+            "Federal versus state authority",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other (write in)"
+        }
+      ]
+    },
+    {
+      "name": "management_authority",
+      "title": "Section 2: Management authority",
+      "description": "Who should decide, and what transition approach feels most responsible?",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "primary_management_authority",
+          "title": "Who should have primary authority over grizzly bear management in the Greater Yellowstone area?",
+          "choices": [
+            "Wyoming, Idaho, and Montana",
+            "Federal agencies",
+            "Shared state and federal authority",
+            "State, federal, and tribal co-management",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "responsible_approach",
+          "title": "Which approach feels most responsible to you?",
+          "choices": [
+            "Delist now and let the states manage",
+            "Keep federal protection until natural connectivity improves",
+            "Keep federal protection but give more flexibility for conflict management",
+            "Create a phased transition to state management with strict benchmarks",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hunting_and_mortality",
+      "title": "Section 3: Hunting and mortality",
+      "description": "How you view hunting and population limits if management changes.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "regulated_hunting_season",
+          "title": "If grizzly bears are delisted, should states ever allow a regulated hunting season?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only after several years of stable population results",
+            "Only for limited conflict-based removal, not recreational hunting",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "mortality_limits_view",
+          "title": "Which statement is closest to your view on bear mortality limits?",
+          "choices": [
+            "Population goals should prioritize keeping bear numbers high",
+            "Population goals should balance bear recovery with local conflict reduction",
+            "Population goals should prioritize reducing conflict even if bear numbers decline",
+            "I do not have a clear view",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "safety_and_conflict",
+      "title": "Section 4: Safety and conflict",
+      "description": "How serious the problem feels and which tools you support most.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "conflict_seriousness",
+          "title": "How serious are grizzly bear conflicts in Wyoming for families, ranchers, outfitters, and recreation users?",
+          "choices": [
+            "Very serious",
+            "Serious",
+            "Moderate",
+            "Minor",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "preferred_management_tools",
+          "title": "Which management tools do you support most? Pick up to 3.",
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Better food storage and attractant control",
+            "Faster removal of problem bears",
+            "State compensation for livestock losses",
+            "More local warning systems and closures",
+            "More education and bear spray outreach",
+            "More restrictions in high-conflict areas",
+            "Stronger penalties for illegal feeding or attractants",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other (write in)"
+        },
+        {
+          "type": "radiogroup",
+          "name": "federal_protection_conflict_flexibility",
+          "title": "If federal protection remains in place, should Wyoming still receive more flexibility to address livestock and property conflicts?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only in clearly defined cases",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "recovery_and_habitat",
+      "title": "Section 5: Recovery and habitat",
+      "description": "What should happen before delisting, and how much connectivity matters.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "requirements_before_delisting",
+          "title": "What should be required before delisting? Pick up to 2.",
+          "maxSelectedChoices": 2,
+          "choices": [
+            "Stable or growing bear numbers",
+            "Stronger habitat protections",
+            "Better natural connectivity to other grizzly populations",
+            "Clear conflict-management rules",
+            "Strong tribal consultation",
+            "Clear state commitments on mortality limits",
+            "None of these, delist now",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "connectivity_view",
+          "title": "Which statement is closest to your view on connectivity?",
+          "choices": [
+            "Connectivity with other grizzly populations is essential before delisting",
+            "Connectivity matters, but delisting can happen first",
+            "Connectivity is not a major concern",
+            "I do not know enough to say",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "genetic_health_translocation",
+          "title": "If natural connectivity does not happen soon, should wildlife managers move bears to improve genetic health?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only as a last resort",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "process_and_trust",
+      "title": "Section 6: Process and trust",
+      "description": "How the decision should be made and which institutions you trust.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "delisting_decision_process",
+          "title": "How should a delisting decision be made?",
+          "choices": [
+            "Through federal scientific rulemaking",
+            "Through Congress",
+            "Through a state petition and agreement process",
+            "Through a combined scientific and legislative process",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "trust_state_agencies",
+          "title": "How much do you trust Wyoming state agencies to manage grizzly bears if delisting occurs?",
+          "choices": [
+            "A lot",
+            "Some",
+            "Not much",
+            "Not at all",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "trust_federal_agencies",
+          "title": "How much do you trust federal agencies to manage grizzly bears fairly in Wyoming?",
+          "choices": [
+            "A lot",
+            "Some",
+            "Not much",
+            "Not at all",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bottom_line",
+      "title": "Section 7: Bottom line",
+      "description": "Your current position today and any written context you want to add.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "support_today",
+          "title": "Which option would you support today?",
+          "choices": [
+            "Delist now",
+            "Keep protections in place",
+            "Delay delisting until more safeguards are met",
+            "Shared management without full delisting",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "what_would_change_for_delisting_support",
+          "title": "In your own words, what would need to happen for you to support delisting?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "comment",
+          "name": "biggest_delisting_concern",
+          "title": "In your own words, what is your biggest concern if grizzly bears are delisted?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_demographics",
+      "title": "Optional demographics",
+      "description": "These questions help interpret the results without identifying you personally.",
+      "elements": [
+        {
+          "type": "dropdown",
+          "name": "state",
+          "title": "State",
+          "searchEnabled": true,
+          "searchMode": "startsWith",
+          "choices": [
+            "Prefer not to answer"
+          ],
+          "choicesByUrl": {
+            "url": "/api/geo/us-states",
+            "valueName": "name",
+            "titleName": "name"
+          }
+        },
+        {
+          "type": "dropdown",
+          "name": "wy_house_district",
+          "title": "If you are a registered voter in Wyoming, what is your State House district?",
+          "choices": [
+            "Don't know",
+            "Not a Wyoming voter",
+            "Prefer not to answer"
+          ],
+          "choicesByUrl": {
+            "url": "/api/wy/house-districts",
+            "valueName": "label",
+            "titleName": "label"
+          }
+        },
+        {
+          "type": "radiogroup",
+          "name": "age_range",
+          "title": "Age range",
+          "choices": [
+            "Under 18",
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "issue_connection",
+          "title": "Connection to the issue",
+          "choices": [
+            "Resident near grizzly habitat",
+            "Rancher or livestock producer",
+            "Hunter",
+            "Outfitter or guide",
+            "Recreation user",
+            "Wildlife advocate",
+            "Tribal member",
+            "Other Wyoming resident",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

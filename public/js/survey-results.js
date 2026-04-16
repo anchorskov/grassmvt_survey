@@ -13,6 +13,8 @@
   let voterSnapshots = null;
   let districtContext = null;
   let userAuth = null;
+  let userHouseContext = null;
+  let userSenateContext = null;
   let availableSurveys = [];
 
   const escapeHtml = (str) => {
@@ -213,7 +215,7 @@
   const renderControls = () => {
     const tierOptions = `
       <option value="1" ${currentTier === 1 ? 'selected' : ''}>Tier 1: All Responses</option>
-      <option value="2" ${currentTier === 2 ? 'selected' : ''}>Tier 2: Verified Address</option>
+      <option value="2" ${currentTier === 2 ? 'selected' : ''}>Tier 2: Registered Voter</option>
     `;
 
     let geoOptionsHtml = '<option value="all|ALL">Statewide (All)</option>';
@@ -247,6 +249,7 @@
         </div>
         <div class="control-group">
           <label for="geo-select">Geography</label>
+          ${currentTier === 1 ? '<p class="results-controls__hint">Select Tier 2 to filter by district</p>' : ''}
           <select id="geo-select" ${currentTier === 1 ? 'disabled' : ''}>${geoOptionsHtml}</select>
         </div>
       </div>
@@ -254,7 +257,7 @@
   };
 
   const renderBadges = (data) => {
-    const tierLabel = data.tier === 1 ? 'Tier 1: All Responses' : 'Tier 2: Verified Address';
+    const tierLabel = data.tier === 1 ? 'Tier 1: All Responses' : 'Tier 2: Registered Voter';
     const geoLabel = data.geo?.label || 'All';
     const nLabel = `n = ${data.n}`;
     const updatedLabel = data.updated_at ? `Updated: ${new Date(data.updated_at).toLocaleDateString()}` : '';
@@ -383,6 +386,28 @@
     `;
   };
 
+  const renderRepCard = (ctx, geoType, distNum) => {
+    const label = geoType === 'state_house' ? `HD-${distNum}` : `SD-${distNum}`;
+    const geoKey = buildGeoKey(geoType, distNum);
+    const isActive = currentGeoType === geoType && currentGeoKey === geoKey;
+    const rep = ctx && ctx.ok && ctx.representatives && ctx.representatives[0];
+
+    const repHtml = rep
+      ? `<span class="ud-rep-name">${escapeHtml(rep.name)}</span>
+         <span class="ud-rep-meta">${escapeHtml(rep.party || '')}${rep.city ? ` &bull; ${escapeHtml(rep.city)}` : ''}</span>`
+      : `<span class="ud-rep-name ud-rep-name--unknown">Representative data unavailable</span>`;
+
+    return `
+      <div class="ud-card${isActive ? ' ud-card--active' : ''}">
+        <div class="ud-card__label">${escapeHtml(label)}</div>
+        <div class="ud-card__rep">${repHtml}</div>
+        ${geoKey ? `<button class="ud-card__btn user-district-link" type="button" data-geo-type="${geoType}" data-geo-key="${geoKey}">
+          ${isActive ? 'Viewing' : 'View results'}
+        </button>` : ''}
+      </div>
+    `;
+  };
+
   const renderUserDistrictPanel = () => {
     if (!userAuth || !userAuth.authenticated || !userAuth.user) return '';
     const av = userAuth.user.address_verification;
@@ -392,28 +417,33 @@
     const senateDist = av.state_senate_dist;
     if (!houseDist && !senateDist) return '';
 
-    let linksHtml = '<p class="user-district-links">View results for your district: ';
-    const links = [];
-    if (houseDist) {
-      const houseLabel = normalizeDistrictNumber(houseDist, 2);
-      const houseKey = buildGeoKey('state_house', houseDist);
-      if (houseKey) {
-        links.push(`<a href="#" class="user-district-link" data-geo-type="state_house" data-geo-key="${houseKey}">HD-${houseLabel}</a>`);
+    let panelTitle = 'Your Districts';
+    let cardsHtml = '';
+
+    if (currentGeoType === 'state_house' || currentGeoType === 'state_senate') {
+      // Show the actively selected district using districtContext (fetched in render())
+      const rawNum = currentGeoKey.split('-').pop();
+      const distNum = normalizeDistrictNumber(rawNum, 2);
+      const isHouse = currentGeoType === 'state_house';
+      const label = isHouse ? `HD-${parseInt(distNum, 10)}` : `SD-${parseInt(distNum, 10)}`;
+      panelTitle = `Selected District \u2014 ${label}`;
+      cardsHtml = renderRepCard(districtContext, currentGeoType, distNum);
+    } else {
+      // Statewide / all — show the user's own verified districts
+      if (houseDist) {
+        const houseLabel = normalizeDistrictNumber(houseDist, 2);
+        cardsHtml += renderRepCard(userHouseContext, 'state_house', houseLabel);
+      }
+      if (senateDist) {
+        const senateLabel = normalizeDistrictNumber(senateDist, 2);
+        cardsHtml += renderRepCard(userSenateContext, 'state_senate', senateLabel);
       }
     }
-    if (senateDist) {
-      const senateLabel = normalizeDistrictNumber(senateDist, 2);
-      const senateKey = buildGeoKey('state_senate', senateDist);
-      if (senateKey) {
-        links.push(`<a href="#" class="user-district-link" data-geo-type="state_senate" data-geo-key="${senateKey}">SD-${senateLabel}</a>`);
-      }
-    }
-    linksHtml += `${links.join(' | ')}</p>`;
 
     return `
       <div class="user-district-panel">
-        ${renderSectionHeading('h4', 'Your Verified Districts', 'verified-districts')}
-        ${linksHtml}
+        ${renderSectionHeading('h4', panelTitle, 'verified-districts')}
+        <div class="ud-cards">${cardsHtml}</div>
       </div>
     `;
   };
@@ -508,10 +538,34 @@
     });
   };
 
+  const injectUserDistrictsIntoGeoOptions = () => {
+    if (!userAuth || !userAuth.authenticated || !userAuth.user) return;
+    const av = userAuth.user.address_verification;
+    if (!av || !av.verified_at) return;
+    const inject = (geoType, rawDist) => {
+      if (!rawDist) return;
+      const geoKey = buildGeoKey(geoType, rawDist);
+      if (!geoKey) return;
+      if (geoOptions.find((o) => o.geo_type === geoType && o.geo_key === geoKey)) return;
+      const distNum = parseInt(normalizeDistrictNumber(rawDist, 2), 10);
+      const isHouse = geoType === 'state_house';
+      geoOptions.push({
+        geo_type: geoType,
+        geo_key: geoKey,
+        option_label: isHouse ? `House District ${distNum}` : `Senate District ${distNum}`,
+        response_count: 0,
+        group_label: 'Your Districts',
+      });
+    };
+    inject('state_house', av.state_house_dist);
+    inject('state_senate', av.state_senate_dist);
+  };
+
   const loadGeoOptions = async () => {
     const resp = await fetch(`/api/results/geo-options?slug=${encodeURIComponent(slug)}&tier=${currentTier}`);
     const data = await resp.json();
     geoOptions = data.ok ? data.options || [] : [];
+    injectUserDistrictsIntoGeoOptions();
   };
 
   const getDefaultTierTwoSelection = () => {
@@ -582,6 +636,37 @@
     } catch (e) {
       return;
     }
+  };
+
+  const loadUserDistrictContexts = async () => {
+    if (!userAuth || !userAuth.authenticated || !userAuth.user) return;
+    const av = userAuth.user.address_verification;
+    if (!av || !av.verified_at) return;
+
+    const fetches = [];
+    if (av.state_house_dist) {
+      const houseKey = buildGeoKey('state_house', av.state_house_dist);
+      if (houseKey) {
+        fetches.push(
+          fetch(`/api/results/district-context?geo_type=state_house&geo_key=${encodeURIComponent(houseKey)}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => { userHouseContext = data; })
+            .catch(() => {})
+        );
+      }
+    }
+    if (av.state_senate_dist) {
+      const senateKey = buildGeoKey('state_senate', av.state_senate_dist);
+      if (senateKey) {
+        fetches.push(
+          fetch(`/api/results/district-context?geo_type=state_senate&geo_key=${encodeURIComponent(senateKey)}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => { userSenateContext = data; })
+            .catch(() => {})
+        );
+      }
+    }
+    await Promise.all(fetches);
   };
 
   const loadStaticSurveys = async () => {
@@ -702,6 +787,7 @@
         loadVoterSnapshots(),
         loadUserAuth(),
       ]);
+      await loadUserDistrictContexts();
 
       const requestedSlug = getSlugFromUrl();
       const validSlug = availableSurveys.some((survey) => survey.slug === requestedSlug) ? requestedSlug : '';

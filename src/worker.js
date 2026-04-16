@@ -18,7 +18,7 @@ import {
   TOWNHALL_STATEMENT_QUALITY_MESSAGE,
   validateTownhallStatementQuality,
 } from './lib/townhall-moderation.js';
-import { sendEmail, sendSupportEmail } from './server/email/resend.js';
+import { sendEmail, sendSupportEmail, sendFeedbackEmail } from './server/email/resend.js';
 
 const escapeHtml = (value = '') =>
   value
@@ -6690,6 +6690,44 @@ export default {
       });
     }
 
+    if (request.method === 'POST' && url.pathname === '/api/feedback') {
+      // POST /api/feedback — anonymous feedback form, sends email via Resend
+      const body = await parseJsonBody(request);
+      const message = (body.message || '').trim();
+      const senderEmail = (body.email || '').trim();
+      const page = (body.page || '').trim();
+
+      if (!message || message.length < 5) {
+        return jsonResponse(
+          { ok: false, code: 'MESSAGE_REQUIRED', message: 'Please enter a message of at least 5 characters.' },
+          { status: 400 }
+        );
+      }
+      if (message.length > 2000) {
+        return jsonResponse(
+          { ok: false, code: 'MESSAGE_TOO_LONG', message: 'Message must be 2000 characters or fewer.' },
+          { status: 400 }
+        );
+      }
+      if (senderEmail && !isValidEmail(senderEmail)) {
+        return jsonResponse(
+          { ok: false, code: 'INVALID_EMAIL', message: 'Email address is not valid.' },
+          { status: 400 }
+        );
+      }
+
+      const result = await sendFeedbackEmail(env, { message, senderEmail, page });
+      if (!result.ok) {
+        console.error('[Feedback] Email send failed:', result);
+        return jsonResponse(
+          { ok: false, code: 'SEND_FAILED', message: 'Unable to send feedback right now. Please try again later.' },
+          { status: 502 }
+        );
+      }
+
+      return jsonResponse({ ok: true, message: 'Thanks — your feedback was sent.', stubbed: Boolean(result.stubbed) });
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/geo') {
       const country = getGeoCountry(request);
       const risk = country === 'US' ? 'low' : 'high';
@@ -8741,10 +8779,10 @@ export default {
 
         // Get voter count from voters_raw table based on district
         if (geoType === 'state_house') {
-          // Extract district number from WY-HD-01 format
+          // Extract district number from WY-HD-01 format; strip leading zeros to match DB storage
           const match = geoKey.match(/WY-HD-(\d+)/);
           if (match) {
-            const districtNum = match[1];
+            const districtNum = String(parseInt(match[1], 10));
             const voterCount = await env.DB.prepare(
               `SELECT COUNT(*) as count FROM voters_raw WHERE house = ?`
             ).bind(districtNum).first();
@@ -8754,7 +8792,7 @@ export default {
             const rep = await env.DB.prepare(
               `SELECT name, party, city, county, phone, email, campaign_website, official_profile_url
                FROM wy_legislators
-               WHERE chamber = 'House' AND district = ?
+               WHERE chamber = 'House' AND CAST(district AS INTEGER) = CAST(? AS INTEGER)
                LIMIT 1`
             ).bind(districtNum).first();
 
@@ -8774,10 +8812,10 @@ export default {
             }
           }
         } else if (geoType === 'state_senate') {
-          // Extract district number from WY-SD-01 format
+          // Extract district number from WY-SD-01 format; strip leading zeros to match DB storage
           const match = geoKey.match(/WY-SD-(\d+)/);
           if (match) {
-            const districtNum = match[1];
+            const districtNum = String(parseInt(match[1], 10));
             const voterCount = await env.DB.prepare(
               `SELECT COUNT(*) as count FROM voters_raw WHERE senate = ?`
             ).bind(districtNum).first();
@@ -8787,7 +8825,7 @@ export default {
             const rep = await env.DB.prepare(
               `SELECT name, party, city, county, phone, email, campaign_website, official_profile_url
                FROM wy_legislators
-               WHERE chamber = 'Senate' AND district = ?
+               WHERE chamber = 'Senate' AND CAST(district AS INTEGER) = CAST(? AS INTEGER)
                LIMIT 1`
             ).bind(districtNum).first();
 

@@ -19,6 +19,12 @@ Important:
 - Creating a file alone is not enough.
 - Every new survey must be added to `surveySources` before seeding.
 
+Prohibited items for Wyoming surveys
+- Do not include a state dropdown or state selector on Wyoming-only surveys.
+- Do not ask for Wyoming House District or Wyoming Senate District in survey questions.
+- District information is derived from the user's account and address verification flow, not from survey answers.
+- If a suggested survey draft includes state or district questions, leave them out unless the user explicitly tells you to keep them.
+
 Multi-part survey metadata
 Use a top-level metadata object that SurveyJS ignores:
 

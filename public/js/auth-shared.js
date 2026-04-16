@@ -39,7 +39,6 @@
 
   window.AuthModals = AuthModals;
 
-  const badgeEl = document.getElementById('auth-badge');
   const quickLogoutButton = document.getElementById('auth-quick-logout');
   const openButton = document.getElementById('auth-open');
   const getAdminLink = () => document.getElementById('admin-link');
@@ -170,10 +169,6 @@
   const setLoggedInState = (isLoggedIn, email) => {
     state.authenticated = !!isLoggedIn;
     state.email = email || '';
-    if (badgeEl) {
-      badgeEl.textContent = email ? `Signed in as ${email}` : 'Signed in';
-      badgeEl.classList.toggle('is-hidden', !isLoggedIn);
-    }
     if (quickLogoutButton) {
       quickLogoutButton.classList.toggle('is-hidden', !isLoggedIn);
     }
@@ -263,6 +258,20 @@
   };
 
   document.addEventListener('click', (event) => {
+    // [data-auth-nav="/path"] — navigate if signed in, otherwise prompt login then redirect
+    const navTarget = event.target.closest('[data-auth-nav]');
+    if (navTarget) {
+      event.preventDefault();
+      const href = navTarget.getAttribute('data-auth-nav') || navTarget.getAttribute('href') || '/';
+      if (state.authenticated) {
+        window.location.href = href;
+      } else {
+        try { localStorage.setItem('auth_return_to', href); } catch (e) { /* ignore */ }
+        AuthModals.open('login');
+      }
+      return;
+    }
+
     const openTarget = event.target.closest('[data-auth-open]');
     if (openTarget) {
       event.preventDefault();

@@ -41,7 +41,13 @@ const {
     <SiteFooter />
     <!-- Auth modal JS — needed on every page that has the site header -->
     <script is:inline src="/js/auth-shared.js"></script>
-    <script is:inline src="/js/auth-modal.js"></script>
+    <script is:inline src="/js/login-modal.js"></script>
+    <script is:inline src="/js/signup-modal.js"></script>
+    <script is:inline src="/js/password-reset-modal.js"></script>
+    <!-- Section help popovers — loaded globally so any page can use ? triggers -->
+    <script is:inline src="/js/section-help.js"></script>
+    <!-- Feedback modal — loaded globally so footer trigger works on every page -->
+    <script is:inline src="/js/feedback-modal.js"></script>
     <slot name="scripts" />
   </body>
 </html>

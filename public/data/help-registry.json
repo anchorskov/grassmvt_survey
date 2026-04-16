@@ -15,18 +15,46 @@
       "body": "Choose a filter first: Verified shows accounts that already have verified voter status, Unverified shows accounts that still need work, and All shows both. Load users fetches the current list from the server. The table helps you confirm email status, verification method, verified scope, Wyoming voter match fields, and district data before deciding what admin action is needed."
     },
     {
+      "page": "survey-list",
+      "section": "survey-paths",
+      "title": "Survey paths",
+      "summary": "Surveys are organized into paths based on the type of questions they ask.",
+      "body": "Normal Life surveys cover everyday issues — cost of living, healthcare access, jobs, housing, and daily local concerns. They are short and quick to complete. Divisive surveys cover issues where values and tradeoffs are sharper and where a broader framing helps produce clearer public signal. Bridge surveys cross party lines and are designed to find common ground across different perspectives."
+    },
+    {
+      "page": "survey-list",
+      "section": "active-surveys",
+      "title": "Active surveys",
+      "summary": "These surveys are open and accepting responses right now.",
+      "body": "Any visitor can browse active surveys. To submit a response that counts in the verified results, you need an account with a verified address. Sign in or create a free account to get started. Your responses are private — only aggregated results are published once a minimum number of responses have been collected."
+    },
+    {
+      "page": "survey-list",
+      "section": "bridge-surveys",
+      "title": "Bridge surveys",
+      "summary": "Bridge surveys are designed to find shared positions across political divides.",
+      "body": "These surveys focus on issues where people across different political backgrounds often have more in common than they realize. Questions are written to avoid loading language and are reviewed for balance before publication. Results show where broad consensus exists, even on topics that can seem divisive in media coverage."
+    },
+    {
+      "page": "survey-list",
+      "section": "coming-soon",
+      "title": "Coming soon",
+      "summary": "These surveys are in development and not yet open for responses.",
+      "body": "Surveys in the queue are reviewed for question clarity, balance, and scope before being published. Coming soon surveys are visible so you can see what topics are planned. Sign in and you will be notified when a new survey becomes active."
+    },
+    {
       "page": "survey-results",
       "section": "filters",
       "title": "Results filters",
       "summary": "Use the tier and geography filters to narrow the current survey's published results.",
-      "body": "Tier 1 shows all published responses for the survey. Tier 2 limits the view to responses tied to a verified Wyoming address. The geography dropdown then lets you review statewide, State House, or State Senate results when data is available for that grouping."
+      "body": "Tier 1 shows all published responses for the survey. Tier 2 limits the view to responses tied to a verified Wyoming address. The geography dropdown then lets you review statewide, State House, or State Senate results when data is available for that grouping. Results are only published once at least 10 responses exist for the selected combination."
     },
     {
       "page": "survey-results",
       "section": "verified-districts",
-      "title": "Your verified districts",
-      "summary": "These shortcuts jump to the same district filters available in the geography dropdown.",
-      "body": "If your account has a verified Wyoming address, this section shows your current House and Senate districts. Choosing one of these links applies the same geography filter as selecting that district from the dropdown."
+      "title": "Your districts",
+      "summary": "Jump directly to results filtered for your verified House or Senate district.",
+      "body": "If your account has a verified Wyoming address, this panel shows your House and Senate districts along with your elected representative's name and party. Clicking View results switches the page to Tier 2 filtered to that district — the same as selecting it manually from the Geography dropdown."
     },
     {
       "page": "survey-results",
@@ -41,6 +69,69 @@
       "title": "Publishing threshold",
       "summary": "Some survey and geography combinations do not yet have enough responses to publish detailed results.",
       "body": "Results are shown only when at least 10 responses exist for the selected survey, tier, and geography combination. If a district has fewer responses than that threshold, the page shows the current count and waits to publish detailed charts until the minimum is reached."
+    },
+    {
+      "page": "account",
+      "section": "passkeys",
+      "title": "Passkeys",
+      "summary": "Passkeys let you sign in without a password using your device's biometrics or PIN.",
+      "body": "Adding a passkey links your device's fingerprint, face ID, or PIN to your account. The next time you sign in, you can authenticate with a single tap instead of typing a password. You can register multiple devices. Give each passkey a nickname so you can tell them apart if you ever need to remove one."
+    },
+    {
+      "page": "account",
+      "section": "passkey-list",
+      "title": "Registered passkeys",
+      "summary": "These are the devices currently authorized to sign in to your account without a password.",
+      "body": "Each row shows the passkey nickname, the date it was registered, and a remove button. Removing a passkey revokes that device's ability to sign in without a password — you can still sign in with your password and re-register the device later. If you see a passkey you do not recognize, remove it immediately."
+    },
+    {
+      "page": "account",
+      "section": "admin-tools",
+      "title": "Admin tools",
+      "summary": "Issue a one-time verification link to help another account complete verified voter status.",
+      "body": "Enter the target user's email, an optional reason note, and how long the link should remain valid. The system sends the link by email or returns it here for manual delivery. This bypasses the normal address and voter-record verification flow and should only be used for accounts you have already confirmed offline."
+    },
+    {
+      "page": "account-location",
+      "section": "connection",
+      "title": "Connection check",
+      "summary": "We check your approximate location to confirm you are accessing from the United States.",
+      "body": "This step uses your IP address to estimate your country. It does not record your precise location and does not affect your survey results. If the country shown is wrong, you can still continue to the address form — the address you enter is what determines your districts."
+    },
+    {
+      "page": "account-location",
+      "section": "address-verify",
+      "title": "Address verification",
+      "summary": "Your address is used to look up your legislative districts and verify you are a resident.",
+      "body": "Enter your full residential address — the one you use for mail delivery. The system looks up your Wyoming House and Senate district numbers based on that address. Your address is stored securely and is never shown in public results. If you are a Wyoming registered voter, a separate optional step can match your record for enhanced credibility on verified-voter surveys."
+    },
+    {
+      "page": "account-location",
+      "section": "device-check",
+      "title": "Device location check",
+      "summary": "This optional step compares your device's GPS location to the address you entered.",
+      "body": "Sharing device location helps confirm that the address you entered is consistent with where you actually are. This is an optional proximity check — not an exact match — and is used to reduce the risk of address fraud. You can complete verification without this step, but your account may be flagged for manual review. If you are away from home, try again when you are closer to your verified address."
+    },
+    {
+      "page": "account-districts",
+      "section": "detected-districts",
+      "title": "Detected districts",
+      "summary": "These districts were looked up automatically based on the address you verified.",
+      "body": "Review each district carefully and confirm whether it is correct. State is your state of residence. Congressional District is your US House district. State House and State Senate are your Wyoming legislative districts. If a district looks wrong, click No to flag it. Your confirmed districts determine which results you can view and how your survey responses are counted in district-level aggregates."
+    },
+    {
+      "page": "account-districts",
+      "section": "wy-voter",
+      "title": "Wyoming voter verification",
+      "summary": "Matching your account to Wyoming's voter rolls adds a higher level of credibility to your responses.",
+      "body": "This optional step looks up your name and address in the Wyoming voter registration database. A successful match marks your account as a verified registered voter, which unlocks a separate tier of results that only include confirmed Wyoming voter responses. This step is optional — you can still use the platform fully without it. Your voter registration data is used only for the match and is not stored or shared."
+    },
+    {
+      "page": "townhall",
+      "section": "overview",
+      "title": "Town Hall",
+      "summary": "Each survey has a Town Hall discussion where participants can share positions and review supporting evidence.",
+      "body": "The Town Hall connects directly to survey topics. Each topic shows statements posted by other participants, organized by tags. You can agree, disagree, or flag statements, and you can post your own. Statements must stay civil and on topic. Moderation removes posts that violate community standards. Sign in to post, react, or reply."
     },
     {
       "page": "townhall-topic",
@@ -68,7 +159,7 @@
       "section": "tags",
       "title": "Tags",
       "summary": "Use tags to group related statements.",
-      "body": "Use tags to group related statements. Start each tag with # and separate multiple tags with commas. If you leave tags blank, your statement will be tagged #opinion by default. For example: #AI, #healthcare, #education"
+      "body": "Start each tag with # and separate multiple tags with commas. If you leave tags blank, your statement will be tagged #opinion by default. For example: #AI, #healthcare, #education"
     },
     {
       "page": "townhall-topic",
@@ -76,6 +167,13 @@
       "title": "Sources",
       "summary": "Add up to 3 public links that support your statement.",
       "body": "Use direct source links, public records, official documents, or other clearly described evidence when possible."
+    },
+    {
+      "page": "verify-voter",
+      "section": "upgrade",
+      "title": "Verified voter upgrade",
+      "summary": "This one-time link upgrades your account to verified voter status using a passkey.",
+      "body": "You must be signed in as the intended account for this link to work. The link expires quickly — if it has expired, ask an admin to issue a new one. Completing the upgrade uses your device passkey to confirm your identity and links your account to a verified Wyoming voter record. Once complete, your survey responses count in the verified-voter tier of results."
     }
   ]
 }

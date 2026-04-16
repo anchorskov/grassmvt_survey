@@ -1,0 +1,127 @@
+// surveys/surveys_security_feedback_v1.jsonc
+// slug: security-feedback
+// version: v1 | 2026-04-16
+// title: Platform Trust and Security Feedback
+{
+  "title": "Platform Trust and Security Feedback",
+  "description": "Help us understand what builds trust, what feels acceptable, and what feels like a step too far.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "trust",
+    "estimated_minutes": 4,
+    "featured": false
+  },
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit feedback",
+  "completedHtml": "<h3>Thank you.</h3><p>Your feedback has been recorded and will help shape how this platform handles trust and verification.</p>",
+  "pages": [
+    {
+      "name": "trust",
+      "title": "Section 1: What builds trust",
+      "description": "Your reaction to the platform's approach to privacy and verification.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "overall_trust",
+          "title": "1. How much do you trust this platform to handle your data responsibly?",
+          "isRequired": true,
+          "choices": [
+            "High trust — the approach feels solid",
+            "Moderate trust — I have some reservations",
+            "Low trust — I need more information",
+            "No trust — the approach concerns me",
+            "Not sure yet"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "trust_factors",
+          "title": "2. Which of the following would increase your trust in this platform? Select all that apply.",
+          "isRequired": false,
+          "choices": [
+            "Published source code (open source)",
+            "Independent security audit",
+            "Clear data deletion policy",
+            "No third-party data sharing",
+            "Transparent versioned survey history",
+            "Email receipts with revision tokens",
+            "Plain-language privacy policy",
+            "Nothing — I already trust it",
+            "Other"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "verification",
+      "title": "Section 2: Verification and identity",
+      "description": "Your comfort level with the verification steps this platform uses.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "address_verification_comfort",
+          "title": "3. How comfortable are you with providing your address for district-level verification?",
+          "isRequired": true,
+          "choices": [
+            "Very comfortable — it makes results more credible",
+            "Somewhat comfortable — I understand why it's needed",
+            "Neutral",
+            "Somewhat uncomfortable — I worry about how it is stored",
+            "Very uncomfortable — I would not provide my address"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "voter_file_verification_comfort",
+          "title": "4. Wyoming uses a voter file to confirm registered voters. How do you feel about that approach?",
+          "isRequired": true,
+          "choices": [
+            "Strongly support it — it raises signal quality",
+            "Support it — it seems reasonable",
+            "Neutral",
+            "Concerned — it feels like too much",
+            "Strongly opposed",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "limits",
+      "title": "Section 3: What feels like too much",
+      "description": "Help us understand where the line is.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "too_far",
+          "title": "5. Which of the following would feel like a step too far? Select all that apply.",
+          "isRequired": false,
+          "choices": [
+            "Storing my full home address",
+            "Checking my location at time of submission",
+            "Linking my responses to my name publicly",
+            "Sharing my data with campaigns or candidates",
+            "Storing a hash of my voter record",
+            "Using IP address for rate limiting",
+            "None of these — all seem reasonable",
+            "Other"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "security_feedback_open",
+          "title": "6. Anything else you want us to know about trust, privacy, or security on this platform?",
+          "isRequired": false,
+          "maxLength": 500,
+          "placeholder": "Optional. Share your thoughts, concerns, or suggestions."
+        }
+      ]
+    }
+  ]
+}
