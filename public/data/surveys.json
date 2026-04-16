@@ -256,6 +256,36 @@
     "href": "/surveys/wy-public-land-sales"
   },
   {
+    "id": "grizzly-bear-delisting",
+    "slug": "grizzly-bear-delisting",
+    "scope": "wy",
+    "title": "Grizzly Bear Delisting Survey",
+    "description": "A Wyoming survey exploring views on grizzly bear delisting, wildlife management, public safety, livestock conflict, hunting, habitat, and who should control the decision.",
+    "landing_blurb": "A Wyoming issue survey on delisting, management authority, safety, hunting, habitat, livestock conflict, and trust in the decision-making process.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "grizzly-bear-delisting",
+    "display_order": 28,
+    "estimated_minutes": 7,
+    "featured": true,
+    "href": "/surveys/grizzly-bear-delisting"
+  },
+  {
+    "id": "cowboy-care",
+    "slug": "cowboy-care",
+    "scope": "wy",
+    "title": "Cowboy Care Survey",
+    "description": "A Wyoming health care survey exploring support for a Wyoming-run coverage model, lower family costs, provider protection, and the role of private insurance.",
+    "landing_blurb": "A Wyoming issue survey on a Wyoming-run coverage model, funding choices, provider protection, malpractice handling, and the role of private insurance.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "cowboy-care",
+    "display_order": 30,
+    "estimated_minutes": 6,
+    "featured": true,
+    "href": "/surveys/cowboy-care"
+  },
+  {
     "id": "military-force-ai",
     "slug": "military-force-ai",
     "scope": "public",

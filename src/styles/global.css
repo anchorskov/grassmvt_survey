@@ -1,0 +1,68 @@
+/* src/styles/global.css */
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Campaign brand tokens — Western / Frontier theme
+   Mirrored verbatim from skovgard2026/src/styles/global.css
+   Token names, hex values, and CSS variable names are intentionally identical.
+--------------------------------------------------------------------------- */
+@theme {
+  /* --- Western / Frontier semantic tokens with Republican red primary --- */
+  --color-wy-charcoal: #2b2b2b;    /* weathered iron — primary dark */
+  --color-wy-ember: #b22234;       /* Old Glory red — primary warm accent */
+  --color-wy-ember-dark: #8b1a26;  /* deeper ember — hover on ember */
+  --color-wy-sandstone: #c68a4a;   /* honeyed sandstone — secondary warm */
+  --color-wy-sage: #7a8a6b;        /* muted green — quiet rails, not bold UI */
+  --color-wy-bone: #f1ece1;        /* page background — cream-warm off-white */
+  --color-wy-rust: #8a3d23;        /* deep ember-brown — tags, link underlines */
+  --color-wy-dust: #b7a88a;        /* pale prairie — card borders, dividers */
+
+  /* --- Legacy aliases (wire old class names to the new palette) --- */
+  --color-wy-navy: #2b2b2b;        /* was deep blue → now charcoal */
+  --color-wy-gold: #c68a4a;        /* was amber → now sandstone */
+  --color-wy-stone: #f1ece1;       /* was cream → now bone */
+  --color-wy-sky: #7a8a6b;         /* was sky blue → now sage */
+
+  /* --- Typography --- */
+  --font-family-sans: 'Source Sans 3', 'Inter', system-ui, sans-serif;
+  --font-family-serif: 'Bitter', 'Merriweather', Georgia, serif;
+}
+
+/* Subtle topographic accent rule used as a frontier-style section divider.
+   Apply with: <hr class="topo-rule" /> */
+.topo-rule {
+  border: 0;
+  height: 10px;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent 6px,
+    var(--color-wy-ember) 6px,
+    var(--color-wy-ember) 9px,
+    transparent 9px,
+    transparent 16px,
+    var(--color-wy-sandstone) 16px,
+    var(--color-wy-sandstone) 18px,
+    transparent 18px,
+    transparent 28px
+  );
+  opacity: 0.7;
+  margin: 0;
+}
+
+/* Body background supports a faint bone-paper grain so large flat expanses
+   don't feel flat on high-density displays. */
+body {
+  background-color: var(--color-wy-bone);
+  background-image:
+    radial-gradient(rgba(43, 43, 43, 0.035) 1px, transparent 1px),
+    radial-gradient(rgba(198, 138, 74, 0.03) 1px, transparent 1px);
+  background-size: 22px 22px, 37px 37px;
+  background-position: 0 0, 11px 11px;
+}
+
+/* Headline serif treatment — slightly condensed, weighty, frontier-era feel */
+h1, h2, h3, .font-serif {
+  font-family: var(--font-family-serif);
+  letter-spacing: -0.01em;
+}

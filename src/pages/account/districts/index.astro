@@ -1,0 +1,98 @@
+---
+// src/pages/account/districts/index.astro
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="District Verification | Grassroots Movement">
+  <main class="max-w-2xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold text-wy-charcoal mb-2">District Verification</h1>
+    <p class="helper-text mb-2">Confirm your districts so your responses count in the right place.</p>
+    <p class="helper-text" id="district-status">Loading your verification status...</p>
+    <p class="helper-text" id="voter-status"></p>
+
+    <section class="survey-form" aria-live="polite">
+      <h2>Your Detected Districts</h2>
+      <p class="helper-text">Please confirm each district is correct by clicking Yes or No.</p>
+
+      <div class="district-row" id="row-state">
+        <span class="district-label">State:</span>
+        <span class="district-value" id="district-state">--</span>
+        <span class="district-actions">
+          <button type="button" class="btn-yes" data-district="state" data-confirm="yes">Yes</button>
+          <button type="button" class="btn-no" data-district="state" data-confirm="no">No</button>
+        </span>
+        <span class="district-status" id="status-state"></span>
+      </div>
+
+      <div class="district-row" id="row-federal">
+        <span class="district-label">Congressional District:</span>
+        <span class="district-value" id="district-federal">--</span>
+        <span class="district-actions">
+          <button type="button" class="btn-yes" data-district="federal" data-confirm="yes">Yes</button>
+          <button type="button" class="btn-no" data-district="federal" data-confirm="no">No</button>
+        </span>
+        <span class="district-status" id="status-federal"></span>
+      </div>
+
+      <div class="district-row" id="row-house">
+        <span class="district-label">State House District:</span>
+        <span class="district-value" id="district-house">--</span>
+        <span class="district-actions">
+          <button type="button" class="btn-yes" data-district="house" data-confirm="yes">Yes</button>
+          <button type="button" class="btn-no" data-district="house" data-confirm="no">No</button>
+        </span>
+        <span class="district-status" id="status-house"></span>
+      </div>
+
+      <div class="district-row" id="row-senate">
+        <span class="district-label">State Senate District:</span>
+        <span class="district-value" id="district-senate">--</span>
+        <span class="district-actions">
+          <button type="button" class="btn-yes" data-district="senate" data-confirm="yes">Yes</button>
+          <button type="button" class="btn-no" data-district="senate" data-confirm="no">No</button>
+        </span>
+        <span class="district-status" id="status-senate"></span>
+      </div>
+
+      <p class="form-error is-hidden" id="district-error" role="alert"></p>
+      <p class="helper-text is-hidden" id="district-result" role="status"></p>
+
+      <button class="button button--primary is-hidden" type="button" id="district-save">Save District Confirmations</button>
+      <button class="button button--secondary" type="button" id="district-continue">Continue to Surveys</button>
+      <button class="button button--outline" type="button" id="district-back">Back to Location Setup</button>
+    </section>
+
+    <section class="survey-form is-hidden" id="wy-voter-section" aria-live="polite">
+      <h2>Wyoming Voter Verification (Optional)</h2>
+      <p class="helper-text">If you are a registered Wyoming voter, verify for enhanced credibility.</p>
+      <form id="wy-voter-form">
+        <div class="form-row">
+          <label for="wy-first-name">First name</label>
+          <input id="wy-first-name" name="first_name" type="text" autocomplete="given-name" required />
+        </div>
+        <div class="form-row">
+          <label for="wy-last-name">Last name</label>
+          <input id="wy-last-name" name="last_name" type="text" autocomplete="family-name" required />
+        </div>
+        <div class="form-row">
+          <label for="wy-street">Street address</label>
+          <input id="wy-street" name="street1" type="text" autocomplete="address-line1" required />
+        </div>
+        <div class="form-row">
+          <label for="wy-city">City</label>
+          <input id="wy-city" name="city" type="text" autocomplete="address-level2" required />
+        </div>
+        <div class="form-row">
+          <label for="wy-zip">ZIP code</label>
+          <input id="wy-zip" name="zip" type="text" autocomplete="postal-code" required />
+        </div>
+        <p class="form-error is-hidden" id="wy-voter-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="wy-voter-result" role="status"></p>
+        <button class="button button--primary" type="submit">Verify Voter Registration</button>
+      </form>
+    </section>
+  </main>
+
+  <Fragment slot="scripts">
+    <script is:inline src="/js/districts-verify.js" defer></script>
+  </Fragment>
+</BaseLayout>

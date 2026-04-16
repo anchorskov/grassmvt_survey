@@ -1,0 +1,124 @@
+---
+// src/pages/auth/email-verify/index.astro
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Verify Email | Grassroots Movement">
+  <main class="max-w-lg mx-auto px-4 py-10">
+    <div class="bg-white border border-wy-dust rounded-xl p-8 text-center shadow-md">
+      <h1 class="text-2xl font-bold text-wy-charcoal mb-4">Verify Your Email</h1>
+
+      <div id="loading" class="bg-gray-100 text-gray-700 border border-gray-300 rounded p-4 mb-4" style="display:none">
+        <p>Verifying your email…</p>
+      </div>
+
+      <div id="success" class="bg-green-50 text-green-800 border border-green-300 rounded p-4 mb-4" style="display:none">
+        <p><strong>Email Verified!</strong></p>
+        <p class="mt-2">Your email has been successfully verified. You can now log in.</p>
+        <div class="mt-4">
+          <a href="/auth/login/" class="button button--primary">Go to Login</a>
+        </div>
+      </div>
+
+      <div id="error" class="bg-red-50 text-red-800 border border-red-300 rounded p-4 mb-4" style="display:none">
+        <p><strong>Verification Failed</strong></p>
+        <p class="mt-2" id="error-message">The verification link is invalid or has expired.</p>
+        <div class="mt-4 flex gap-2 justify-center">
+          <a href="/auth/signup/" class="button button--secondary">Back to Signup</a>
+          <a href="/auth/login/" class="button button--primary">Go to Login</a>
+        </div>
+      </div>
+
+      <div id="confirm-screen" style="display:none">
+        <p class="text-wy-charcoal mb-4">Click the button below to confirm your email address.</p>
+        <button id="confirm-btn" class="button button--primary">Confirm Email</button>
+        <p class="text-xs text-gray-400 mt-4">This extra step protects your account from automated email scanners.</p>
+      </div>
+
+      <div id="token-form" style="display:none">
+        <p class="text-wy-charcoal mb-4">Enter your verification token:</p>
+        <input type="text" id="token-input" class="w-full border border-wy-dust rounded px-3 py-2 font-mono text-sm mb-4" placeholder="Paste verification token here" />
+        <div class="flex gap-2 justify-center">
+          <button onclick="verifyToken()" class="button button--primary">Verify</button>
+          <a href="/auth/signup/" class="button button--secondary">Back to Signup</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script is:inline>
+    const AUTH_RETURN_KEY = 'auth_return_to';
+    const AUTH_POST_VERIFY_KEY = 'auth_post_verify';
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token') || '';
+    const returnFromUrl = urlParams.get('returnTo') || '';
+
+    const normalizeReturnTo = (value) => {
+      if (!value) return '';
+      if (!value.startsWith('/')) return '';
+      if (value.startsWith('//')) return '';
+      return value;
+    };
+
+    const getReturnTo = () => {
+      const fromUrl = normalizeReturnTo(returnFromUrl);
+      if (fromUrl) return fromUrl;
+      try {
+        const stored = normalizeReturnTo(localStorage.getItem(AUTH_RETURN_KEY) || '');
+        if (stored) { localStorage.removeItem(AUTH_RETURN_KEY); return stored; }
+      } catch (e) { return ''; }
+      return '';
+    };
+
+    const setPostVerifyFlag = () => {
+      try { localStorage.setItem(AUTH_POST_VERIFY_KEY, '1'); } catch (e) {}
+    };
+
+    if (tokenFromUrl) {
+      document.getElementById('confirm-screen').style.display = 'block';
+      document.getElementById('confirm-btn').addEventListener('click', function() {
+        verifyEmailToken(tokenFromUrl);
+      });
+    } else {
+      document.getElementById('token-form').style.display = 'block';
+    }
+
+    function verifyToken() {
+      const token = document.getElementById('token-input').value.trim();
+      if (!token) { alert('Please enter a verification token'); return; }
+      verifyEmailToken(token);
+    }
+
+    async function verifyEmailToken(token) {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('token-form').style.display = 'none';
+      document.getElementById('confirm-screen').style.display = 'none';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('success').style.display = 'none';
+      try {
+        const response = await fetch('/api/auth/email/verify/confirm', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token }),
+          credentials: 'include',
+        });
+        const data = await response.json();
+        document.getElementById('loading').style.display = 'none';
+        if (response.ok && data.ok) {
+          const returnTo = getReturnTo() || '/';
+          const successLink = document.querySelector('#success a.button');
+          if (successLink) successLink.setAttribute('href', returnTo);
+          setPostVerifyFlag();
+          document.getElementById('success').style.display = 'block';
+          setTimeout(() => { window.location.href = returnTo; }, 1500);
+        } else {
+          document.getElementById('error-message').textContent = data.message || 'The verification link is invalid or has expired.';
+          document.getElementById('error').style.display = 'block';
+        }
+      } catch (err) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error-message').textContent = 'An error occurred. Please try again.';
+        document.getElementById('error').style.display = 'block';
+      }
+    }
+  </script>
+</BaseLayout>

@@ -1,0 +1,47 @@
+---
+// src/pages/auth/signup/index.astro
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Create Account | Grassroots Movement">
+  <main class="max-w-lg mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold text-wy-charcoal mb-2">Create account</h1>
+    <p class="helper-text mb-6">Use a strong password with at least 12 characters.</p>
+
+    <section id="auth-logged-in" class="survey-form is-hidden" aria-live="polite">
+      <p>You are signed in.</p>
+      <button class="button button--primary" type="button" id="logout-button">Sign out</button>
+      <a class="button button--small" href="/surveys/list/">Back to surveys</a>
+      <a class="button button--small" href="/account/">Add a passkey</a>
+    </section>
+
+    <form id="auth-form" class="survey-form" data-auth-mode="signup">
+      <div class="form-row">
+        <label for="auth-email">Email</label>
+        <input id="auth-email" name="email" type="email" autocomplete="email" required />
+      </div>
+      <div class="form-row">
+        <label for="auth-password">Password</label>
+        <input id="auth-password" name="password" type="password" autocomplete="new-password" required />
+      </div>
+      <div class="form-row">
+        <label for="auth-password-confirm">Verify password</label>
+        <input id="auth-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" required />
+      </div>
+      <div class="form-row" id="turnstile-signup"></div>
+      <input type="hidden" id="turnstile-token" name="turnstileToken" />
+      <p class="form-error is-hidden" id="auth-error" role="alert"></p>
+      <button class="button button--primary" type="submit">Create account</button>
+    </form>
+
+    <p class="helper-text mt-4">
+      Already have an account? <a href="/auth/login/" class="text-wy-ember hover:underline">Sign in</a>
+    </p>
+  </main>
+
+  <Fragment slot="scripts">
+    <script is:inline src="/js/turnstile-loader.js"></script>
+    <script is:inline src="/js/auth/turnstile-client.js"></script>
+    <script is:inline src="/js/passkey-debug.js"></script>
+    <script is:inline src="/js/auth.js"></script>
+  </Fragment>
+</BaseLayout>

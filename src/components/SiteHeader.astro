@@ -1,0 +1,102 @@
+---
+/* src/components/SiteHeader.astro */
+---
+<header class="site-header bg-wy-charcoal text-white">
+  <div class="site-header__inner max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+    <a class="site-brand font-serif font-bold text-lg text-white hover:text-wy-sandstone transition-colors" href="/">
+      Grassroots Movement
+    </a>
+    <nav class="site-nav flex flex-wrap items-center gap-1 text-sm" aria-label="Primary">
+      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors" href="/surveys/list/">Surveys</a>
+      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors" href="/townhall/">Town Hall</a>
+      <button class="site-nav__link site-nav__button px-3 py-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer" type="button" data-auth-open id="auth-open">
+        Account
+      </button>
+      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors is-hidden" href="/admin/" id="admin-link">Admin</a>
+      <span class="auth-badge is-hidden text-wy-sandstone text-xs font-semibold" id="auth-badge">Signed in</span>
+      <button
+        class="site-nav__link site-nav__button px-3 py-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer is-hidden"
+        type="button"
+        id="auth-quick-logout"
+      >
+        Log out
+      </button>
+      <a class="site-nav__link px-3 py-1.5 rounded bg-wy-ember hover:bg-wy-ember-dark transition-colors font-semibold" href="/donate/">Donate</a>
+      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors" href="/security/">Security</a>
+      <a class="site-nav__link px-3 py-1.5 rounded hover:bg-white/10 transition-colors" href="https://volunteers.grassrootsmvt.org/" rel="external">Volunteers</a>
+    </nav>
+  </div>
+  <div class="user-info-bar is-hidden bg-wy-charcoal/80 border-t border-white/10 text-xs text-wy-dust px-4 py-1.5" id="user-info-bar">
+    <div class="max-w-6xl mx-auto flex gap-3">
+      <span class="user-info__email" id="user-info-email"></span>
+      <span aria-hidden="true">|</span>
+      <span class="user-info__districts" id="user-info-districts"></span>
+    </div>
+  </div>
+</header>
+
+<script>
+(function() {
+  const FIPS_TO_STATE = {
+    '01': 'Alabama', '02': 'Alaska', '04': 'Arizona', '05': 'Arkansas', '06': 'California',
+    '08': 'Colorado', '09': 'Connecticut', '10': 'Delaware', '11': 'District of Columbia',
+    '12': 'Florida', '13': 'Georgia', '15': 'Hawaii', '16': 'Idaho', '17': 'Illinois',
+    '18': 'Indiana', '19': 'Iowa', '20': 'Kansas', '21': 'Kentucky', '22': 'Louisiana',
+    '23': 'Maine', '24': 'Maryland', '25': 'Massachusetts', '26': 'Michigan', '27': 'Minnesota',
+    '28': 'Mississippi', '29': 'Missouri', '30': 'Montana', '31': 'Nebraska', '32': 'Nevada',
+    '33': 'New Hampshire', '34': 'New Jersey', '35': 'New Mexico', '36': 'New York',
+    '37': 'North Carolina', '38': 'North Dakota', '39': 'Ohio', '40': 'Oklahoma', '41': 'Oregon',
+    '42': 'Pennsylvania', '44': 'Rhode Island', '45': 'South Carolina', '46': 'South Dakota',
+    '47': 'Tennessee', '48': 'Texas', '49': 'Utah', '50': 'Vermont', '51': 'Virginia',
+    '53': 'Washington', '54': 'West Virginia', '55': 'Wisconsin', '56': 'Wyoming',
+  };
+  const formatDist = (val) => val ? String(parseInt(val, 10)) : null;
+
+  async function loadUserInfo() {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.authenticated || !data.user) return;
+
+      const bar = document.getElementById('user-info-bar');
+      const emailEl = document.getElementById('user-info-email');
+      const districtsEl = document.getElementById('user-info-districts');
+      const adminLink = document.getElementById('admin-link');
+      if (!bar || !emailEl || !districtsEl) return;
+
+      const user = data.user;
+      const addr = user.address_verification || {};
+
+      if (adminLink && user.is_admin) {
+        adminLink.classList.remove('is-hidden');
+      }
+
+      if (!user.address_verified) return;
+
+      emailEl.textContent = user.email || '';
+
+      const stateFips = addr.state_fips || '';
+      const stateName = FIPS_TO_STATE[stateFips] || user.profile?.state || '';
+      const house = formatDist(addr.state_house_dist);
+      const senate = formatDist(addr.state_senate_dist);
+
+      const parts = [];
+      if (stateName) parts.push(stateName);
+      if (house) parts.push(`HD-${house}`);
+      if (senate) parts.push(`SD-${senate}`);
+
+      districtsEl.textContent = parts.join(' \u2022 ');
+      bar.classList.remove('is-hidden');
+    } catch (e) {
+      // silently fail
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadUserInfo);
+  } else {
+    loadUserInfo();
+  }
+})();
+</script>

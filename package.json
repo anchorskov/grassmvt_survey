@@ -2,15 +2,20 @@
   "name": "grassmvt_survey",
   "version": "1.0.0",
   "description": "Static site tooling for Cloudflare Pages.",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "build:surveyjs": "node scripts/build-surveyjs.js",
     "build:vendor:webauthn": "node scripts/build-simplewebauthn-browser.mjs",
-    "format": "prettier --write \"public/**/*.{html,css,js,md}\"",
-    "lint": "eslint \"public/**/*.js\" && stylelint \"public/**/*.css\" && htmlhint \"public/**/*.html\"",
-    "check": "npm run lint && prettier --check \"public/**/*.{html,css,js,md}\"",
+    "build": "astro build",
+    "dev:astro": "astro dev --port 4321",
+    "format": "prettier --write \"public/**/*.{css,js,md}\"",
+    "lint": "eslint \"public/**/*.js\" && stylelint \"public/**/*.css\"",
+    "check": "npm run lint && astro check",
     "dev": "http-server ./public -p 8788 -c-1",
     "dev:worker": "wrangler dev --config wrangler.jsonc",
-    "deploy": "wrangler pages deploy public --project-name grassrootsmvt --config wrangler.jsonc",
+    "deploy": "astro build && wrangler pages deploy dist --project-name grassrootsmvt --config wrangler.jsonc",
     "cf:login": "wrangler login --config wrangler.jsonc",
     "tail:prod": "wrangler tail --format pretty",
     "tail:json": "wrangler tail --format json",
@@ -27,10 +32,13 @@
     "@noble/hashes": "^1.8.0",
     "@simplewebauthn/browser": "9.0.1",
     "@simplewebauthn/server": "^13.2.2",
+    "@tailwindcss/vite": "^4.2.2",
+    "astro": "^6.1.7",
     "lucia": "^3.2.2",
     "snarkdown": "^2.0.0",
     "survey-core": "^1.12.19",
-    "survey-js-ui": "^1.12.19"
+    "survey-js-ui": "^1.12.19",
+    "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

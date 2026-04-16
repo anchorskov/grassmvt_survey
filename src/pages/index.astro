@@ -1,0 +1,199 @@
+---
+// src/pages/index.astro — public marketing landing page
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Grassroots Movement | Verified voices. Clear public signal." description="Take a survey, review the results, and join Wyoming conversations built for trust and follow-through.">
+
+  {/* ── Hero ── */}
+  <section class="bg-wy-charcoal text-white" aria-labelledby="hero-title">
+    <div class="mx-auto max-w-4xl px-6 py-20 md:py-28">
+      <p class="text-wy-dust text-sm font-semibold uppercase tracking-widest mb-4">Grassroots Movement</p>
+      <h1 id="hero-title" class="font-serif text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+        Verified voices.<br />Clear public signal.
+      </h1>
+      <p class="text-wy-dust text-lg md:text-xl max-w-2xl mb-10 leading-relaxed">
+        Take a survey, review the results, and join Wyoming conversations built for trust and follow-through.
+      </p>
+      <div class="flex flex-wrap gap-4">
+        <a class="button button--primary" href="/surveys/list/">Browse surveys</a>
+        <a class="button button--secondary" href="/surveys/results/">View results</a>
+        <a class="button button--secondary" href="/townhall/">Join discussions</a>
+      </div>
+    </div>
+  </section>
+
+  {/* ── What This Is — 3-column feature grid ── */}
+  <section class="bg-wy-bone" aria-labelledby="features-title">
+    <div class="mx-auto max-w-5xl px-6 py-16 md:py-20">
+      <p class="text-wy-rust text-sm font-semibold uppercase tracking-widest mb-2">What this is</p>
+      <h2 id="features-title" class="font-serif text-3xl font-bold text-wy-charcoal mb-12">Built for real participation</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div>
+          <div class="text-wy-ember text-3xl font-bold mb-3">01</div>
+          <h3 class="font-serif text-xl font-semibold text-wy-charcoal mb-2">Surveys with integrity</h3>
+          <p class="text-wy-charcoal/80 leading-relaxed">
+            Short and practical for daily-life topics. Longer and structured for issues that need more framing.
+            Each survey is versioned and publicly auditable.
+          </p>
+        </div>
+        <div>
+          <div class="text-wy-ember text-3xl font-bold mb-3">02</div>
+          <h3 class="font-serif text-xl font-semibold text-wy-charcoal mb-2">Town Hall discussions</h3>
+          <p class="text-wy-charcoal/80 leading-relaxed">
+            Post statements, cite sources, and engage with other participants. Each Town Hall ties directly
+            to a survey topic so discussion stays grounded in data.
+          </p>
+        </div>
+        <div>
+          <div class="text-wy-ember text-3xl font-bold mb-3">03</div>
+          <h3 class="font-serif text-xl font-semibold text-wy-charcoal mb-2">Results by district</h3>
+          <p class="text-wy-charcoal/80 leading-relaxed">
+            Verified participants unlock statewide, House district, and Senate district result views.
+            Responses stay private; aggregated signal is public.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── How It Works — 4-step timeline ── */}
+  <section class="bg-wy-stone" aria-labelledby="how-title">
+    <div class="mx-auto max-w-4xl px-6 py-16 md:py-20">
+      <p class="text-wy-rust text-sm font-semibold uppercase tracking-widest mb-2">How it works</p>
+      <h2 id="how-title" class="font-serif text-3xl font-bold text-wy-charcoal mb-12">Four steps, start to receipt</h2>
+      <ol class="relative border-l-2 border-wy-dust ml-4 space-y-10">
+        <li class="pl-8">
+          <span class="absolute -left-[1.1rem] flex h-9 w-9 items-center justify-center rounded-full bg-wy-ember text-white font-bold text-sm">1</span>
+          <h3 class="font-serif text-lg font-semibold text-wy-charcoal mb-1">Enter basic info</h3>
+          <p class="text-wy-charcoal/80">Create a free account with your email. No phone number required to get started.</p>
+        </li>
+        <li class="pl-8">
+          <span class="absolute -left-[1.1rem] flex h-9 w-9 items-center justify-center rounded-full bg-wy-ember text-white font-bold text-sm">2</span>
+          <h3 class="font-serif text-lg font-semibold text-wy-charcoal mb-1">Verify participation</h3>
+          <p class="text-wy-charcoal/80">Confirm your address to unlock district-level results. Wyoming voters can verify for enhanced credibility.</p>
+        </li>
+        <li class="pl-8">
+          <span class="absolute -left-[1.1rem] flex h-9 w-9 items-center justify-center rounded-full bg-wy-ember text-white font-bold text-sm">3</span>
+          <h3 class="font-serif text-lg font-semibold text-wy-charcoal mb-1">Submit and receive a receipt</h3>
+          <p class="text-wy-charcoal/80">Your response is recorded with a timestamp and version hash. You receive a receipt token to edit your answers later.</p>
+        </li>
+        <li class="pl-8">
+          <span class="absolute -left-[1.1rem] flex h-9 w-9 items-center justify-center rounded-full bg-wy-ember text-white font-bold text-sm">4</span>
+          <h3 class="font-serif text-lg font-semibold text-wy-charcoal mb-1">Review grouped results</h3>
+          <p class="text-wy-charcoal/80">Results publish once 10+ responses exist for a given survey and scope. No single answer is ever exposed.</p>
+        </li>
+      </ol>
+      <p class="mt-10">
+        <a class="link-button" href="/how-surveys-work/">How Surveys Work &rarr;</a>
+      </p>
+    </div>
+  </section>
+
+  {/* ── The Numbers — live stats ── */}
+  <section class="bg-wy-charcoal text-white" aria-labelledby="stats-title">
+    <div class="mx-auto max-w-4xl px-6 py-16 md:py-20 text-center">
+      <p class="text-wy-dust text-sm font-semibold uppercase tracking-widest mb-2">The numbers</p>
+      <h2 id="stats-title" class="font-serif text-3xl font-bold mb-12">Participation so far</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-8" id="stats-grid" aria-live="polite">
+        <div class="stats-card">
+          <div class="text-4xl font-bold text-wy-sandstone mb-2" id="stat-responses">&mdash;</div>
+          <div class="text-wy-dust text-sm uppercase tracking-wide">Verified responses</div>
+        </div>
+        <div class="stats-card">
+          <div class="text-4xl font-bold text-wy-sandstone mb-2" id="stat-house">&mdash;</div>
+          <div class="text-wy-dust text-sm uppercase tracking-wide">House districts represented</div>
+        </div>
+        <div class="stats-card">
+          <div class="text-4xl font-bold text-wy-sandstone mb-2" id="stat-senate">&mdash;</div>
+          <div class="text-wy-dust text-sm uppercase tracking-wide">Senate districts represented</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Trust links ── */}
+  <section class="bg-wy-bone" aria-labelledby="trust-title">
+    <div class="mx-auto max-w-4xl px-6 py-12">
+      <p class="text-wy-rust text-sm font-semibold uppercase tracking-widest mb-2">Trust</p>
+      <h2 id="trust-title" class="font-serif text-2xl font-bold text-wy-charcoal mb-4">Built for transparency</h2>
+      <ul class="info-list text-wy-charcoal/80 mb-6">
+        <li>Bias review creates a visible revision trail.</li>
+        <li>Verification and rate limits protect public results.</li>
+        <li>Open methods keep audits and improvements possible.</li>
+      </ul>
+      <div class="hero-links flex flex-wrap gap-4">
+        <a href="/security/">Security</a>
+        <a href="/bias/">Bias</a>
+        <a href="/open-source/">Open source</a>
+        <a href="https://volunteers.grassrootsmvt.org/" rel="external">Volunteers</a>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Footer CTA ── */}
+  <section class="bg-wy-ember text-white" aria-labelledby="cta-title">
+    <div class="mx-auto max-w-3xl px-6 py-16 text-center">
+      <h2 id="cta-title" class="font-serif text-3xl font-bold mb-4">Ready to add your voice?</h2>
+      <p class="text-white/80 text-lg mb-8 max-w-xl mx-auto">
+        It takes about five minutes to complete a Normal Life survey. Your input shapes verified public signal
+        that candidates and communities can actually use.
+      </p>
+      <div class="flex flex-wrap justify-center gap-4">
+        <a class="button button--primary bg-white text-wy-ember hover:bg-wy-bone" href="/surveys/list/">Browse surveys</a>
+        <a class="button button--secondary border-white text-white hover:bg-white/10" href="/how-surveys-work/">How it works</a>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Dynamic account panel (JS-driven, preserves homepage.js behavior) ── */}
+  <section class="account-panel is-hidden" id="landing-account-panel" aria-live="polite">
+    <div class="account-panel__surface">
+      <div class="account-panel__copy">
+        <p class="landing-eyebrow">Your account</p>
+        <h2 id="landing-account-title">Create a free account</h2>
+        <p id="landing-account-message">
+          Save your place, return to surveys and Town Halls, and keep your receipts and participation history in one place.
+        </p>
+      </div>
+      <div class="account-panel__actions" id="landing-account-actions">
+        <button class="button button--primary" type="button" data-auth-open="signup">Create account</button>
+        <button class="button button--secondary" type="button" data-auth-open="login">Sign in</button>
+      </div>
+    </div>
+  </section>
+
+  <template id="landing-card-template">
+    <article class="landing-card">
+      <div class="landing-card__content">
+        <p class="landing-card__kicker" data-card-eyebrow></p>
+        <h2 data-card-title></h2>
+        <p class="landing-card__question" data-card-question></p>
+        <p class="landing-card__body" data-card-body></p>
+        <div class="landing-card__actions" data-card-actions>
+          <a class="button button--primary" data-card-primary></a>
+          <a class="landing-card__link" data-card-secondary></a>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <Fragment slot="scripts">
+    <script is:inline src="/js/homepage.js"></script>
+    <script is:inline>
+      // Load live stats from /api/stats
+      (function () {
+        fetch('/api/stats')
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (data) {
+            if (!data) return;
+            var fmt = function (n) { return (n == null ? '—' : Number(n).toLocaleString()); };
+            var el = function (id) { return document.getElementById(id); };
+            el('stat-responses') && (el('stat-responses').textContent = fmt(data.verified_responses));
+            el('stat-house') && (el('stat-house').textContent = fmt(data.house_districts));
+            el('stat-senate') && (el('stat-senate').textContent = fmt(data.senate_districts));
+          })
+          .catch(function () {});
+      })();
+    </script>
+  </Fragment>
+</BaseLayout>

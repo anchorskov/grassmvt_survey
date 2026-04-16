@@ -1,13 +1,13 @@
 // wrangler.jsonc
 // Wrangler configuration for grassmvtsurvey Cloudflare Worker
-// Static assets directory: ./public
+// Static assets directory: ./dist (Astro build output)
 
 {
   "name": "grassmvtsurvey",
   "compatibility_date": "2026-01-20",
   "main": "./src/worker.js",
   "assets": {
-    "directory": "./public",
+    "directory": "./dist",
     "binding": "ASSETS"
   },
   "vars": {

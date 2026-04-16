@@ -1,0 +1,35 @@
+---
+// src/pages/auth/password-reset/index.astro
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Reset Password | Grassroots Movement">
+  <main class="max-w-lg mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold text-wy-charcoal mb-2">Reset password</h1>
+    <p class="helper-text mb-6">Enter your new password to finish the reset.</p>
+
+    <section id="password-reset-missing" class="survey-form is-hidden" aria-live="polite">
+      <p class="form-error">The reset link is missing or invalid.</p>
+      <a class="button button--primary" href="/">Return home</a>
+    </section>
+
+    <form id="password-reset-confirm-form" class="survey-form">
+      <input type="hidden" id="password-reset-uid" name="uid" />
+      <input type="hidden" id="password-reset-token" name="token" />
+      <div class="form-row">
+        <label for="password-reset-new-password">New password</label>
+        <input id="password-reset-new-password" name="newPassword" type="password" autocomplete="new-password" required />
+      </div>
+      <div class="form-row" id="password-reset-turnstile"></div>
+      <input type="hidden" id="password-reset-turnstile-token" name="turnstileToken" />
+      <p class="form-error is-hidden" id="password-reset-confirm-error" role="alert"></p>
+      <p class="helper-text is-hidden" id="password-reset-confirm-success" role="status"></p>
+      <button class="button button--primary" type="submit">Reset password</button>
+    </form>
+  </main>
+
+  <Fragment slot="scripts">
+    <script is:inline src="/js/turnstile-loader.js"></script>
+    <script is:inline src="/js/auth/turnstile-client.js"></script>
+    <script is:inline src="/js/password-reset-confirm.js"></script>
+  </Fragment>
+</BaseLayout>

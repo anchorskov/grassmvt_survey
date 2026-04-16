@@ -6510,6 +6510,27 @@ export default {
       return townhallError(404, 'TOWNHALL_ROUTE_NOT_FOUND', 'Town Hall endpoint not found.');
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/stats') {
+      try {
+        if (!env.DB) return jsonResponse({ verified_responses: null, house_districts: null, senate_districts: null });
+        const row = await env.DB.prepare(
+          `SELECT
+            COUNT(*) AS verified_responses,
+            COUNT(DISTINCT JSON_EXTRACT(district, '$.house')) AS house_districts,
+            COUNT(DISTINCT JSON_EXTRACT(district, '$.senate')) AS senate_districts
+          FROM responses
+          WHERE tier >= 2`
+        ).first();
+        return jsonResponse({
+          verified_responses: row ? row.verified_responses : 0,
+          house_districts: row ? row.house_districts : 0,
+          senate_districts: row ? row.senate_districts : 0,
+        });
+      } catch (e) {
+        return jsonResponse({ verified_responses: null, house_districts: null, senate_districts: null });
+      }
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/surveys/list') {
       try {
         if (!env.DB) {

@@ -1,0 +1,117 @@
+---
+/* src/components/SiteFooter.astro */
+---
+<footer class="site-footer bg-wy-charcoal text-wy-dust text-sm mt-16">
+  <div class="site-footer__inner max-w-6xl mx-auto px-4 py-6 flex flex-wrap gap-3 items-center">
+    <span>&copy; 2026 Grassroots Movement</span>
+    <span aria-hidden="true">&middot;</span>
+    <a class="hover:text-white transition-colors" href="/credits/">Credits</a>
+    <span aria-hidden="true">&middot;</span>
+    <span>Powered by Cloudflare Pages</span>
+  </div>
+</footer>
+
+<!-- Auth modals — present on every page so header/inline triggers work anywhere -->
+<div class="auth-modal is-hidden" id="login-modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="auth-modal__backdrop" data-auth-close></div>
+  <div class="auth-modal__panel" role="document">
+    <button class="auth-modal__close" type="button" data-auth-close aria-label="Close">&times;</button>
+    <div class="auth-modal__content">
+      <h2>Sign in</h2>
+      <p class="helper-text">Use your account to continue.</p>
+      <section class="survey-form is-hidden" id="login-modal-logged-in" aria-live="polite">
+        <p>You are signed in.</p>
+        <button class="button button--primary" type="button" id="login-modal-logout">Sign out</button>
+        <a class="button button--small" href="/account/">Manage passkeys</a>
+      </section>
+      <form class="survey-form" id="login-modal-form">
+        <div class="passkey-actions">
+          <button class="button button--primary" type="button" id="login-passkey-button">Sign in with passkey</button>
+          <p class="helper-text">Use a passkey for faster sign-in, or use your password below.</p>
+        </div>
+        <div class="form-row">
+          <label for="login-modal-email">Email</label>
+          <input id="login-modal-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="form-row">
+          <label for="login-modal-password">Password</label>
+          <input id="login-modal-password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <p class="helper-text is-hidden" id="login-modal-turnstile-label">Complete the human check to continue.</p>
+        <div class="form-row is-hidden" id="login-modal-turnstile"></div>
+        <input type="hidden" id="login-modal-token" name="turnstileToken" />
+        <p class="form-error is-hidden" id="login-modal-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="login-modal-turnstile-status" role="status"></p>
+        <button class="button button--primary" type="submit" id="login-modal-submit" disabled>Sign in</button>
+        <p class="helper-text auth-modal__links">
+          <button class="link-button" type="button" data-auth-open="password-reset">Forgot password?</button>
+        </p>
+        <p class="helper-text auth-modal__links">
+          New here? <button class="link-button" type="button" data-auth-open="signup">Create account</button>
+        </p>
+      </form>
+      <section class="survey-form is-hidden" id="login-modal-passkey-nudge" aria-live="polite">
+        <h3>Add a passkey for faster sign-in</h3>
+        <p class="helper-text">Use this device or your phone. No password needed next time.</p>
+        <div class="form-row">
+          <button class="button button--primary" type="button" id="login-modal-passkey-add">Add passkey</button>
+          <button class="button button--small" type="button" id="login-modal-passkey-skip">Not now</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="auth-modal is-hidden" id="signup-modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="auth-modal__backdrop" data-auth-close></div>
+  <div class="auth-modal__panel" role="document">
+    <button class="auth-modal__close" type="button" data-auth-close aria-label="Close">&times;</button>
+    <div class="auth-modal__content">
+      <h2>Create account</h2>
+      <p class="helper-text">Use a strong password with at least 12 characters.</p>
+      <form class="survey-form" id="signup-modal-form">
+        <div class="form-row">
+          <label for="signup-modal-email">Email</label>
+          <input id="signup-modal-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="form-row">
+          <label for="signup-modal-password">Password</label>
+          <input id="signup-modal-password" name="password" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="form-row">
+          <label for="signup-modal-password-confirm">Verify password</label>
+          <input id="signup-modal-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="form-row" id="signup-modal-turnstile"></div>
+        <input type="hidden" id="signup-modal-token" name="turnstileToken" />
+        <p class="form-error is-hidden" id="signup-modal-error" role="alert"></p>
+        <button class="button button--primary" type="submit">Create account</button>
+        <p class="helper-text auth-modal__links">
+          Already have an account? <button class="link-button" type="button" data-auth-open="login">Sign in</button>
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="auth-modal is-hidden" id="password-reset-modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="auth-modal__backdrop" data-auth-close></div>
+  <div class="auth-modal__panel" role="document">
+    <button class="auth-modal__close" type="button" data-auth-close aria-label="Close">&times;</button>
+    <div class="auth-modal__content">
+      <h2>Reset password</h2>
+      <p class="helper-text">We will email a one-time link to reset your password.</p>
+      <form class="survey-form" id="password-reset-modal-form">
+        <div class="form-row">
+          <label for="password-reset-modal-email">Email</label>
+          <input id="password-reset-modal-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="form-row" id="password-reset-modal-turnstile"></div>
+        <input type="hidden" id="password-reset-modal-token" name="turnstileToken" />
+        <p class="form-error is-hidden" id="password-reset-modal-error" role="alert"></p>
+        <p class="helper-text is-hidden" id="password-reset-modal-success" role="status"></p>
+        <button class="button button--primary" type="submit">Send reset link</button>
+      </form>
+    </div>
+  </div>
+</div>
