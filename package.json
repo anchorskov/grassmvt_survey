@@ -16,7 +16,7 @@
     "check": "npm run lint && astro check",
     "dev": "http-server ./dist -p 8788 -c-1",
     "dev:worker": "astro build && wrangler dev --config wrangler.jsonc",
-    "deploy": "astro build && wrangler pages deploy dist --project-name grassrootsmvt --config wrangler.jsonc",
+    "deploy": "astro build && wrangler deploy --env production --config wrangler.jsonc",
     "cf:login": "wrangler login --config wrangler.jsonc",
     "tail:prod": "wrangler tail --format pretty",
     "tail:json": "wrangler tail --format json",
