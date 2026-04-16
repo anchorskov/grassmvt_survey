@@ -4,20 +4,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-A Wyoming civic-engagement platform for surveys and public discussion. It is a **no-build static site** deployed to Cloudflare Pages (`public/`) backed by a **Cloudflare Worker** (`src/worker.js`) with a **Cloudflare D1** SQLite database. There is no React, Vue, or equivalent framework — SurveyJS is the only third-party UI library and it has a single bundling step.
+A Wyoming civic-engagement platform for surveys and public discussion. It uses **Astro v6** (static output → `dist/`) for all pages, **Tailwind v4** for the landing page, and a **Cloudflare Worker** (`src/worker.js`) with **Cloudflare D1** SQLite for all API routes. SurveyJS is bundled separately.
 
 ## Commands
 
 ```bash
 npm i                        # install dependencies
 npm run build:surveyjs       # bundle SurveyJS into public/js and public/css (required after install)
-npm run dev:worker           # run Worker + static assets locally at http://localhost:8787
-npm run dev                  # static-only server at http://localhost:8788 (no Worker/D1)
-npm run check                # lint (ESLint + Stylelint + HTMLHint) + Prettier check — run before every commit
-npm run format               # auto-format public/ HTML/CSS/JS/MD
+npm run build                # astro build → dist/
+npm run dev:worker           # build then run Worker + dist/ assets at http://localhost:8787 (full stack)
+npm run build:watch          # astro build --watch (run alongside dev:worker for live rebuild)
+npm run dev:astro            # astro dev at http://localhost:4321 (frontend only, no Worker/D1)
+npm run dev                  # http-server ./dist at http://localhost:8788 (static only, no Worker)
+npm run check                # lint (ESLint + Stylelint) + astro check — run before every commit
+npm run format               # auto-format public/ CSS/JS/MD
 npm run lint                 # lint only
-npm run deploy               # deploy to Cloudflare Pages (production)
+npm run deploy               # astro build + wrangler pages deploy dist (production)
 npm run test:townhall-ui     # smoke-test the Town Hall UI
+```
+
+**Full local dev workflow (two terminals):**
+```bash
+# Terminal 1 — rebuilds dist/ on .astro file changes
+npm run build:watch
+
+# Terminal 2 — Worker + D1 + static assets at localhost:8787
+wrangler dev --config wrangler.jsonc
 ```
 
 Always use `--config wrangler.jsonc` for all Wrangler commands.
