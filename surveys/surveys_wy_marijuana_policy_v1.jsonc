@@ -1,0 +1,474 @@
+// surveys/surveys_wy_marijuana_policy_v1.jsonc
+// slug: wy-marijuana-policy
+// version: v1 | 2026-04-28
+// title: Wyoming Marijuana Policy Survey
+{
+  "title": "Wyoming Marijuana Policy Survey",
+  "description": "Measure what Wyoming residents believe state marijuana policy should be, including medical use, adult use, penalties, safety, taxation, local control, employers, youth protection, and personal responsibility.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "off",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "marijuana-policy",
+    "estimated_minutes": 8,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey measures what Wyoming residents believe state marijuana policy should be. The goal is to understand public judgment on current law, medical use, adult use, criminal penalties, public safety, taxation, local control, employers, youth protection, and personal responsibility.</p><p>Results will be published in aggregate. Exact question wording and response options will be published with the results. Individual responses will be protected.</p><h3>Definitions</h3><ul><li><strong>Marijuana or cannabis:</strong> A plant or product containing THC, the substance that can cause intoxication.</li><li><strong>Medical marijuana:</strong> Marijuana used by a patient for a qualifying medical condition under state rules.</li><li><strong>Adult recreational marijuana:</strong> Marijuana used by adults age 21 and older outside a medical program.</li><li><strong>Decriminalization:</strong> Reducing or removing criminal penalties for possession while sales may still remain illegal.</li><li><strong>Civil penalty:</strong> A non-criminal fine, similar to a traffic ticket.</li></ul>"
+        }
+      ]
+    },
+    {
+      "name": "baseline_view",
+      "title": "Section 1: Baseline view",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "marijuana_policy_importance",
+          "title": "1. How important is marijuana policy to you personally?",
+          "choices": [
+            "Very important",
+            "Important",
+            "Somewhat important",
+            "Low importance",
+            "Unsure",
+            "Prefer to skip"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "wy_law_understanding_confidence",
+          "title": "2. How confident are you in your understanding of current Wyoming marijuana law?",
+          "choices": [
+            "Very confident",
+            "Somewhat confident",
+            "Slightly confident",
+            "Unsure",
+            "Prefer to skip"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "overall_marijuana_policy_view",
+          "title": "3. Which statement is closest to your overall view?",
+          "choices": [
+            "Wyoming should keep marijuana illegal for both medical and adult recreational use",
+            "Wyoming should allow medical marijuana only",
+            "Wyoming should allow adult recreational marijuana under state regulation",
+            "Wyoming should reduce penalties for possession but keep marijuana illegal",
+            "Wyoming should wait for federal law to change before changing state law",
+            "Unsure"
+          ],
+          "hasOther": true,
+          "otherText": "Prefer to explain in my own words"
+        }
+      ]
+    },
+    {
+      "name": "medical_marijuana",
+      "title": "Section 2: Medical marijuana",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "medical_marijuana_support",
+          "title": "4. Do you support or oppose legalizing medical marijuana in Wyoming for patients with qualifying medical conditions?",
+          "choices": [
+            "Strongly support",
+            "Somewhat support",
+            "Neither support nor oppose",
+            "Somewhat oppose",
+            "Strongly oppose",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "medical_program_rule_strictness",
+          "title": "5. If Wyoming created a medical marijuana program, how strict should the rules be?",
+          "choices": [
+            "Very strict, limited to a short list of serious conditions",
+            "Moderately strict, available for serious conditions with clinician approval",
+            "Broad, allowing clinician judgment case by case",
+            "Wyoming should keep medical marijuana illegal",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "medical_marijuana_access_view",
+          "title": "6. Which statement is closest to your view on medical marijuana access?",
+          "choices": [
+            "Medical marijuana should remain illegal under Wyoming law",
+            "Medical marijuana should be allowed only for severe or terminal conditions",
+            "Medical marijuana should be allowed for a defined list of qualifying conditions",
+            "Medical marijuana should be allowed when a licensed clinician recommends it",
+            "Unsure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "adult_recreational_marijuana",
+      "title": "Section 3: Adult recreational marijuana",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "adult_recreational_support",
+          "title": "7. Do you support or oppose legalizing adult recreational marijuana in Wyoming for adults age 21 and older?",
+          "choices": [
+            "Strongly support",
+            "Somewhat support",
+            "Neither support nor oppose",
+            "Somewhat oppose",
+            "Strongly oppose",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "adult_recreational_policy_view",
+          "title": "8. Which statement is closest to your view on adult recreational marijuana?",
+          "choices": [
+            "Keep adult recreational marijuana illegal under Wyoming law",
+            "Reduce penalties for possession, but keep sales illegal",
+            "Allow possession for adults, but prohibit retail sales",
+            "Allow regulated retail sales for adults age 21 and older",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "small_amount_possession_if_illegal",
+          "title": "9. If adult recreational marijuana remains illegal, what should Wyoming do with possession of small amounts by adults?",
+          "choices": [
+            "Keep current criminal penalties",
+            "Reduce penalties but keep possession criminal",
+            "Replace criminal penalties with a civil fine",
+            "Remove penalties for small amount possession by adults",
+            "Unsure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public_safety",
+      "title": "Section 4: Public safety",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "legalization_public_safety_concern",
+          "title": "10. How concerned are you that marijuana legalization could increase public safety risks?",
+          "choices": [
+            "Very concerned",
+            "Somewhat concerned",
+            "Slightly concerned",
+            "Low concern",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "illegal_unnecessary_penalties_concern",
+          "title": "11. How concerned are you that keeping marijuana illegal may create unnecessary criminal penalties for adults?",
+          "choices": [
+            "Very concerned",
+            "Somewhat concerned",
+            "Slightly concerned",
+            "Low concern",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "safeguards_if_law_changes",
+          "title": "12. Which safeguards would matter most if Wyoming changed marijuana law? Pick up to 4.",
+          "choices": [
+            "Age 21+ limits",
+            "Strong impaired-driving enforcement",
+            "Child-resistant packaging",
+            "Product testing and labeling",
+            "Limits on advertising to youth",
+            "Limits on high-potency products",
+            "Restrictions near schools",
+            "Employer protections for safety-sensitive jobs",
+            "Public education on health risks",
+            "Treatment funding for substance abuse",
+            "Wyoming should keep marijuana illegal",
+            "Unsure"
+          ],
+          "maxSelectedChoices": 4
+        }
+      ]
+    },
+    {
+      "name": "local_control",
+      "title": "Section 5: Local control",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "local_authority_over_businesses",
+          "title": "13. Should cities and counties have authority to limit or prohibit marijuana businesses if state law changes?",
+          "choices": [
+            "Yes, local communities should decide",
+            "Yes, but only through a public vote",
+            "Statewide rules should apply equally",
+            "Marijuana businesses should remain illegal statewide",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "local_retail_sales_opt_out",
+          "title": "14. If marijuana were legalized statewide, should local communities be able to opt out of retail sales?",
+          "choices": [
+            "Yes",
+            "No",
+            "Unsure",
+            "Marijuana should remain illegal statewide"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "taxes_and_revenue",
+      "title": "Section 6: Taxes and revenue",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "tax_marijuana_sales_support",
+          "title": "15. Do you support or oppose taxing marijuana sales if retail marijuana is legalized?",
+          "choices": [
+            "Strongly support",
+            "Somewhat support",
+            "Neither support nor oppose",
+            "Somewhat oppose",
+            "Strongly oppose",
+            "Unsure",
+            "Marijuana sales should remain illegal"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "marijuana_tax_revenue_priorities",
+          "title": "16. If marijuana tax revenue exists, where should it go first? Pick up to 3.",
+          "choices": [
+            "Substance abuse treatment",
+            "Mental health services",
+            "Public schools",
+            "Property tax relief",
+            "Law enforcement training",
+            "Roads and infrastructure",
+            "Veteran services",
+            "General state fund",
+            "Marijuana sales should remain illegal",
+            "Unsure"
+          ],
+          "maxSelectedChoices": 3
+        }
+      ]
+    },
+    {
+      "name": "employers_youth_health",
+      "title": "Section 7: Employers, youth, and health",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "drug_free_workplace_policy",
+          "title": "17. Should employers be allowed to maintain drug-free workplace policies if marijuana law changes?",
+          "choices": [
+            "Yes, for all workplaces",
+            "Yes, for safety-sensitive jobs only",
+            "Off-duty legal use should be protected",
+            "Marijuana should remain illegal",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "youth_access_concern",
+          "title": "18. How concerned are you about youth access if marijuana law changes?",
+          "choices": [
+            "Very concerned",
+            "Somewhat concerned",
+            "Slightly concerned",
+            "Low concern",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "unregulated_products_concern",
+          "title": "19. How concerned are you about unregulated marijuana products if marijuana remains illegal?",
+          "choices": [
+            "Very concerned",
+            "Somewhat concerned",
+            "Slightly concerned",
+            "Low concern",
+            "Unsure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "values_and_tradeoffs",
+      "title": "Section 8: Values and tradeoffs",
+      "elements": [
+        {
+          "type": "matrix",
+          "name": "marijuana_policy_values",
+          "title": "20. How much do you agree or disagree with each statement?",
+          "columns": [
+            {
+              "value": "strongly_agree",
+              "text": "Strongly agree"
+            },
+            {
+              "value": "agree",
+              "text": "Agree"
+            },
+            {
+              "value": "neither",
+              "text": "Neither agree nor disagree"
+            },
+            {
+              "value": "disagree",
+              "text": "Disagree"
+            },
+            {
+              "value": "strongly_disagree",
+              "text": "Strongly disagree"
+            },
+            {
+              "value": "unsure",
+              "text": "Unsure"
+            }
+          ],
+          "rows": [
+            {
+              "value": "illegal_due_to_social_safety_risks",
+              "text": "A. Wyoming should keep marijuana illegal because legalization creates social and public safety risks."
+            },
+            {
+              "value": "allow_medical_with_clinician",
+              "text": "B. Wyoming should allow medical marijuana when patients and licensed clinicians believe it may help."
+            },
+            {
+              "value": "adult_possession_criminal_penalties",
+              "text": "C. Adult marijuana possession should carry criminal penalties."
+            },
+            {
+              "value": "adult_possession_civil_or_lower_enforcement",
+              "text": "D. Adult marijuana possession should be handled through civil penalties or lower-level enforcement."
+            },
+            {
+              "value": "wait_for_federal_law",
+              "text": "E. Wyoming should wait for federal law to change before changing state law."
+            },
+            {
+              "value": "state_decision_based_on_residents",
+              "text": "F. Wyoming should make its own decision based on what residents believe is best."
+            },
+            {
+              "value": "regulation_safer_than_illegal_market",
+              "text": "G. Regulation is safer than an illegal market."
+            },
+            {
+              "value": "illegal_safer_than_legal_market",
+              "text": "H. Keeping marijuana illegal is safer than creating a legal market."
+            },
+            {
+              "value": "local_voice",
+              "text": "I. Local communities should have a strong voice in marijuana policy."
+            },
+            {
+              "value": "youth_safety_personal_responsibility",
+              "text": "J. Marijuana policy should focus on youth protection, public safety, and personal responsibility."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "final_position",
+      "title": "Section 9: Final position",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "preferred_wy_policy",
+          "title": "21. After considering the questions above, which policy would you prefer Wyoming adopt?",
+          "choices": [
+            "Keep current Wyoming law",
+            "Keep marijuana illegal, but reduce penalties for adult possession of small amounts",
+            "Legalize medical marijuana only",
+            "Legalize medical marijuana and decriminalize adult possession",
+            "Legalize medical and adult recreational marijuana under state regulation",
+            "Wait for federal law to change before Wyoming changes state law",
+            "Unsure"
+          ],
+          "hasOther": true,
+          "otherText": "Prefer to explain in my own words"
+        },
+        {
+          "type": "comment",
+          "name": "biggest_concern_legalization_or_prohibition",
+          "title": "22. In your own words, what is your biggest concern about marijuana legalization or marijuana prohibition?",
+          "description": "Long answer optional.",
+          "maxLength": 1200
+        },
+        {
+          "type": "comment",
+          "name": "fair_responsible_wy_policy",
+          "title": "23. In your own words, what policy would feel fair and responsible for Wyoming, even if it is outside your ideal outcome?",
+          "description": "Long answer optional.",
+          "maxLength": 1200
+        }
+      ]
+    },
+    {
+      "name": "optional_verification_demographics",
+      "title": "Optional verification and demographics",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "include_in_verified_wy_voter_reporting",
+          "title": "24. Would you like your response included in verified Wyoming voter reporting?",
+          "choices": [
+            "Yes, verify my response for Wyoming voter-file reporting",
+            "No, include my response only in general unverified results",
+            "Unsure",
+            "Prefer to skip"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "age_range",
+          "title": "25. Age range",
+          "choices": [
+            "Under 18",
+            "18 to 24",
+            "25 to 34",
+            "35 to 44",
+            "45 to 54",
+            "55 to 64",
+            "65+",
+            "Prefer to skip"
+          ]
+        }
+      ]
+    }
+  ]
+}

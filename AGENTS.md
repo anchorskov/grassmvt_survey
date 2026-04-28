@@ -90,6 +90,8 @@ This file gives repo-specific instructions for coding agents working in `/home/a
   - Deploying code does not update D1 survey rows — seeding is a separate step.
   - A survey will not appear or function in production until seeded with `--db=prod`.
   - Similarly, removing or retiring a survey locally does not affect production D1 until the change is applied there.
+  - `scripts/seed-surveys-from-jsonc.mjs` now prints a production follow-up reminder after local and preview seeds by default; do not suppress it unless the user explicitly wants a quiet run.
+  - Prefer explicit source keys such as `--slug=grizzly-bear-delisting-v1` for production survey seeding; avoid `--slug=all` unless one shared DB version across all selected surveys is intentional.
 - Important files for survey addition:
   - `surveys/`
   - `scripts/seed-surveys-from-jsonc.mjs`

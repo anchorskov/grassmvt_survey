@@ -44,6 +44,11 @@ const surveySources = {
     file: 'surveys/surveys_grizzly_bear_delisting_v1.jsonc',
     scope: 'wy',
   },
+  'wy-marijuana-policy-v1': {
+    slug: 'wy-marijuana-policy',
+    file: 'surveys/surveys_wy_marijuana_policy_v1.jsonc',
+    scope: 'wy',
+  },
   'wy-time-change-v1': {
     slug: 'wy-time-change',
     file: 'surveys/surveys_wy_time_change_v1.jsonc',
@@ -127,6 +132,8 @@ const parseArgs = (argv) => {
   });
   return args;
 };
+
+const shellQuote = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
 
 const stripJsonc = (input) => {
   let output = '';
@@ -359,6 +366,73 @@ const runWrangler = ({ dbName, local, sqlFile, envName }) => {
   }
 };
 
+const buildSeedCommand = ({
+  dbTarget,
+  slug,
+  version,
+  publish,
+  changelog,
+}) =>
+  [
+    'node',
+    'scripts/seed-surveys-from-jsonc.mjs',
+    `--db=${dbTarget}`,
+    `--slug=${slug}`,
+    `--version=${version}`,
+    `--publish=${publish ? 'true' : 'false'}`,
+    `--changelog=${shellQuote(changelog)}`,
+  ].join(' ');
+
+const logProductionReminder = ({
+  dbTarget,
+  slugArg,
+  targets,
+  version,
+  publish,
+  changelog,
+  remindProd,
+}) => {
+  if (dbTarget === 'prod' || !remindProd) {
+    return;
+  }
+
+  console.log('');
+  console.log('Production follow-up required if these surveys should be live on production.');
+  console.log('Deploying code does not seed production D1 survey rows.');
+
+  if (slugArg === 'all') {
+    console.log('This run targeted all registered survey sources.');
+    console.log('After local verification, seed production explicitly for the source keys you changed.');
+    console.log(
+      `Example: ${buildSeedCommand({
+        dbTarget: 'prod',
+        slug: '<source-key>',
+        version,
+        publish,
+        changelog,
+      })}`
+    );
+    console.log('Avoid using --slug=all on production unless you intentionally want one shared DB version across every selected survey.');
+    return;
+  }
+
+  console.log('After local verification, run:');
+  targets.forEach((source) => {
+    console.log(
+      `  ${buildSeedCommand({
+        dbTarget: 'prod',
+        slug: source.key,
+        version,
+        publish,
+        changelog,
+      })}`
+    );
+  });
+  console.log(
+    'Then verify the remote rows with: npx wrangler d1 execute wy --remote --env production --config wrangler.jsonc --command "SELECT s.slug, v.version, v.json_hash FROM survey_versions v JOIN surveys s ON s.id = v.survey_id ORDER BY s.slug, v.version"'
+  );
+};
+
 const main = () => {
   const args = parseArgs(process.argv.slice(2));
   const dbTarget = args.db || 'local';
@@ -366,6 +440,7 @@ const main = () => {
   const version = Number(args.version || '1');
   const publish = args.publish !== 'false';
   const changelog = args.changelog || 'Seeded from JSONC source';
+  const remindProd = args['remind-prod'] !== 'false';
 
   if (!['local', 'preview', 'prod'].includes(dbTarget)) {
     throw new Error('Invalid --db, use local, preview, or prod');
@@ -376,8 +451,10 @@ const main = () => {
 
   const targets =
     slugArg === 'all'
-      ? Object.values(surveySources)
-      : [surveySources[slugArg]].filter(Boolean);
+      ? Object.entries(surveySources).map(([key, source]) => ({ key, ...source }))
+      : [[slugArg, surveySources[slugArg]]]
+          .filter(([, source]) => Boolean(source))
+          .map(([key, source]) => ({ key, ...source }));
 
   if (!targets.length) {
     throw new Error(`Invalid --slug, use one of: ${Object.keys(surveySources).join(', ')}, or all`);
@@ -421,6 +498,15 @@ const main = () => {
   fs.writeFileSync(sqlFile, sql);
   runWrangler({ dbName, local: dbTarget === 'local', sqlFile, envName });
   fs.rmSync(sqlFile, { force: true });
+  logProductionReminder({
+    dbTarget,
+    slugArg,
+    targets,
+    version,
+    publish,
+    changelog,
+    remindProd,
+  });
 };
 
 try {

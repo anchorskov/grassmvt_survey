@@ -271,6 +271,21 @@
     "href": "/surveys/grizzly-bear-delisting"
   },
   {
+    "id": "wy-marijuana-policy",
+    "slug": "wy-marijuana-policy",
+    "scope": "wy",
+    "title": "Wyoming Marijuana Policy Survey",
+    "description": "Measure what Wyoming residents believe state marijuana policy should be, including medical use, adult use, penalties, safety, taxation, local control, employers, youth protection, and personal responsibility.",
+    "landing_blurb": "A Wyoming policy survey on medical marijuana, adult use, penalties, safety, taxes, local control, employers, youth protection, and personal responsibility.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "marijuana-policy",
+    "display_order": 29,
+    "estimated_minutes": 8,
+    "featured": true,
+    "href": "/surveys/wy-marijuana-policy"
+  },
+  {
     "id": "cowboy-care",
     "slug": "cowboy-care",
     "scope": "wy",

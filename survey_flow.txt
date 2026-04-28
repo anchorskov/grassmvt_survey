@@ -52,6 +52,7 @@ Working process
    - If you are only adding/updating survey JSONC content, skip this step.
 3) Seed surveys from JSONC into local D1
    - node scripts/seed-surveys-from-jsonc.mjs --db=local --slug=all --version=<version> --publish=true --changelog="Seed from JSONC"
+   - The seed script now prints a production follow-up reminder after local or preview runs unless `--remind-prod=false` is passed.
 4) Verify the stored JSON and hash in local D1
    - wrangler d1 execute wy_local --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash FROM survey_versions v JOIN surveys s ON s.id = v.survey_id ORDER BY s.slug, v.version" --local --config wrangler.jsonc
 5) Start the Worker for local testing
@@ -70,9 +71,12 @@ Add a new survey (canonical)
    - scripts/seed-surveys-from-jsonc.mjs (`surveySources`)
 3) Seed that source key
    - node scripts/seed-surveys-from-jsonc.mjs --db=local --slug=<source-key> --version=<version> --publish=true --changelog="Add <slug> v<version>"
-4) Verify list discoverability
+4) Seed production D1 after local verification
+   - node scripts/seed-surveys-from-jsonc.mjs --db=prod --slug=<source-key> --version=<version> --publish=true --changelog="Add <slug> v<version>"
+   - Do not rely on deploy to update production surveys or Town Hall topic links.
+5) Verify list discoverability
    - GET /api/surveys/list should include slug/title/status
-5) Verify runtime load
+6) Verify runtime load
    - GET /api/surveys/<slug> returns surveyJson/versionId/versionHash
    - GET /surveys/<slug> renders SurveyJS
 
@@ -92,8 +96,10 @@ SurveyJS data lives in survey_versions. Use the JSONC seed script to update it a
    - wrangler d1 execute wy_local --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash, v.published_at FROM survey_versions v JOIN surveys s ON s.id = v.survey_id WHERE s.slug = '<slug>' ORDER BY v.version DESC LIMIT 2" --local --config wrangler.jsonc
 
 Production workflow
-1) Seed JSONC into production D1
-   - node scripts/seed-surveys-from-jsonc.mjs --db=prod --slug=all --version=<version> --publish=true --changelog="Seed from JSONC"
+1) Seed JSONC into production D1 with explicit source keys for the surveys you changed
+   - node scripts/seed-surveys-from-jsonc.mjs --db=prod --slug=<source-key> --version=<version> --publish=true --changelog="Seed from JSONC"
+   - Prefer explicit source keys for adds or targeted updates.
+   - Avoid `--slug=all` unless you intentionally want one shared DB version across every selected survey in that run.
 2) Verify production data
    - wrangler d1 execute wy --command "SELECT s.slug, v.version, length(v.json_text) AS json_len, v.json_hash FROM survey_versions v JOIN surveys s ON s.id = v.survey_id ORDER BY s.slug, v.version" --config wrangler.jsonc
 
