@@ -6569,10 +6569,15 @@ export default {
         const row = await env.DB.prepare(
           `SELECT
             COUNT(*) AS verified_responses,
-            COUNT(DISTINCT JSON_EXTRACT(district, '$.house')) AS house_districts,
-            COUNT(DISTINCT JSON_EXTRACT(district, '$.senate')) AS senate_districts
-          FROM responses
-          WHERE tier >= 2`
+            COUNT(DISTINCT COALESCE(
+              JSON_EXTRACT(district, '$.stateHouse'),
+              JSON_EXTRACT(district, '$.house')
+            )) AS house_districts,
+            COUNT(DISTINCT COALESCE(
+              JSON_EXTRACT(district, '$.stateSenate'),
+              JSON_EXTRACT(district, '$.senate')
+            )) AS senate_districts
+          FROM responses`
         ).first();
         return jsonResponse({
           verified_responses: row ? row.verified_responses : 0,
