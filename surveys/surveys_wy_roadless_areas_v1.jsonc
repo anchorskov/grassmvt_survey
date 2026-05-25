@@ -1,0 +1,175 @@
+// surveys/surveys_wy_roadless_areas_v1.jsonc
+// slug: wy-roadless-areas
+// version: v1 | 2026-05-24
+// title: Public Lands and Roadless Areas Survey
+{
+  "title": "Public Lands and Roadless Areas Survey",
+  "description": "A Wyoming survey on H.R. 7695, roadless-area protections, public access, wildfire management, local input, and national forest priorities.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "completeText": "Submit survey",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "roadless-areas",
+    "estimated_minutes": 4,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey asks how Wyoming voters view H.R. 7695 and the future of roadless-area protections on national forest land.</p><h3>Short background</h3><p>WyoFile reports that the Roadless Rule affects millions of acres nationally and about 3.3 million acres in Wyoming. The introduced bill text for H.R. 7695 says it would make the 2001 Roadless Rule have no force or effect and require certain road construction on National Forest System lands.</p><h3>How responses will be used</h3><ul><li>Results will be published in aggregate.</li><li>Exact question wording and response options will be published with results.</li><li>Individual responses remain private.</li></ul>"
+        }
+      ]
+    },
+    {
+      "name": "overall_position",
+      "title": "Section 1: Overall position",
+      "description": "Your overall view of H.R. 7695.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "hr7695_position",
+          "title": "Do you support or oppose H.R. 7695?",
+          "isRequired": true,
+          "choices": [
+            "Support",
+            "Oppose",
+            "Unsure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "protections_and_future_rules",
+      "title": "Section 2: Roadless-area protections",
+      "description": "Whether existing and future roadless-area protections should remain available.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "wy_roadless_protections_remain",
+          "title": "Should roadless-area protections remain in place on Wyoming national forest land?",
+          "isRequired": true,
+          "choices": [
+            "Yes",
+            "No",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "block_future_protections",
+          "title": "Should Congress block future administrations from creating similar roadless-area protections?",
+          "isRequired": true,
+          "choices": [
+            "Yes",
+            "No",
+            "Unsure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "access_and_fire",
+      "title": "Section 3: Public access and wildfire management",
+      "description": "Your main access concern and wildfire-risk approach.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "public_access_top_concern",
+          "title": "Which concern matters most to you?",
+          "isRequired": true,
+          "choices": [
+            "More road access for timber, fire response, and land management",
+            "Protecting quiet backcountry areas for hunting, fishing, wildlife, and recreation",
+            "A balanced approach",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "wildfire_risk_approach",
+          "title": "Which approach do you trust most for reducing wildfire risk?",
+          "isRequired": true,
+          "choices": [
+            "More roads and active forest management",
+            "Targeted management while keeping roadless protections",
+            "Case-by-case local planning",
+            "Unsure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "local_voice_and_priorities",
+      "title": "Section 4: Local voice and public lands priority",
+      "description": "How much public input should matter and what Wyoming national forests should prioritize.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "wy_public_input_weight",
+          "title": "Before changing roadless-area protections, how much weight should Wyoming public input carry?",
+          "isRequired": true,
+          "choices": [
+            "A lot",
+            "Some",
+            "Very little",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "national_forest_top_priority",
+          "title": "What should be the top priority for Wyoming's national forests?",
+          "isRequired": true,
+          "choices": [
+            "Access and active management",
+            "Wildlife and water protection",
+            "Outdoor recreation and hunting",
+            "Timber and rural jobs",
+            "Balanced multiple use",
+            "Unsure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "accountability_and_comment",
+      "title": "Section 5: Representative accountability",
+      "description": "How verified public input should affect representation.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "representative_follow_verified_input",
+          "title": "If verified Wyoming voters oppose H.R. 7695, should our representative vote with verified public input?",
+          "isRequired": true,
+          "choices": [
+            "Yes",
+            "No",
+            "It depends on the details",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "representatives_public_lands_comment",
+          "title": "Optional comment: What do you want our elected representatives to understand about Wyoming public lands?",
+          "isRequired": false,
+          "rows": 6,
+          "maxLength": 2000
+        }
+      ]
+    }
+  ]
+}

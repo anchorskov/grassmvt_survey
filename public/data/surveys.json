@@ -256,6 +256,21 @@
     "href": "/surveys/wy-public-land-sales"
   },
   {
+    "id": "wy-roadless-areas",
+    "slug": "wy-roadless-areas",
+    "scope": "wy",
+    "title": "Public Lands and Roadless Areas Survey",
+    "description": "Share your view on H.R. 7695, roadless-area protections, public access, wildfire management, and Wyoming national forest priorities.",
+    "landing_blurb": "A Wyoming survey on H.R. 7695, roadless protections, access, wildfire management, local input, and public lands priorities.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "roadless-areas",
+    "display_order": 26,
+    "estimated_minutes": 4,
+    "featured": true,
+    "href": "/surveys/wy-roadless-areas"
+  },
+  {
     "id": "grizzly-bear-delisting",
     "slug": "grizzly-bear-delisting",
     "scope": "wy",
