@@ -316,6 +316,21 @@
     "href": "/surveys/cowboy-care"
   },
   {
+    "id": "wy-primary-elections-party-preselection",
+    "slug": "wy-primary-elections-party-preselection",
+    "scope": "wy",
+    "title": "Wyoming Primary Elections and Party Pre-Selection Survey",
+    "description": "Measure what Wyoming voters believe about political party involvement in contested primary elections, including pre-selection, endorsements, financial support, and the role of party leadership before voters cast ballots.",
+    "landing_blurb": "A Wyoming election survey on contested primaries, party endorsements, party funds, disclosure, and voter trust before ballots are cast.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "primary-elections",
+    "display_order": 31,
+    "estimated_minutes": 5,
+    "featured": true,
+    "href": "/surveys/wy-primary-elections-party-preselection"
+  },
+  {
     "id": "military-force-ai",
     "slug": "military-force-ai",
     "scope": "public",

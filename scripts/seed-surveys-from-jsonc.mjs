@@ -59,6 +59,11 @@ const surveySources = {
     file: 'surveys/surveys_wy_time_change_v1.jsonc',
     scope: 'wy',
   },
+  'wy-primary-elections-party-preselection-v1': {
+    slug: 'wy-primary-elections-party-preselection',
+    file: 'surveys/surveys_wy_primary_elections_party_preselection_v1.jsonc',
+    scope: 'wy',
+  },
   'cost-of-living-v1': {
     slug: 'cost-of-living',
     file: 'surveys/surveys_cost_of_living_v1.jsonc',

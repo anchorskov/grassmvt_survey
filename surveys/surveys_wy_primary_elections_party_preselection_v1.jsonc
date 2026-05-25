@@ -1,0 +1,228 @@
+// surveys/surveys_wy_primary_elections_party_preselection_v1.jsonc
+// slug: wy-primary-elections-party-preselection
+// version: v1 | 2026-05-25
+// title: Wyoming Primary Elections and Party Pre-Selection Survey
+{
+  "title": "Wyoming Primary Elections and Party Pre-Selection Survey",
+  "description": "Measure what Wyoming voters believe about political party involvement in contested primary elections, including pre-selection, endorsements, financial support, and the role of party leadership before voters cast ballots.",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p><p><strong>The people choose. The party serves. The government answers to us.</strong></p>",
+  "showQuestionNumbers": "off",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "primary-elections",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey measures what Wyoming voters believe about political party involvement in contested primary elections, including pre-selection, endorsements, financial support, and the role of party leadership before voters cast ballots.</p><h3>Background</h3><p>Wyoming law currently states: <strong>&quot;No political party funds shall be expended directly or indirectly in the aid of the nomination of any one person as against another person of the same political party running in the primary election.&quot;</strong></p><p>W.S. 22-25-104</p><p>Recent Wyoming GOP bylaw discussions and reporting have raised public questions about whether party organizations should endorse or financially support candidates before a primary election is decided by voters.</p><p>Results will be published in aggregate. Exact question wording and response options will be published with the results. Individual responses will be protected.</p>"
+        }
+      ]
+    },
+    {
+      "name": "primary_elections_voter_choice",
+      "title": "Section 1: Primary Elections and Voter Choice",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "who_should_decide_primary",
+          "title": "1. In your opinion, who should decide a party primary election?",
+          "choices": [
+            "Primary voters",
+            "Party leadership",
+            "County party organizations",
+            "Major donors and political organizations",
+            "A combination of these",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "party_pre_primary_endorsement",
+          "title": "2. Before a contested primary election, should a political party officially endorse one candidate over another candidate from the same party?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only after a vote of party members",
+            "Only in certain circumstances",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "party_funds_same_party_primary",
+          "title": "3. Should party organizations be allowed to spend party funds supporting one same-party candidate before a primary election?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only with full public disclosure",
+            "Only after a convention vote",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_keep_wy_party_funds_law",
+          "title": "4. Wyoming law currently restricts party funds from being used to help one same-party candidate over another in a primary election. Do you support keeping this law?",
+          "choices": [
+            "Strongly support",
+            "Support",
+            "Oppose",
+            "Strongly oppose",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "party_role_before_nominee",
+          "title": "5. Which statement comes closest to your view?",
+          "choices": [
+            "Political parties should remain neutral until voters choose a nominee",
+            "Political parties should actively help select preferred candidates before the primary",
+            "Political parties should only provide information, not endorsements",
+            "Political parties should only endorse after the primary",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "trust_accountability",
+      "title": "Section 2: Trust and Accountability",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "trust_if_leadership_preselects",
+          "title": "6. How much trust would you have in a primary election if party leadership publicly pre-selects candidates before voters cast ballots?",
+          "choices": [
+            "A lot",
+            "Some",
+            "Very little",
+            "None",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "preselection_concerns",
+          "title": "7. Which concerns you most about party pre-selection? Pick up to 2.",
+          "choices": [
+            "Party insiders gain too much influence",
+            "Voters feel pressured to support preferred candidates",
+            "Financial advantages become unfair",
+            "Grassroots candidates lose opportunity",
+            "It reduces trust in elections",
+            "I do not have major concerns"
+          ],
+          "hasOther": true,
+          "otherText": "Other",
+          "maxSelectedChoices": 2
+        },
+        {
+          "type": "radiogroup",
+          "name": "pre_primary_endorsement_disclosure",
+          "title": "8. If a party endorses candidates before a primary, should all financial support and coordination be publicly disclosed?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only large expenditures",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "voters_see_party_support",
+          "title": "9. Should Wyoming voters be able to see which candidates receive party organizational support before voting begins?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only financial support should be disclosed",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "principles_values",
+      "title": "Section 3: Principles and Values",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "principle_statement",
+          "title": "10. Which statement best reflects your view?",
+          "choices": [
+            "The voters choose, the party serves",
+            "The party should guide voters toward preferred candidates",
+            "Strong party leadership produces better candidates",
+            "Competitive primaries should remain fully open and neutral",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "fair_independent_primary_importance",
+          "title": "11. How important is it that Wyoming primary elections feel fair and independent from insider influence?",
+          "choices": [
+            "Extremely important",
+            "Very important",
+            "Somewhat important",
+            "Not important",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "party_role_before_primary_open",
+          "title": "12. In your own words, what role should political parties play before a primary election?",
+          "isRequired": false,
+          "maxLength": 1000,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "comment",
+          "name": "increase_primary_trust_open",
+          "title": "13. In your own words, what would increase your trust in Wyoming primary elections?",
+          "isRequired": false,
+          "maxLength": 1000,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_demographics",
+      "title": "Optional Demographics",
+      "elements": [
+        {
+          "type": "html",
+          "name": "wy_voter_reporting_note",
+          "html": "<p>Verified Wyoming voters are aggregated by Wyoming State House district and Senate district. This helps provide district-level public reporting so elected representatives and the public can better understand the views of registered Wyoming voters and neighbors while protecting individual responses.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "registered_wy_voter",
+          "title": "14. Are you a registered Wyoming voter?",
+          "choices": [
+            "Yes",
+            "No",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}
