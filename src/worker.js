@@ -988,38 +988,92 @@ const requireTownhallModerator = async (request, env) => {
   return auth;
 };
 
+const formatTownhallTopicForApi = (topic) => {
+  if (!topic) {
+    return null;
+  }
+
+  const surveySlug = (topic.survey_record_slug || topic.survey_slug || '').toString().trim();
+  const surveyTitle = (topic.survey_title || '').toString().trim();
+
+  return {
+    id: topic.id,
+    survey_slug: topic.survey_slug,
+    slug: topic.slug,
+    title: topic.title,
+    description: topic.description,
+    status: topic.status,
+    created_at: topic.created_at,
+    updated_at: topic.updated_at,
+    survey: surveySlug
+      ? {
+          slug: surveySlug,
+          title: surveyTitle,
+          href: `/surveys/${encodeURIComponent(surveySlug)}`,
+        }
+      : null,
+  };
+};
+
 const townhallListTopics = async (db) => {
-  const result = await db.prepare(
-    `SELECT id, survey_slug, slug, title, description, status, created_at, updated_at
-     FROM townhall_topics
-     WHERE status = 'active'
-     ORDER BY created_at DESC`
-  ).all();
+  const hasSurveyId = await tableColumnExists(db, 'townhall_topics', 'survey_id');
+  const query = hasSurveyId
+    ? `SELECT t.id, t.survey_slug, t.slug, t.title, t.description, t.status, t.created_at, t.updated_at,
+              s.slug AS survey_record_slug, s.title AS survey_title
+       FROM townhall_topics t
+       LEFT JOIN surveys s
+         ON (t.survey_id = s.id OR (t.survey_id IS NULL AND s.slug = t.survey_slug))
+       WHERE t.status = 'active'
+       ORDER BY t.created_at DESC`
+    : `SELECT t.id, t.survey_slug, t.slug, t.title, t.description, t.status, t.created_at, t.updated_at,
+              s.slug AS survey_record_slug, s.title AS survey_title
+       FROM townhall_topics t
+       LEFT JOIN surveys s
+         ON s.slug = t.survey_slug
+       WHERE t.status = 'active'
+       ORDER BY t.created_at DESC`;
+  const result = await db.prepare(query).all();
   return result.results || [];
 };
 
 const townhallGetTopicBySlug = async (db, slug) => {
-  return db
-    .prepare(
-      `SELECT id, survey_slug, slug, title, description, status, created_at, updated_at
-       FROM townhall_topics
-       WHERE slug = ? OR survey_slug = ?
+  const hasSurveyId = await tableColumnExists(db, 'townhall_topics', 'survey_id');
+  const query = hasSurveyId
+    ? `SELECT t.id, t.survey_slug, t.slug, t.title, t.description, t.status, t.created_at, t.updated_at,
+              s.slug AS survey_record_slug, s.title AS survey_title
+       FROM townhall_topics t
+       LEFT JOIN surveys s
+         ON (t.survey_id = s.id OR (t.survey_id IS NULL AND s.slug = t.survey_slug))
+       WHERE t.slug = ? OR t.survey_slug = ?
        LIMIT 1`
-    )
-    .bind(slug, slug)
-    .first();
+    : `SELECT t.id, t.survey_slug, t.slug, t.title, t.description, t.status, t.created_at, t.updated_at,
+              s.slug AS survey_record_slug, s.title AS survey_title
+       FROM townhall_topics t
+       LEFT JOIN surveys s
+         ON s.slug = t.survey_slug
+       WHERE t.slug = ? OR t.survey_slug = ?
+       LIMIT 1`;
+  return db.prepare(query).bind(slug, slug).first();
 };
 
 const townhallGetTopicBySurveySlug = async (db, surveySlug) => {
-  return db
-    .prepare(
-      `SELECT id, survey_slug, slug, title, description, status, created_at, updated_at
-       FROM townhall_topics
-       WHERE survey_slug = ?
+  const hasSurveyId = await tableColumnExists(db, 'townhall_topics', 'survey_id');
+  const query = hasSurveyId
+    ? `SELECT t.id, t.survey_slug, t.slug, t.title, t.description, t.status, t.created_at, t.updated_at,
+              s.slug AS survey_record_slug, s.title AS survey_title
+       FROM townhall_topics t
+       LEFT JOIN surveys s
+         ON (t.survey_id = s.id OR (t.survey_id IS NULL AND s.slug = t.survey_slug))
+       WHERE t.survey_slug = ?
        LIMIT 1`
-    )
-    .bind(surveySlug)
-    .first();
+    : `SELECT t.id, t.survey_slug, t.slug, t.title, t.description, t.status, t.created_at, t.updated_at,
+              s.slug AS survey_record_slug, s.title AS survey_title
+       FROM townhall_topics t
+       LEFT JOIN surveys s
+         ON s.slug = t.survey_slug
+       WHERE t.survey_slug = ?
+       LIMIT 1`;
+  return db.prepare(query).bind(surveySlug).first();
 };
 
 const townhallCreateTopic = async (
@@ -1066,15 +1120,7 @@ const townhallCreateTopic = async (
       )
       .run();
   }
-  return db
-    .prepare(
-      `SELECT id, survey_slug, slug, title, description, status, created_at, updated_at
-       FROM townhall_topics
-       WHERE id = ?
-       LIMIT 1`
-    )
-    .bind(id)
-    .first();
+  return townhallGetTopicBySlug(db, slug);
 };
 
 const townhallListStatements = async (db, topicId, limit, cursor) => {
@@ -5969,7 +6015,8 @@ export default {
 
       if (request.method === 'GET' && pathParts[2] === 'topics' && pathParts.length === 3) {
         try {
-          const topics = await townhallListTopics(env.DB);
+          const topicRows = await townhallListTopics(env.DB);
+          const topics = topicRows.map((topic) => formatTownhallTopicForApi(topic));
           return townhallOk({ topics });
         } catch (error) {
           return townhallError(500, 'TOWNHALL_TOPICS_FAILED', error.message || 'Unable to load topics.');
@@ -6038,7 +6085,7 @@ export default {
         const existing = existingBySurveySlug || existingBySlug;
         if (existing) {
           return townhallOk(
-            { created: false, topic: existing },
+            { created: false, topic: formatTownhallTopicForApi(existing) },
             { status: 200 }
           );
         }
@@ -6064,7 +6111,7 @@ export default {
             },
           });
           return townhallOk(
-            { created: true, topic: createdTopic },
+            { created: true, topic: formatTownhallTopicForApi(createdTopic) },
             { status: 201 }
           );
         } catch (error) {
@@ -6073,7 +6120,10 @@ export default {
               (await townhallGetTopicBySurveySlug(env.DB, surveySlug)) ||
               (await townhallGetTopicBySlug(env.DB, slug));
             if (existingAfterRace) {
-              return townhallOk({ created: false, topic: existingAfterRace }, { status: 200 });
+              return townhallOk(
+                { created: false, topic: formatTownhallTopicForApi(existingAfterRace) },
+                { status: 200 }
+              );
             }
           }
           return townhallError(500, 'SEED_TOPIC_FAILED', error.message || 'Unable to seed topic.');
@@ -6087,8 +6137,10 @@ export default {
           return townhallError(404, 'TOPIC_NOT_FOUND', 'Town Hall topic not found.');
         }
 
+        const apiTopic = formatTownhallTopicForApi(topic);
+
         if (request.method === 'GET' && pathParts.length === 4) {
-          return townhallOk({ topic });
+          return townhallOk({ topic: apiTopic });
         }
 
         if (
@@ -6102,10 +6154,11 @@ export default {
             const result = await townhallListStatements(env.DB, topic.id, limit, cursor);
             return townhallOk({
               topic: {
-                id: topic.id,
-                slug: topic.slug,
-                surveySlug: topic.survey_slug,
-                title: topic.title,
+                id: apiTopic.id,
+                slug: apiTopic.slug,
+                surveySlug: apiTopic?.survey?.slug || apiTopic.survey_slug,
+                title: (apiTopic?.survey?.title || '').trim() || apiTopic.title,
+                survey: apiTopic.survey,
               },
               statements: result.items,
               nextCursor: result.nextCursor,

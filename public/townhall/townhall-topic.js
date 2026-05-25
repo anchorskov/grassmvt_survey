@@ -5,6 +5,7 @@
   const allowedReactions = ['agree', 'disagree', 'needs_evidence'];
 
   const topicTitleEl = document.getElementById('topic-title');
+  const topicSurveyLinkEl = document.getElementById('topic-survey-link');
   const topicDescriptionEl = document.getElementById('topic-description');
   const topicErrorEl = document.getElementById('topic-error');
 
@@ -157,6 +158,10 @@
     if (topicDescriptionEl) {
       topicDescriptionEl.textContent = 'Loading...';
     }
+    if (topicSurveyLinkEl) {
+      topicSurveyLinkEl.textContent = '';
+      setHidden(topicSurveyLinkEl, true);
+    }
     if (enableTopicBtnEl) {
       setHidden(enableTopicBtnEl, true);
     }
@@ -236,7 +241,7 @@
 
   const inferTitleFromSlug = (slug) => {
     const normalized = String(slug || '').trim();
-    if (!normalized) return 'Town Hall';
+    if (!normalized) return 'Survey discussion';
     return normalized
       .split(/[-_]+/g)
       .filter(Boolean)
@@ -244,12 +249,56 @@
       .join(' ');
   };
 
-  const renderMissingTopic = () => {
-    if (topicTitleEl) topicTitleEl.textContent = 'Town Hall not enabled yet';
-    if (topicMissingTitleEl) topicMissingTitleEl.textContent = 'Town Hall not enabled yet';
-    if (topicMissingBodyEl) {
-      topicMissingBodyEl.textContent = 'This survey does not have a Town Hall topic yet.';
+  const getTopicSurveyMeta = (topic) => {
+    const surveySlug =
+      (topic?.survey?.slug || '').toString().trim() ||
+      (topic?.survey_slug || '').toString().trim();
+    const surveyTitle =
+      (topic?.survey?.title || '').toString().trim() ||
+      (topic?.title || '').toString().trim() ||
+      inferTitleFromSlug(surveySlug);
+    const surveyHref =
+      (topic?.survey?.href || '').toString().trim() ||
+      (surveySlug ? `/surveys/${encodeURIComponent(surveySlug)}` : '');
+    return {
+      slug: surveySlug,
+      title: surveyTitle || 'Survey discussion',
+      href: surveyHref,
+    };
+  };
+
+  const renderTopicSurveyLink = (topic) => {
+    if (!topicSurveyLinkEl) return;
+    const survey = getTopicSurveyMeta(topic);
+    topicSurveyLinkEl.textContent = '';
+    if (!survey.slug && !survey.title) {
+      setHidden(topicSurveyLinkEl, true);
+      return;
     }
+
+    const prefix = document.createTextNode('Linked survey: ');
+    topicSurveyLinkEl.appendChild(prefix);
+
+    if (survey.href) {
+      const link = document.createElement('a');
+      link.className = 'link-button';
+      link.href = survey.href;
+      link.textContent = survey.title;
+      topicSurveyLinkEl.appendChild(link);
+    } else {
+      topicSurveyLinkEl.appendChild(document.createTextNode(survey.title));
+    }
+
+    setHidden(topicSurveyLinkEl, false);
+  };
+
+  const renderMissingTopic = () => {
+    if (topicTitleEl) topicTitleEl.textContent = 'Discussion not enabled yet';
+    if (topicMissingTitleEl) topicMissingTitleEl.textContent = 'Discussion not enabled yet';
+    if (topicMissingBodyEl) {
+      topicMissingBodyEl.textContent = 'This survey does not have a discussion topic yet.';
+    }
+    renderTopicSurveyLink({ survey_slug: state.topicSlug, title: inferTitleFromSlug(state.topicSlug) });
   };
 
   const reactionLabel = (type) => {
@@ -575,12 +624,14 @@
 
   const renderTopicReady = (topic) => {
     if (currentState === 'missing') return;
+    const survey = getTopicSurveyMeta(topic);
     if (topicTitleEl) {
-      topicTitleEl.textContent = topic?.title || 'Town Hall';
+      topicTitleEl.textContent = `Discussion: ${survey.title}`;
     }
     if (topicDescriptionEl) {
       topicDescriptionEl.textContent = topic?.description || '';
     }
+    renderTopicSurveyLink(topic);
   };
 
   const loadStatements = async (append = false) => {
@@ -642,7 +693,7 @@
   const setEnableTopicLoading = (loading) => {
     if (!enableTopicBtnEl) return;
     enableTopicBtnEl.disabled = loading;
-    enableTopicBtnEl.textContent = loading ? 'Enabling...' : 'Enable Town Hall for this survey';
+    enableTopicBtnEl.textContent = loading ? 'Enabling...' : 'Enable discussion for this survey';
   };
 
   const enableTopicForSurvey = async () => {
@@ -667,12 +718,12 @@
         payload = null;
       }
       if (!response.ok || !payload?.ok) {
-        showError(enableTopicErrorEl, payload?.error?.message || 'Unable to enable Town Hall.');
+        showError(enableTopicErrorEl, payload?.error?.message || 'Unable to enable discussion.');
         return;
       }
       window.location.reload();
     } catch (error) {
-      showError(enableTopicErrorEl, 'Unable to enable Town Hall.');
+      showError(enableTopicErrorEl, 'Unable to enable discussion.');
     } finally {
       setEnableTopicLoading(false);
     }

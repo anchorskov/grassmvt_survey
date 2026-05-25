@@ -14,11 +14,19 @@
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
+  const formatTitleFromSlug = (slug) =>
+    String(slug || '')
+      .trim()
+      .split(/[-_]+/g)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+
   const showError = (message) => {
     if (!errorEl) {
       return;
     }
-    errorEl.textContent = message || 'Unable to load Town Hall topics.';
+    errorEl.textContent = message || 'Unable to load discussions.';
     errorEl.classList.remove('is-hidden');
   };
 
@@ -31,7 +39,7 @@
   };
 
   const renderEmpty = () => {
-    topicsRoot.innerHTML = '<article class="card"><p>No Town Hall topics are available yet.</p></article>';
+    topicsRoot.innerHTML = '<article class="card"><p>No survey discussions are available yet.</p></article>';
   };
 
   const renderTopics = (topics) => {
@@ -43,14 +51,21 @@
     topicsRoot.innerHTML = topics
       .map((topic) => {
         const topicSlug = encodeURIComponent(topic.slug || topic.survey_slug || '');
-        const title = escapeHtml(topic.title || topic.slug || 'Town Hall topic');
+        const survey = topic?.survey || null;
+        const surveyTitle =
+          (survey?.title || '').trim() ||
+          topic.title ||
+          formatTitleFromSlug(survey?.slug || topic.survey_slug || topic.slug) ||
+          'Survey discussion';
+        const title = escapeHtml(surveyTitle);
         const description = escapeHtml(topic.description || '');
+        const ctaLabel = escapeHtml(`Discuss ${surveyTitle}`);
         return `
           <article class="card">
             <h2>${title}</h2>
             ${description ? `<p class="card__meta">${description}</p>` : '<p class="card__meta">Join this discussion.</p>'}
             <div class="card__actions">
-              <a class="button button--small" href="/townhall/topic/?slug=${topicSlug}">Open topic</a>
+              <a class="button button--small" href="/townhall/topic/?slug=${topicSlug}">${ctaLabel}</a>
             </div>
           </article>
         `;
@@ -75,7 +90,7 @@
       renderTopics(payload.data?.topics || []);
     } catch (error) {
       renderEmpty();
-      showError('Unable to load Town Hall topics right now.');
+      showError('Unable to load discussions right now.');
     }
   };
 

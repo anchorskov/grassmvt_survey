@@ -5,20 +5,21 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 <BaseLayout title="Town Hall Topic | Grassroots Movement">
   <main>
     <p><a class="link-button" href="/townhall/">Back to Town Hall topics</a></p>
-    <h1 id="topic-title">Town Hall topic</h1>
+    <h1 id="topic-title">Survey discussion</h1>
+    <p class="helper-text is-hidden" id="topic-survey-link"></p>
     <p class="helper-text" id="topic-description"></p>
     <p class="form-error is-hidden" id="topic-error" role="alert"></p>
 
     <section class="card is-hidden" id="topic-missing">
-      <h2 id="topic-missing-title">Town Hall not enabled yet</h2>
-      <p id="topic-missing-body">This survey does not have a Town Hall topic yet.</p>
+      <h2 id="topic-missing-title">Discussion not enabled yet</h2>
+      <p id="topic-missing-body">This survey does not have a discussion topic yet.</p>
       <p class="card__actions">
         <a class="button button--small button--secondary" href="/surveys/list/">Back to surveys list</a>
-        <a class="button button--small button--secondary" href="/townhall/">Town Hall home</a>
+        <a class="button button--small button--secondary" href="/townhall/">Discussion home</a>
       </p>
       <p class="card__actions">
         <button class="button button--small is-hidden" id="enable-topic-btn" type="button">
-          Enable Town Hall for this survey
+          Enable discussion for this survey
         </button>
       </p>
       <p class="form-error is-hidden" id="enable-topic-error" role="alert"></p>
