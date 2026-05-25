@@ -10,12 +10,14 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     data-page-title="Browse surveys"
   >
     <section class="survey-browse-page__hero" aria-labelledby="survey-browse-title">
-      <p class="survey-browse-page__eyebrow">Survey paths</p>
+      <p class="survey-browse-page__eyebrow">Your voice, measured</p>
       <h1 id="survey-browse-title">Browse surveys</h1>
       <p class="survey-browse-page__lede">
-        Choose a path, review current topics, and see which surveys are active now versus still in the queue.
+        Real questions on the issues that matter. Take a survey, see aggregated results, and watch how views shift over time.
       </p>
     </section>
+
+    <div id="survey-featured-container"></div>
 
     <section class="survey-path-picker" aria-labelledby="survey-path-picker-title">
       <div class="survey-path-picker__header">
@@ -42,6 +44,13 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
       </div>
     </section>
 
+    <div class="survey-filter-tabs" role="tablist" aria-label="Filter surveys by path">
+      <button class="survey-filter-tab is-active" role="tab" aria-selected="true" data-filter-tab="all">All</button>
+      <button class="survey-filter-tab" role="tab" aria-selected="false" data-filter-tab="normal-life">Normal Life</button>
+      <button class="survey-filter-tab" role="tab" aria-selected="false" data-filter-tab="divisive">Divisive</button>
+      <button class="survey-filter-tab" role="tab" aria-selected="false" data-filter-tab="bridge">Bridge</button>
+    </div>
+
     <section class="survey-listings__section" id="survey-active-section" aria-labelledby="survey-active-title">
       <div class="survey-listings__header">
         <h2 id="survey-active-title">
@@ -50,7 +59,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
         </h2>
         <p class="helper-text" id="survey-active-intro"></p>
       </div>
-      <div id="survey-active-grid" class="grid"></div>
+      <div id="survey-active-grid" class="grid sbc2-grid"></div>
     </section>
 
     <section class="survey-listings__section is-hidden" id="survey-bridge-section" aria-labelledby="survey-bridge-title">
@@ -60,7 +69,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
           <button class="section-help-trigger" type="button" aria-label="Help: bridge surveys" aria-expanded="false" data-help-page="survey-list" data-help-section="bridge-surveys">?</button>
         </h2>
       </div>
-      <div id="survey-bridge-grid" class="grid"></div>
+      <div id="survey-bridge-grid" class="grid sbc2-grid"></div>
     </section>
 
     <section class="survey-listings__section is-hidden" id="survey-coming-section" aria-labelledby="survey-coming-title">
@@ -70,7 +79,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
           <button class="section-help-trigger" type="button" aria-label="Help: coming soon surveys" aria-expanded="false" data-help-page="survey-list" data-help-section="coming-soon">?</button>
         </h2>
       </div>
-      <div id="survey-coming-grid" class="grid"></div>
+      <div id="survey-coming-grid" class="grid sbc2-grid"></div>
     </section>
   </main>
 
