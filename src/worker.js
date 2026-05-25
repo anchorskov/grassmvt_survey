@@ -6566,19 +6566,53 @@ export default {
     if (request.method === 'GET' && url.pathname === '/api/stats') {
       try {
         if (!env.DB) return jsonResponse({ verified_responses: null, house_districts: null, senate_districts: null });
-        const row = await env.DB.prepare(
-          `SELECT
-            COUNT(*) AS verified_responses,
-            COUNT(DISTINCT COALESCE(
-              JSON_EXTRACT(district, '$.stateHouse'),
-              JSON_EXTRACT(district, '$.house')
-            )) AS house_districts,
-            COUNT(DISTINCT COALESCE(
-              JSON_EXTRACT(district, '$.stateSenate'),
-              JSON_EXTRACT(district, '$.senate')
-            )) AS senate_districts
-          FROM responses`
-        ).first();
+        let row = null;
+
+        // Prefer rollups so totals include all existing published surveys without
+        // depending on raw response row shape.
+        const hasRollups = await tableExists(env.DB, 'aggregate_rollups');
+        if (hasRollups) {
+          row = await env.DB.prepare(
+            `WITH latest_published AS (
+               SELECT s.id AS survey_id,
+                      (
+                        SELECT v.id
+                        FROM survey_versions v
+                        WHERE v.survey_id = s.id AND v.published_at IS NOT NULL
+                        ORDER BY v.published_at DESC, v.version DESC, v.id DESC
+                        LIMIT 1
+                      ) AS version_id
+               FROM surveys s
+             )
+             SELECT
+               COALESCE(SUM(CASE WHEN ar.tier = 1 AND ar.geo_type = 'all' AND ar.geo_key = 'ALL' THEN ar.response_count ELSE 0 END), 0) AS verified_responses,
+               COUNT(DISTINCT CASE WHEN ar.tier = 2 AND ar.geo_type = 'state_house' AND ar.response_count > 0 THEN ar.geo_key END) AS house_districts,
+               COUNT(DISTINCT CASE WHEN ar.tier = 2 AND ar.geo_type = 'state_senate' AND ar.response_count > 0 THEN ar.geo_key END) AS senate_districts
+             FROM aggregate_rollups ar
+             JOIN latest_published lp
+               ON lp.survey_id = ar.survey_id
+              AND lp.version_id = ar.survey_version_id
+             WHERE lp.version_id IS NOT NULL`
+          ).first();
+        }
+
+        // Fallback for environments without rollups/backfill.
+        if (!row) {
+          row = await env.DB.prepare(
+            `SELECT
+              COUNT(*) AS verified_responses,
+              COUNT(DISTINCT COALESCE(
+                JSON_EXTRACT(district, '$.stateHouse'),
+                JSON_EXTRACT(district, '$.house')
+              )) AS house_districts,
+              COUNT(DISTINCT COALESCE(
+                JSON_EXTRACT(district, '$.stateSenate'),
+                JSON_EXTRACT(district, '$.senate')
+              )) AS senate_districts
+            FROM responses`
+          ).first();
+        }
+
         return jsonResponse({
           verified_responses: row ? row.verified_responses : 0,
           house_districts: row ? row.house_districts : 0,
