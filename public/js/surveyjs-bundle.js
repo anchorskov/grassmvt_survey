@@ -86635,8 +86635,8 @@
         <li>Lets you come back and edit answers before a survey closes.</li>
       </ul>
       <div class="survey-auth-banner__actions">
-        <a class="button button--primary" href="/auth/signup/" data-auth-open="signup">Create free account</a>
-        <a class="button button--secondary" href="/auth/login/" data-auth-open="login">I already have an account</a>
+        <a class="button button--primary" href="/auth/signup/" data-auth-cta="signup">Create free account</a>
+        <a class="button button--secondary" href="/auth/login/" data-auth-cta="login">I already have an account</a>
       </div>
       <p class="helper-text survey-auth-banner__help">
         After sign in, you return to this survey and can submit immediately.
@@ -86651,9 +86651,9 @@
           return;
         }
         banner.scrollIntoView({ behavior: "smooth", block: "start" });
-        const firstAction = banner.querySelector("[data-auth-open]");
-        if (firstAction && typeof firstAction.focus === "function") {
-          firstAction.focus({ preventScroll: true });
+        const firstBannerAction = banner.querySelector(".survey-auth-banner__actions a.button");
+        if (firstBannerAction && typeof firstBannerAction.focus === "function") {
+          firstBannerAction.focus({ preventScroll: true });
         }
       };
       var bindBrowseModeActions = (slug, getAnswers) => {
@@ -86662,7 +86662,7 @@
         }
         document.body.dataset.surveyAuthBound = "true";
         document.addEventListener("click", (event) => {
-          const authTarget = event.target.closest("[data-auth-open]");
+          const authTarget = event.target.closest("[data-auth-open], [data-auth-cta]");
           if (!authTarget) {
             return;
           }

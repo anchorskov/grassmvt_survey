@@ -280,7 +280,29 @@
         return;
       }
       const target = openTarget.getAttribute('data-auth-open');
-      AuthModals.open(target || 'login');
+      const resolvedTarget = target || 'login';
+      const registeredModal = AuthModals.registry && AuthModals.registry[resolvedTarget];
+      const canOpenModal = !!(
+        registeredModal && typeof registeredModal.open === 'function'
+      );
+      if (!canOpenModal) {
+        const href = openTarget.getAttribute('href');
+        if (href) {
+          window.location.href = href;
+          return;
+        }
+        if (resolvedTarget === 'signup') {
+          window.location.href = '/auth/signup/';
+          return;
+        }
+        if (resolvedTarget === 'password-reset') {
+          window.location.href = '/auth/password-reset/';
+          return;
+        }
+        window.location.href = '/auth/login/';
+        return;
+      }
+      AuthModals.open(resolvedTarget);
       return;
     }
     if (event.target.closest('[data-auth-close]')) {
