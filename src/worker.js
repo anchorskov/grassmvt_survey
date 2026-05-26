@@ -8449,6 +8449,11 @@ export default {
     }
 
     if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'surveys' && pathParts[2] && pathParts[3] === 'submit') {
+      const isProduction = (env.ENVIRONMENT || '').toLowerCase() === 'production';
+      if (isProduction) {
+        return new Response('Not found.', { status: 404 });
+      }
+
       const slug = decodeURIComponent(pathParts[2]);
       const formData = await request.formData();
       const selectedKey = formData.get('selected_key');
