@@ -6909,6 +6909,9 @@ export default {
       }
 
       const verifiedAt = nowIso();
+      // TODO: tighten address coordinate persistence so addr_lat/addr_lng are
+      // only retained after the address is linked to an approved verification
+      // flow, such as a registered voter-file match.
       await env.DB.prepare(
         `INSERT INTO user_address_verification 
          (user_id, state_fips, state_house_dist, state_senate_dist, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, verified_at, created_at, updated_at)
@@ -6999,22 +7002,22 @@ export default {
             await env.DB.prepare(
               `INSERT INTO user_address_verification 
                (user_id, state_fips, state_house_dist, state_senate_dist, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, verified_at, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)
                ON CONFLICT(user_id) DO UPDATE SET
                  state_fips = excluded.state_fips,
                  state_house_dist = excluded.state_house_dist,
                  state_senate_dist = excluded.state_senate_dist,
                  addr_lat = excluded.addr_lat,
                  addr_lng = excluded.addr_lng,
-                 device_lat = excluded.device_lat,
-                 device_lng = excluded.device_lng,
+                 device_lat = NULL,
+                 device_lng = NULL,
                  distance_m = excluded.distance_m,
                  accuracy_m = excluded.accuracy_m,
                  verified_at = excluded.verified_at,
                  updated_at = excluded.updated_at
               `
             )
-              .bind(userId, stateFips, stateHouseDist, stateSenateDist, addrLat, addrLng, deviceLat, deviceLng, Math.round(distance), Math.round(accuracy), verifiedAt, verifiedAt, verifiedAt)
+              .bind(userId, stateFips, stateHouseDist, stateSenateDist, addrLat, addrLng, Math.round(distance), Math.round(accuracy), verifiedAt, verifiedAt, verifiedAt)
               .run();
 
             if (stateCode) {
@@ -7296,7 +7299,7 @@ export default {
         );
       }
 
-      // Check if this voter_id is already claimed by another user
+      // Check if this voter_id is already claimed by another user.
       if (match.voter_id) {
         const existingClaim = await env.DB.prepare(
           `SELECT user_id FROM user_verification WHERE wy_voter_id = ? AND user_id != ?`

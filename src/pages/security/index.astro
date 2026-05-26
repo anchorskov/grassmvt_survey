@@ -27,7 +27,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       padding-top: 0;
       border-top: none;
     }
-    /* Visible link styling — charcoal text, underline offset for readability */
+    /* Visible link styling - charcoal text, underline offset for readability */
     .security-prose a:not(.button) {
       color: #2b2b2b;
       text-decoration: underline;
@@ -95,7 +95,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     <h3>Account basics</h3>
     <ul class="info-list">
       <li>Your email address.</li>
-      <li>A password hash — never the password itself.</li>
+      <li>A password hash, never the password itself.</li>
       <li>Session records to keep you logged in across page loads.</li>
     </ul>
 
@@ -144,16 +144,39 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
     <h3>What we do not store</h3>
     <ul class="info-list">
-      <li>Plaintext passwords — never stored under any circumstances.</li>
-      <li>Your precise device location. If we run a home-of-record proximity check, we store only the outcome: pass or fail, a distance bucket, an accuracy bucket, and a timestamp.</li>
+      <li>Plaintext passwords. We store a password hash, never the password itself.</li>
+      <li>Ongoing device location. We do not use GPS or browser location as a live tracker.</li>
+      <li>Live movement history. We do not build a profile of where your phone or browser goes over time.</li>
+      <li>Personal identifiers in published results. Public result views are aggregated, not published as individual voter records.</li>
+    </ul>
+
+    <h3>Address coordinates and device location</h3>
+    <p>
+      Address coordinates and device location are different.
+      Address coordinates describe a place (the address on file).
+      Device location describes where a phone or browser is at a moment in time.
+    </p>
+    <ul class="info-list">
+      <li>We may store address coordinates to support district assignment and proximity checks.</li>
+      <li>Address coordinates are address metadata, not a live movement trail.</li>
+      <li>We do not store ongoing device location.</li>
+      <li>If we run a home-of-record proximity check, we store only the result context: pass/fail, distance, accuracy, and timestamp.</li>
     </ul>
 
     <h3>Wyoming</h3>
     <p>
-      Wyoming provides candidates access to a voter file. For Wyoming accounts, we can verify
-      eligibility using that dataset and then store a salted hash that prevents one person from
-      verifying multiple accounts. We do not publish or track personally identifying information.
-      We use voter file data provided by your elected Secretary of State.
+      Wyoming provides candidates access to a voter file. For Wyoming accounts, we use that voter
+      file to confirm whether an account matches a registered voter and to support district-level
+      reporting.
+    </p>
+    <p>
+      Coordinates, when stored, are tied to the registered address and district verification process.
+      They are not used to follow a person or create a live movement profile.
+    </p>
+    <p>
+      Published results are aggregated. We do not publish individual names, email addresses, voter
+      identifiers, addresses, or personal location records in survey result views. We use voter file
+      data provided by your elected Secretary of State.
     </p>
     <p>
       Candidates wishing to participate may contact Jimmy Skovgard via
@@ -163,18 +186,18 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     <h3>National</h3>
     <p>
       For broader participation across the country, we use an address-based jurisdiction method.
-      We ask for an address, derive districts, and store only the jurisdiction keys needed for
-      aggregation. We also store an address hash for deduplication and internal consistency checks.
+      We ask for an address, derive districts, and store the jurisdiction keys needed for aggregation.
+      Internal deduplication and consistency checks may use signals such as an address hash.
     </p>
     <p>
-      If we add a proximity check, we ask the user to confirm location once at the home-of-record
-      address. We do not store your location, latitude, or longitude.
+      We do not store ongoing device location. If we add or use a proximity check, we ask the user
+      to confirm location for the home-of-record process, not to track movement over time.
     </p>
 
     <h2 id="anti-spam">Anti-spam protections</h2>
     <p>We use multiple layers:</p>
     <ul class="info-list">
-      <li>A bot challenge on sensitive actions — signup and other high-risk endpoints.</li>
+      <li>A bot challenge on sensitive actions, including signup and other high-risk endpoints.</li>
       <li>Rate limits on abuse-prone endpoints.</li>
       <li>One counted response per user per survey version, unless the survey design explicitly allows updates.</li>
       <li>Audit events that flag suspicious patterns for review.</li>
@@ -191,14 +214,14 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     <ul class="info-list">
       <li>Participation is always optional.</li>
       <li>Address verification is optional, but unlocks district-level result views.</li>
-      <li>Location checks are one-time only, and we store only the outcome.</li>
+      <li>Device-location checks are not used as ongoing tracking or movement history.</li>
       <li>You can sign in at any time to revise your survey answers, unless the survey has closed. Most surveys allow revisions.</li>
-      <li>In the future, we plan to offer mail-based account verification — a one-time code sent to your physical address — as an additional layer of identity assurance.</li>
+      <li>In the future, we plan to offer mail-based account verification, using a one-time code sent to your physical address, as an additional layer of identity assurance.</li>
     </ul>
 
     <h2>Feedback</h2>
     <p>
-      Security is not a static promise — it is a process. We invite feedback and we publish the
+      Security is not a static promise. It is a process. We invite feedback and we publish the
       results.
     </p>
     <p>
