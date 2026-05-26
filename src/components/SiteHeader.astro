@@ -104,7 +104,8 @@
     });
     /* Close drawer when a nav item is clicked */
     siteNav.addEventListener('click', function(e) {
-      const item = e.target.closest('a, button');
+      const target = e.target;
+      const item = target instanceof Element ? target.closest('a, button') : null;
       if (item) {
         siteNav.classList.add('is-hidden');
         siteNav.classList.remove('flex');

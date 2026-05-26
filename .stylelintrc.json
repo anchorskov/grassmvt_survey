@@ -1,5 +1,7 @@
 {
   "extends": ["stylelint-config-standard"],
+  "defaultSeverity": "warning",
+  "ignoreFiles": ["public/css/surveyjs.css"],
   "rules": {
     "color-hex-length": "short"
   }

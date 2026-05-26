@@ -13,7 +13,7 @@
   const turnstileContainer = document.getElementById('turnstile-login');
   const turnstileClient = window.TurnstileClient;
   const oauthGoogleButton = document.getElementById('auth-oauth-google');
-  const submitButton = form ? form.querySelector('button[type=\"submit\"]') : null;
+  const submitButton = form ? form.querySelector('button[type="submit"]') : null;
   const turnstileStatusEl = document.getElementById('turnstile-login-status');
   const turnstileLabelEl = document.getElementById('turnstile-login-label');
   const passkeyNudgeEl = document.getElementById('login-passkey-nudge');

@@ -33,7 +33,7 @@
       baseUrl = 'https://grassmvtsurvey.anchorskov.workers.dev';
     }
     let cmd = `VERIFY_VOTER_BASE_URL=${baseUrl} node scripts/admin_issue_verify_voter_link.mjs --email ${email}`;
-    if (notes) cmd += ` --notes "${notes.replace(/"/g, '\"')}"`;
+    if (notes) cmd += ` --notes "${notes.replace(/"/g, '\\"')}"`;
     if (expires && Number(expires) > 0) cmd += ` --expires ${expires}`;
     cmd += ' --session <session-id>';
     commandEl.textContent = cmd;
