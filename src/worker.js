@@ -8300,11 +8300,29 @@ export default {
               max-width: 48rem;
             }
 
+            .survey-auth-banner__reasons {
+              margin: 0.75rem 0 0;
+              max-width: 48rem;
+              padding-left: 1.1rem;
+            }
+
+            .survey-auth-banner__reasons li {
+              margin-bottom: 0.3rem;
+            }
+
             .survey-auth-banner__actions {
               display: flex;
               flex-wrap: wrap;
               gap: 0.75rem;
               margin-top: 1rem;
+            }
+
+            .survey-auth-banner__help {
+              margin-top: 0.75rem;
+            }
+
+            .survey-submit-note {
+              margin: 0.35rem 0 0;
             }
 
             @media (max-width: 640px) {

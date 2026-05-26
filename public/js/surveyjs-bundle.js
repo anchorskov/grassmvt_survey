@@ -86624,18 +86624,37 @@
         banner.innerHTML = `
     <div class="survey-auth-banner__body">
       <p class="survey-auth-banner__eyebrow">Browse mode</p>
-      <h2 class="survey-auth-banner__title">Sign in to save your response</h2>
+      <h2 class="survey-auth-banner__title">Account required to submit a survey</h2>
       <p class="survey-auth-banner__copy">
-        You can read every question now, but answers are only recorded for signed-in users.
-        Voter-verified totals only include verified registered voters.
+        You can read every question now, and your draft stays in this browser, but final survey
+        submission requires an account.
       </p>
+      <ul class="info-list survey-auth-banner__reasons">
+        <li>Prevents bot and spam submissions.</li>
+        <li>Keeps one counted response per person per survey version.</li>
+        <li>Lets you come back and edit answers before a survey closes.</li>
+      </ul>
       <div class="survey-auth-banner__actions">
-        <a class="button button--primary" href="/auth/login/" data-auth-open="login">Sign in to save</a>
-        <a class="button button--secondary" href="/auth/signup/" data-auth-open="signup">Create account</a>
+        <a class="button button--primary" href="/auth/signup/" data-auth-open="signup">Create free account</a>
+        <a class="button button--secondary" href="/auth/login/" data-auth-open="login">I already have an account</a>
       </div>
+      <p class="helper-text survey-auth-banner__help">
+        After sign in, you return to this survey and can submit immediately.
+      </p>
     </div>
   `.trim();
         banner.classList.remove("is-hidden");
+      };
+      var focusAuthBanner = () => {
+        const banner = document.getElementById(authBannerId);
+        if (!banner || banner.classList.contains("is-hidden")) {
+          return;
+        }
+        banner.scrollIntoView({ behavior: "smooth", block: "start" });
+        const firstAction = banner.querySelector("[data-auth-open]");
+        if (firstAction && typeof firstAction.focus === "function") {
+          firstAction.focus({ preventScroll: true });
+        }
       };
       var bindBrowseModeActions = (slug, getAnswers) => {
         if (document.body.dataset.surveyAuthBound === "true") {
@@ -86712,7 +86731,7 @@
           backdrop.addEventListener("click", closeModal);
         }
       };
-      var buildSectionControls = (survey, meta, container) => {
+      var buildSectionControls = (survey, meta, container, authenticated = false) => {
         const existing = container.querySelector(".survey-section-controls");
         if (existing) {
           existing.remove();
@@ -86724,6 +86743,12 @@
         label.className = "helper-text";
         label.textContent = labelText;
         controls.appendChild(label);
+        if (survey.isLastPage && !authenticated) {
+          const submitNotice = document.createElement("p");
+          submitNotice.className = "helper-text survey-submit-note";
+          submitNotice.textContent = "Account required: create an account or sign in to submit. Your draft is saved in this browser.";
+          controls.appendChild(submitNotice);
+        }
         const continueButton = document.createElement("button");
         continueButton.type = "button";
         continueButton.className = "button button--primary";
@@ -86845,12 +86870,10 @@
             renderBrowseModeBanner(false);
             storeAuthReturnTo();
             writeBrowseDraft(slug, answersJson || {});
-            setStatus(message || "Browse mode: sign in or create an account to save this response.");
-            if (window.AuthModals && typeof window.AuthModals.open === "function") {
-              window.AuthModals.open("login");
-              return;
-            }
-            window.location.href = "/auth/login/";
+            setStatus(
+              message || "Submission paused. Create an account or sign in to submit. Your answers are saved in this browser and will be restored when you return."
+            );
+            focusAuthBanner();
           };
           window.addEventListener("auth:changed", (event) => {
             const authenticated = !!event.detail?.authenticated;
@@ -86863,7 +86886,10 @@
             }
             options.allow = false;
             options.allowComplete = false;
-            promptForSignIn(sender.data || {}, "Browse mode: sign in or create an account to save this response.");
+            promptForSignIn(
+              sender.data || {},
+              "Submission paused. We require an account to prevent spam and keep one counted response per person. Create an account or sign in above to finish submitting."
+            );
           });
           model.onChoicesSearch.add((sender, options) => {
             if (!options.question || options.question.name !== "state") {
@@ -86884,7 +86910,7 @@
               if (!options || !options.htmlElement) {
                 return;
               }
-              buildSectionControls(sender, surveyMeta, options.htmlElement);
+              buildSectionControls(sender, surveyMeta, options.htmlElement, authState.authenticated);
             });
           }
           model.onComplete.add(async (sender) => {
