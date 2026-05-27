@@ -331,6 +331,21 @@
     "href": "/surveys/wy-primary-elections-party-preselection"
   },
   {
+    "id": "wy-primary-election-participation",
+    "slug": "wy-primary-election-participation",
+    "scope": "wy",
+    "title": "Wyoming Primary Election Participation Survey",
+    "description": "Measure Wyoming voter perspectives on primary participation, party nomination rights, privacy, election administration, and public reporting.",
+    "landing_blurb": "A Wyoming election survey on primary access, nomination rights, filing deadlines, and how results should be reported publicly.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "primary-elections",
+    "display_order": 32,
+    "estimated_minutes": 7,
+    "featured": true,
+    "href": "/surveys/wy-primary-election-participation"
+  },
+  {
     "id": "military-force-ai",
     "slug": "military-force-ai",
     "scope": "public",
