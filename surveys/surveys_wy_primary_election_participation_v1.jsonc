@@ -4,7 +4,7 @@
 // title: Wyoming Primary Election Participation Survey
 {
   "title": "Wyoming Primary Election Participation Survey",
-  "description": "Measure Wyoming voter perspectives on primary participation, party nomination rights, privacy, election administration, and public reporting.",
+  "description": "Measure Wyoming voter perspectives on primary participation, party nomination rights, privacy, election administration, deadline timing, benefits, concerns, and public reporting.",
   "x_meta": {
     "flow": "sectioned",
     "sectionExitEnabled": true,
@@ -12,7 +12,7 @@
     "exitUrl": "/surveys/list/",
     "path": "divisive",
     "category_slug": "primary-elections",
-    "estimated_minutes": 7,
+    "estimated_minutes": 6,
     "featured": true
   },
   "showQuestionNumbers": "off",
@@ -27,13 +27,13 @@
         {
           "type": "html",
           "name": "survey_overview",
-          "html": "<h3>Purpose</h3><p>This survey asks Wyoming voters how primary elections should work. The goal is to measure public opinion on voter participation, party nomination rights, privacy, election administration, and public reporting.</p><h3>How responses will be used</h3><p>This survey is a tool to gather and report registered Wyoming voter survey results in aggregate. Exact question wording, response options, collection dates, sample size, verification method, and revision notes will be published with the results. Individual responses will remain confidential.</p><h3>Verification note</h3><p>For Wyoming voters, responses may be verified against a voter-file data set obtained from the Wyoming Secretary of State. The current verification file reflects registered voter records as of August 2025.</p><p>This serves two purposes:</p><ul><li>It helps report survey results from verified registered Wyoming voters.</li><li>It can help a respondent see whether the submitted information matches a registered voter record in the August 2025 file.</li></ul><p>A match confirms the respondent appeared in that data file. It does not confirm later registration changes, current party affiliation, or current voter status after August 2025. If a respondent registered, moved, or updated voter information after August 2025, the match result may need additional review.</p><p>Where possible, county, State House district, and State Senate district will come from the voter-file match instead of asking extra questions. Verified and unverified results should be reported separately.</p><h3>Background note</h3><p>Wyoming currently uses a closed primary system for major party nomination contests. Registered voters must declare or change party affiliation before receiving a major party primary ballot. In 2026, the party-affiliation change deadline was May 13, and candidate filing opened May 14.</p><h3>References used to draft this survey</h3><p>These links are provided for voters who want to review the source material. Reading them is optional and is not required to answer the survey. The questions below are intended to measure opinion, not persuade.</p><ul><li><a href=\"https://wyoleg.gov/statutes/compress/title97.pdf\" target=\"_blank\" rel=\"noopener noreferrer\">Wyoming Constitution, Article 1</a></li><li><a href=\"https://law.justia.com/codes/wyoming/title-22/chapter-5/article-2/section-22-5-212/\" target=\"_blank\" rel=\"noopener noreferrer\">Wyoming Election Code, W.S. 22-5-212</a></li><li><a href=\"https://law.justia.com/codes/wyoming/title-22/chapter-5/article-2/section-22-5-214/\" target=\"_blank\" rel=\"noopener noreferrer\">Wyoming Election Code, W.S. 22-5-214</a></li><li><a href=\"https://www.campbellcountywy.gov/867/Elections\" target=\"_blank\" rel=\"noopener noreferrer\">2026 Wyoming election calendar example, Campbell County</a></li><li><a href=\"https://www.law.cornell.edu/supremecourt/text/99-401\" target=\"_blank\" rel=\"noopener noreferrer\">California Democratic Party v. Jones</a></li><li><a href=\"https://www.law.cornell.edu/supremecourt/text/479/208\" target=\"_blank\" rel=\"noopener noreferrer\">Tashjian v. Republican Party of Connecticut</a></li></ul>"
+          "html": "<h3>Purpose</h3><p>This survey asks Wyoming voters how primary elections should work. The goal is to measure public opinion on voter participation, party nomination rights, privacy, election administration, deadline timing, benefits, concerns, and public reporting.</p><h3>How responses will be used</h3><p>This survey is a tool to gather and report registered Wyoming voter survey results in aggregate. Exact question wording, response options, collection dates, sample size, verification method, and revision notes will be published with the results. Individual responses will remain confidential.</p><h3>Verification note</h3><p>For Wyoming voters, responses may be checked against a voter-file data set obtained from the Wyoming Secretary of State. The current verification file reflects registered voter records as of August 2025.</p><p>This serves two purposes:</p><ul><li>It helps report survey results from verified registered Wyoming voters.</li><li>It can help a respondent see whether submitted information matches a registered voter record in the August 2025 file.</li></ul><p>A match confirms the respondent appeared in that data file. It does not confirm later registration changes, current party affiliation, or current voter status after August 2025. If a respondent registered, moved, or updated voter information after August 2025, the match result may need additional review.</p><p>Where possible, county, State House district, and State Senate district will come from the voter-file match instead of asking extra questions. Verified and unverified results should be reported separately.</p><h3>Background note</h3><p>Wyoming currently uses an affiliation-based system for major party primary ballots. Registered voters must declare or change party affiliation before receiving a major party primary ballot. In 2026, the party-affiliation change deadline was May 13, and candidate filing opened May 14.</p><p>Wyoming's Constitution also says elections shall be &ldquo;open, free and equal&rdquo; and protects the &ldquo;untrammeled exercise&rdquo; of suffrage. This survey asks how voters believe that principle should be balanced with party nomination rights, election administration, and voter privacy.</p><h3>Terms used in this survey</h3><p><strong>Affiliation-based primary:</strong> A primary system where a voter's party affiliation determines which party ballot the voter may receive.</p><p><strong>Ballot-choice primary:</strong> A primary system where a voter chooses one available party ballot when voting, and that ballot choice does not automatically change voter registration.</p><p><strong>Open-to-unaffiliated model:</strong> A primary system where unaffiliated voters may choose one party ballot, while voters already affiliated with a party follow affiliation rules.</p><h3>References used to draft this survey</h3><p>These links are provided for voters who want to review the source material. Reading them is optional and is not required to answer the survey. The questions below are intended to measure opinion, not persuade.</p><ul><li>Wyoming Constitution, Article 1</li><li>Wyoming Election Code, W.S. 22-5-212</li><li>Wyoming Election Code, W.S. 22-5-214</li><li>Wyoming Secretary of State, 2026 Key Election Dates</li><li>NCSL, State Primary Election Types</li><li>U.S. Supreme Court cases on party association and primary participation</li></ul>"
         }
       ]
     },
     {
-      "name": "current_understanding",
-      "title": "Section 1: Current understanding",
+      "name": "survey_questions",
+      "title": "Survey Questions",
       "elements": [
         {
           "type": "radiogroup",
@@ -50,245 +50,138 @@
         },
         {
           "type": "radiogroup",
-          "name": "knew_party_affiliation_requirement",
-          "title": "2. Before this survey, did you know registered voters must declare or change party affiliation before receiving a major party primary ballot?",
-          "isRequired": true,
-          "choices": [
-            "Yes",
-            "No",
-            "Not sure"
-          ]
-        },
-        {
-          "type": "radiogroup",
-          "name": "knew_deadline_before_candidate_filing",
-          "title": "3. Before this survey, did you know the 2026 party-affiliation deadline came before the candidate filing period opened?",
-          "isRequired": true,
-          "choices": [
-            "Yes",
-            "No",
-            "Not sure"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "preferred_primary_structure",
-      "title": "Section 2: Preferred primary structure",
-      "elements": [
-        {
-          "type": "radiogroup",
           "name": "preferred_primary_system",
-          "title": "4. Which primary election system do you prefer for Wyoming?",
+          "title": "2. Which primary system do you prefer for Wyoming?",
           "isRequired": true,
           "choices": [
-            "Current closed primary system",
-            "Major party primaries open to unaffiliated voters only",
-            "Major party primaries open to any registered voter, with each voter choosing one party ballot",
-            "One primary ballot with all candidates, with the top two advancing",
-            "One primary ballot with all candidates, with the top four advancing",
-            "Another system",
+            "Keep the current closed primary system",
+            "Allow unaffiliated voters to choose one party primary ballot",
+            "Allow any registered voter to choose one party primary ballot",
+            "Let each major party decide who may participate",
+            "Use one ballot with all candidates, with the top two advancing",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "radiogroup",
+          "name": "who_should_vote_in_major_party_primary",
+          "title": "3. Who should be able to vote in a major party primary?",
+          "isRequired": true,
+          "choices": [
+            "Only voters registered with that party",
+            "Voters registered with that party, plus unaffiliated voters",
+            "Any registered voter, choosing only one party ballot",
+            "Each major party should decide",
             "Not sure"
           ]
         },
         {
           "type": "radiogroup",
-          "name": "eligibility_for_party_ballot",
-          "title": "5. If Wyoming keeps party primaries, who should be eligible to choose a major party primary ballot?",
-          "isRequired": true,
-          "choices": [
-            "Only voters already affiliated with that party",
-            "Voters affiliated with that party plus unaffiliated voters",
-            "Any registered voter, limited to one party ballot per election",
-            "Each party should decide who may participate",
-            "Not sure"
-          ]
-        },
-        {
-          "type": "radiogroup",
-          "name": "ballot_choice_changes_affiliation",
-          "title": "6. Should choosing a party primary ballot automatically change a voter's official party affiliation?",
-          "isRequired": true,
-          "choices": [
-            "Yes",
-            "No",
-            "Only if the voter requests the change",
-            "Not sure"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "balancing_principles",
-      "title": "Section 3: Balancing principles",
-      "elements": [
-        {
-          "type": "radiogroup",
-          "name": "most_important_principle",
-          "title": "7. Which principle should receive the most weight in Wyoming primary election law?",
-          "isRequired": true,
-          "choices": [
-            "Voter access to publicly funded primary elections",
-            "Party association in choosing nominees",
-            "Election administration and clear rules",
-            "Voter privacy in ballot choice",
-            "Equal treatment of registered voters",
-            "Not sure"
-          ]
-        },
-        {
-          "type": "radiogroup",
-          "name": "fairness_when_principles_conflict",
-          "title": "8. When voter access and party nomination rights conflict, which approach feels most fair?",
-          "isRequired": true,
-          "choices": [
-            "Give more weight to voter access",
-            "Give more weight to party nomination rights",
-            "Balance both as evenly as possible",
-            "Depends on the office or election",
-            "Not sure"
-          ]
-        },
-        {
-          "type": "radiogroup",
-          "name": "allow_party_choice_for_unaffiliated",
-          "title": "9. Should state law allow each major party to decide whether unaffiliated voters may participate in that party's primary?",
-          "isRequired": true,
-          "choices": [
-            "Yes",
-            "No",
-            "Only if the rule is published before candidate filing begins",
-            "Not sure"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "deadline_timing",
-      "title": "Section 4: Deadline timing",
-      "elements": [
-        {
-          "type": "radiogroup",
-          "name": "preferred_affiliation_deadline_timing",
-          "title": "10. Should party-affiliation deadlines be set before or after the candidate filing period?",
+          "name": "affiliation_deadline_timing",
+          "title": "4. When should the party-affiliation deadline be set?",
           "isRequired": true,
           "choices": [
             "Before candidate filing opens",
             "After candidate filing closes",
-            "Same day candidate filing closes",
-            "Keep the current timeline",
+            "On primary election day",
+            "A deadline is unnecessary if voters choose one party ballot when voting",
             "Not sure"
           ]
         },
         {
           "type": "radiogroup",
-          "name": "importance_of_candidate_list_before_deadline",
-          "title": "11. How important is it for voters to know the full candidate list before a party-affiliation deadline?",
+          "name": "which_matters_more",
+          "title": "5. Which matters more to you in a primary election system?",
           "isRequired": true,
           "choices": [
-            "Very important",
-            "Important",
-            "Somewhat important",
-            "Not important",
+            "Party members choosing party nominees",
+            "More registered voters having access to meaningful primary choices",
+            "A balanced approach between both",
             "Not sure"
           ]
-        }
-      ]
-    },
-    {
-      "name": "benefits_and_concerns",
-      "title": "Section 5: Benefits and concerns",
-      "elements": [
+        },
         {
-          "type": "checkbox",
-          "name": "benefits_of_more_open_primary",
-          "title": "12. What possible benefits of a more open primary system matter most to you? Pick up to 3.",
+          "type": "radiogroup",
+          "name": "preferred_voter_privacy_approach",
+          "title": "6. Which voter privacy approach do you prefer?",
           "isRequired": true,
-          "maxSelectedChoices": 3,
           "choices": [
-            "More registered voters can participate in primary contests",
-            "Unaffiliated voters have more ballot choice",
-            "Voters have more privacy in political participation",
-            "Candidates may speak to a broader voter base",
-            "Primary results may better reflect the broader electorate",
-            "Less influence by party leadership in nomination contests",
+            "Party registration should determine which primary ballot a voter receives",
+            "Voters should choose one available party ballot when voting",
+            "Either approach is acceptable",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "strongest_reason_closed_primary",
+          "title": "7. What is the strongest reason to keep a closed primary? Pick one.",
+          "isRequired": true,
+          "choices": [
+            "Party members should choose party nominees",
+            "Closed primaries may reduce strategic crossover voting",
+            "Party identity and party accountability may be clearer",
+            "Election rules may be easier to administer",
+            "I do not see a strong reason",
             "Not sure"
           ],
           "showOtherItem": true,
           "otherText": "Other"
         },
         {
-          "type": "checkbox",
-          "name": "concerns_about_more_open_primary",
-          "title": "13. What possible concerns about a more open primary system matter most to you? Pick up to 3.",
+          "type": "radiogroup",
+          "name": "strongest_reason_more_open_primary",
+          "title": "8. What is the strongest reason to support a more open primary? Pick one.",
           "isRequired": true,
-          "maxSelectedChoices": 3,
+          "choices": [
+            "More registered voters can participate",
+            "Unaffiliated voters have more meaningful ballot access",
+            "Voters have more privacy in ballot choice",
+            "Candidates may speak to a broader voter base",
+            "I do not see a strong reason",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "radiogroup",
+          "name": "biggest_concern_current_closed_system",
+          "title": "9. What is your biggest concern about Wyoming's current closed primary system? Pick one.",
+          "isRequired": true,
+          "choices": [
+            "Some registered voters have fewer meaningful primary choices",
+            "Party-affiliation deadlines happen before voters know the full candidate list",
+            "Voters may change affiliation mainly to access a useful ballot",
+            "Unaffiliated voters have limited participation",
+            "I do not have a major concern",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "radiogroup",
+          "name": "biggest_concern_more_open_system",
+          "title": "10. What is your biggest concern about a more open primary system? Pick one.",
+          "isRequired": true,
           "choices": [
             "Voters outside a party may influence that party's nominee",
-            "Strategic voting across party lines",
-            "Weaker party identity or party accountability",
-            "More complex election administration",
-            "More voter confusion",
-            "Higher chance of litigation",
+            "Strategic crossover voting may increase",
+            "Party identity may become less clear",
+            "Election rules may become more complex",
+            "I do not have a major concern",
             "Not sure"
           ],
           "showOtherItem": true,
           "otherText": "Other"
-        }
-      ]
-    },
-    {
-      "name": "public_reporting_and_accountability",
-      "title": "Section 6: Public reporting and accountability",
-      "elements": [
-        {
-          "type": "radiogroup",
-          "name": "publish_participation_reports",
-          "title": "14. Should Wyoming publish public reports showing primary participation rates by registration category and ballot type?",
-          "isRequired": true,
-          "choices": [
-            "Yes",
-            "No",
-            "Only statewide",
-            "By county and legislative district",
-            "Not sure"
-          ]
         },
-        {
-          "type": "checkbox",
-          "name": "reporting_fields_preference",
-          "title": "15. What information should be published with primary election reports? Pick up to 3.",
-          "isRequired": true,
-          "maxSelectedChoices": 3,
-          "choices": [
-            "Total turnout",
-            "Turnout by party affiliation or registration category",
-            "Number of unaffiliated voters",
-            "Number of voters receiving limited ballots",
-            "Number of voters changing affiliation before the deadline",
-            "Number of new voters registering after the deadline",
-            "County and district-level summaries",
-            "Not sure"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "open_response",
-      "title": "Section 7: Open response",
-      "elements": [
         {
           "type": "comment",
           "name": "best_primary_system_open_response",
-          "title": "16. In your own words, what primary election system would best serve Wyoming voters?",
-          "isRequired": false,
-          "maxLength": 1200,
-          "placeholder": "Long answer, optional."
-        },
-        {
-          "type": "comment",
-          "name": "lawmakers_consideration_open_response",
-          "title": "17. What concern, if any, should lawmakers consider before changing Wyoming's primary election rules?",
+          "title": "11. In your own words, what primary election system would best serve Wyoming voters?",
           "isRequired": false,
           "maxLength": 1200,
           "placeholder": "Long answer, optional."
