@@ -12,9 +12,12 @@
   const activeGrid = document.getElementById('survey-active-grid');
   const activeIntro = document.getElementById('survey-active-intro');
   const activeSection = document.getElementById('survey-active-section');
-  const comingSoonGrid = document.getElementById('survey-coming-grid');
-  const comingSoonIntro = document.getElementById('survey-coming-intro');
-  const comingSoonSection = document.getElementById('survey-coming-section');
+  const comingSoonGrid = document.getElementById('survey-coming-grid')
+    || document.getElementById('survey-coming-soon-grid');
+  const comingSoonIntro = document.getElementById('survey-coming-intro')
+    || document.getElementById('survey-coming-soon-intro');
+  const comingSoonSection = document.getElementById('survey-coming-section')
+    || document.getElementById('survey-coming-soon-section');
   const bridgeGrid = document.getElementById('survey-bridge-grid');
   const bridgeIntro = document.getElementById('survey-bridge-intro');
   const bridgeSection = document.getElementById('survey-bridge-section');
