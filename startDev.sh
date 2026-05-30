@@ -49,6 +49,13 @@ fi
 # Clear any stale listener on the target port even if no PID file exists
 clear_port "$PORT" || true
 
+# Build dist/ so all public/ assets are available before wrangler starts
+echo "🔨 Building dist/ ..."
+if ! npm run build --silent; then
+  echo "❌ Build failed — fix errors before starting dev server"
+  exit 1
+fi
+
 # Start the server
 echo "🚀 Starting wrangler dev on http://localhost:$PORT"
 echo "🧭 Config: $CONFIG"

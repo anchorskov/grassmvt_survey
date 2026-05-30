@@ -211,6 +211,21 @@
     "href": "/surveys/wy-time-change"
   },
   {
+    "id": "wy-voter-access",
+    "slug": "wy-voter-access",
+    "scope": "wy",
+    "title": "Wyoming Voter Access Survey",
+    "description": "Help measure where Wyoming voters stand on voter access, registration, and election-day participation.",
+    "landing_blurb": "A short Wyoming survey on voting access, voter registration, and election-day participation.",
+    "path": "normal-life",
+    "status": "active",
+    "category_slug": "primary-elections",
+    "display_order": 116,
+    "estimated_minutes": 3,
+    "featured": false,
+    "href": "/surveys/wy-voter-access"
+  },
+  {
     "id": "abortion",
     "slug": "abortion",
     "scope": "wy",

@@ -1,0 +1,98 @@
+// surveys/surveys_wy_voter_access_v1.jsonc
+// slug: wy-voter-access
+// version: v1 | 2026-05-29
+// title: Wyoming Voter Access Survey
+// source: voter_access_survey.pdf
+{
+  "title": "Wyoming Voter Access Survey",
+  "description": "Help measure where Wyoming voters stand on voter access, registration, and election-day participation.",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "primary-elections",
+    "estimated_minutes": 3,
+    "featured": false
+  },
+  "showQuestionNumbers": "off",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "checkErrorsMode": "onValueChanged",
+  "completeText": "Submit survey",
+  "completedHtml": "<h3>Thank you.</h3><p>Your response has been recorded.</p>",
+  "pages": [
+    {
+      "name": "overview",
+      "elements": [
+        {
+          "type": "html",
+          "name": "survey_overview",
+          "html": "<h3>Purpose</h3><p>Help measure where Wyoming voters stand on voter access, registration, and election-day participation.</p><p><a class=\"button button--small button--secondary\" href=\"/assets/voter_access_survey.pdf\" target=\"_blank\" rel=\"noopener\">Want to know more?</a></p><h3>How responses will be used</h3><p>Results will be published in aggregate. Exact question wording and response options will be published with the results.</p><p>For Wyoming voters, responses may be checked against a voter-file data set obtained from the Wyoming Secretary of State. Verified and unverified responses may be reported separately.</p>"
+        }
+      ]
+    },
+    {
+      "name": "questions",
+      "title": "Survey Questions",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "statewide_voting_holiday",
+          "title": "1. Should Wyoming create a statewide voting holiday for election days so eligible voters have time to vote?",
+          "isRequired": true,
+          "choices": [
+            "Yes, for both Primary Election Day and General Election Day",
+            "Yes, for Primary Election Day only",
+            "Yes, for General Election Day only",
+            "Keep the current voting rules",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "automatic_voter_registration",
+          "title": "2. Should eligible Wyoming residents be automatically registered to vote when getting or renewing a Wyoming driver's license or state ID?",
+          "isRequired": true,
+          "choices": [
+            "Yes",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "same_day_registration",
+          "title": "3. Should Wyoming protect same-day voter registration, so eligible citizens can register and vote on Election Day?",
+          "isRequired": true,
+          "choices": [
+            "Yes",
+            "No",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "all_candidate_primary_ballot",
+          "title": "4. Should Wyoming offer voters an optional all-candidate primary ballot, in addition to existing party primary ballots, listing all candidates for each office and allowing one choice per office regardless of party affiliation?",
+          "isRequired": true,
+          "choices": [
+            "Yes",
+            "No",
+            "Keep the current primary ballot system",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "voter_access_open_feedback",
+          "title": "5. What would make voting access work better in Wyoming while keeping elections secure?",
+          "isRequired": false,
+          "maxLength": 1200,
+          "placeholder": "Optional long answer"
+        }
+      ]
+    }
+  ]
+}
