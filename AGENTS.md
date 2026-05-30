@@ -9,7 +9,7 @@ Read this alongside `CLAUDE.md` at the project root — both files are required 
 - `CLAUDE.md` — commands, architecture overview, build workflow, key constraints (AI_CONTRACT)
 - `survey_flow.txt` — step-by-step survey build/seed/verify workflow
 - `AI_CONTRACT.md` — full workflow and data exposure rules
-- `docs/survey/attach_pdf_sources.md` — canonical method for attaching a PDF sources document to a survey (file placement, naming, JSONC link pattern, build requirement, email integration)
+- `guides/survey/attach_pdf_sources.md` — canonical method for attaching a PDF sources document to a survey (file placement, naming, JSONC link pattern, build requirement, email integration)
 
 ## Purpose
 

@@ -134,4 +134,4 @@ TURNSTILE_BYPASS=true
 - `AGENTS.md` — detailed routing map, D1 rules, Town Hall moderation rules, survey lifecycle checklist, and known gotchas. Read this alongside `CLAUDE.md`; both files are required context for agents working in this repo.
 - `survey_flow.txt` — step-by-step survey build/seed/verify workflow
 - `AI_CONTRACT.md` — full workflow and data exposure rules
-- `docs/survey/attach_pdf_sources.md` — canonical method for attaching a PDF sources document to a survey (file placement, naming, JSONC link pattern, email integration, build requirement)
+- `guides/survey/attach_pdf_sources.md` — canonical method for attaching a PDF sources document to a survey (file placement, naming, JSONC link pattern, email integration, build requirement)
