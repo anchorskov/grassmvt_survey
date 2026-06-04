@@ -1,0 +1,187 @@
+---
+// src/pages/races/us-senate-2026/index.astro
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const supportChoices = [
+  'Strongly support',
+  'Lean support',
+  'Neutral or undecided',
+  'Lean oppose',
+  'Strongly oppose',
+  'I need more information',
+  'I am unfamiliar with this candidate',
+];
+
+const candidates = [
+  {
+    name: 'Candidate A',
+    office: 'U.S. Senate, Wyoming, 2026',
+    status: 'Placeholder candidate',
+    website: 'Not added yet',
+    contact: 'Not added yet',
+    statement: 'Candidate statement will be added when verified public information is available.',
+    sourceNote: 'Placeholder sample data for layout planning only.',
+  },
+  {
+    name: 'Candidate B',
+    office: 'U.S. Senate, Wyoming, 2026',
+    status: 'Placeholder candidate',
+    website: 'Not added yet',
+    contact: 'Not added yet',
+    statement: 'Candidate statement will be added when verified public information is available.',
+    sourceNote: 'Placeholder sample data for layout planning only.',
+  },
+  {
+    name: 'Candidate C',
+    office: 'U.S. Senate, Wyoming, 2026',
+    status: 'Placeholder candidate',
+    website: 'Not added yet',
+    contact: 'Not added yet',
+    statement: 'Candidate statement will be added when verified public information is available.',
+    sourceNote: 'Placeholder sample data for layout planning only.',
+  },
+];
+
+const resultRows = [
+  ['Support', 'Pending'],
+  ['Oppose', 'Pending'],
+  ['Undecided', 'Pending'],
+  ['Need more information', 'Pending'],
+  ['Unfamiliar with candidate', 'Pending'],
+  ['Total responses', '0'],
+  ['Verified Wyoming voter responses', '0'],
+  ['Last updated', 'Not yet collected'],
+];
+---
+
+<BaseLayout title="U.S. Senate, Wyoming, 2026 | Grassroots Movement" description="Review candidate information and preview the public sentiment poll for the U.S. Senate race in Wyoming.">
+  <main>
+    <section class="bg-wy-charcoal text-white" aria-labelledby="race-title">
+      <div class="mx-auto max-w-5xl px-6 py-16 md:py-20">
+        <p class="mb-3 text-xs font-bold uppercase tracking-widest text-wy-sandstone">Federal race</p>
+        <h1 id="race-title" class="mb-5 font-serif text-4xl font-bold leading-tight md:text-5xl">U.S. Senate, Wyoming, 2026</h1>
+        <p class="mb-8 max-w-3xl text-lg leading-relaxed text-white/85">
+          This page gathers public input for this race. Citizens can review candidate information, answer a short support poll, and see aggregate sentiment as the race develops.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <a class="button button--primary" href="#support-poll">Take the Candidate Support Poll</a>
+          <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#candidates">Review Candidate Info</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="candidates" class="bg-white" aria-labelledby="candidates-title">
+      <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Candidate information</p>
+        <h2 id="candidates-title" class="mb-8 font-serif text-3xl font-bold text-wy-charcoal">Candidate cards</h2>
+        <div class="grid gap-5 lg:grid-cols-3">
+          {candidates.map((candidate) => (
+            <article class="rounded-lg border border-wy-dust bg-wy-bone/40 p-5">
+              <h3 class="mb-4 font-serif text-2xl font-semibold text-wy-charcoal">{candidate.name}</h3>
+              <dl class="space-y-3 text-sm">
+                <div>
+                  <dt class="font-bold uppercase tracking-wide text-wy-rust">Office</dt>
+                  <dd class="mt-1 text-wy-charcoal">{candidate.office}</dd>
+                </div>
+                <div>
+                  <dt class="font-bold uppercase tracking-wide text-wy-rust">Status</dt>
+                  <dd class="mt-1 text-wy-charcoal">{candidate.status}</dd>
+                </div>
+                <div>
+                  <dt class="font-bold uppercase tracking-wide text-wy-rust">Campaign website</dt>
+                  <dd class="mt-1 text-wy-charcoal">{candidate.website}</dd>
+                </div>
+                <div>
+                  <dt class="font-bold uppercase tracking-wide text-wy-rust">Public contact</dt>
+                  <dd class="mt-1 text-wy-charcoal">{candidate.contact}</dd>
+                </div>
+                <div>
+                  <dt class="font-bold uppercase tracking-wide text-wy-rust">Candidate statement</dt>
+                  <dd class="mt-1 text-wy-charcoal">{candidate.statement}</dd>
+                </div>
+                <div>
+                  <dt class="font-bold uppercase tracking-wide text-wy-rust">Source note</dt>
+                  <dd class="mt-1 text-wy-charcoal">{candidate.sourceNote}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="support-poll" class="bg-wy-bone" aria-labelledby="poll-title">
+      <div class="mx-auto max-w-5xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Poll preview</p>
+        <h2 id="poll-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support poll</h2>
+        <p class="mb-8 max-w-3xl text-wy-charcoal/75">This preview shows the first poll structure. It does not submit responses yet.</p>
+
+        <form class="space-y-6">
+          {candidates.map((candidate) => (
+            <fieldset class="rounded-lg border border-wy-dust bg-white p-5">
+              <legend class="px-1 font-serif text-xl font-semibold text-wy-charcoal">{candidate.name}</legend>
+              <p class="mb-4 mt-2 text-wy-charcoal">Based on what you know today, do you support this candidate for this office?</p>
+              <div class="grid gap-2 sm:grid-cols-2">
+                {supportChoices.map((choice) => (
+                  <label class="flex items-start gap-3 rounded-md border border-wy-dust/70 bg-wy-bone/30 px-3 py-2 text-wy-charcoal">
+                    <input class="mt-1" type="radio" name={`support-${candidate.name.toLowerCase().replace(/\s+/g, '-')}`} value={choice} />
+                    <span>{choice}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+
+          <fieldset class="rounded-lg border border-wy-dust bg-white p-5">
+            <legend class="px-1 font-serif text-xl font-semibold text-wy-charcoal">Race questions</legend>
+            <div class="mt-4 grid gap-5">
+              <label class="block">
+                <span class="mb-2 block font-semibold text-wy-charcoal">Which issue matters most in this race?</span>
+                <input class="w-full rounded-md border border-wy-dust px-4 py-3" type="text" name="issue-most" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block font-semibold text-wy-charcoal">What quality matters most in a candidate for this office?</span>
+                <input class="w-full rounded-md border border-wy-dust px-4 py-3" type="text" name="quality-most" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block font-semibold text-wy-charcoal">What question should every candidate in this race answer?</span>
+                <input class="w-full rounded-md border border-wy-dust px-4 py-3" type="text" name="candidate-question" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block font-semibold text-wy-charcoal">Optional comment: What should candidates in this race understand about Wyoming?</span>
+                <textarea class="min-h-32 w-full rounded-md border border-wy-dust px-4 py-3" name="wyoming-comment"></textarea>
+              </label>
+            </div>
+          </fieldset>
+
+          <button class="button button--primary" type="button">Preview only</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="results" class="bg-white" aria-labelledby="results-title">
+      <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Results concept</p>
+        <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Aggregate sentiment</h2>
+        <p class="mb-8 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
+          This is a public sentiment poll, not an election prediction.
+        </p>
+        <div class="grid gap-5 lg:grid-cols-3">
+          {candidates.map((candidate) => (
+            <article class="rounded-lg border border-wy-dust bg-white p-5">
+              <h3 class="mb-4 font-serif text-xl font-semibold text-wy-charcoal">{candidate.name}</h3>
+              <dl class="divide-y divide-wy-dust/60">
+                {resultRows.map(([label, value]) => (
+                  <div class="grid grid-cols-[1fr_auto] gap-4 py-3">
+                    <dt class="text-wy-charcoal/75">{label}</dt>
+                    <dd class="font-semibold text-wy-charcoal">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+</BaseLayout>

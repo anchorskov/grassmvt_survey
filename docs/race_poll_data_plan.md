@@ -1,0 +1,270 @@
+<!-- docs/race_poll_data_plan.md -->
+
+# Race Poll Data Plan
+
+This document describes how the race polling feature connects to the existing
+GrassrootsMVT data layer. It is the authoritative reference before any
+migration, API route, or page data-loading code is written.
+
+Last reviewed: 2026-06-04 (branch: race)
+
+See also: `docs/data_inventory.md` for a full inventory of existing tables,
+bindings, and routes.
+
+---
+
+## Recommended Connection to Existing Survey Data
+
+The race polling feature should **reuse the existing survey system** for poll
+storage. Each race poll is a SurveyJS survey seeded through the existing path:
+
+1. Create a JSONC source file under `surveys/` containing the candidate support
+   poll questions.
+2. Register it in `scripts/seed-surveys-from-jsonc.mjs`.
+3. Seed it into D1 as a normal survey row.
+4. The existing `responses`, `response_answers`, `response_aggregates`, and
+   `aggregate_rollups` tables store and report poll data with zero schema
+   changes.
+5. `responses.verified_flag` already separates verified Wyoming voter responses
+   from unverified responses — no new column is needed.
+
+This means the race poll results are already reportable via:
+
+- `/api/results/summary?slug=<race-slug>&tier=1&geo_type=all&geo_key=ALL`
+- `/api/results/summary?slug=<race-slug>&tier=2&geo_type=state&geo_key=WY`
+
+The only thing the existing survey system cannot provide is **which candidates
+belong to which race**, and the structured candidate metadata needed to render
+candidate cards. That is the single gap the new table fills.
+
+---
+
+## The One New Table
+
+### Why it is needed
+
+The existing `surveys` table has a `slug`, `title`, and `status`, but no
+concept of an office, an election year, candidates, jurisdictions, or a link
+to existing legislator data. The race pages need that structured data to render
+candidate cards, link to the survey, and optionally link incumbents to
+`wy_legislators`.
+
+### What it will not duplicate
+
+- **Voter data** — no voter columns. The `WY_VOTERS_DB` binding remains the
+  sole source.
+- **Response data** — no response columns. `responses` and `response_answers`
+  remain the storage layer.
+- **Legislator data** — no copy of legislator fields. A nullable
+  `wy_legislator_name` reference column links to `wy_legislators` by name plus
+  race context. For state legislative races, derive `wy_legislators.chamber`
+  from `district_type` and match `wy_legislators.district` to
+  `district_number`. Do not duplicate legislator contact info.
+- **Aggregate data** — no aggregate columns. `response_aggregates` remains the
+  reporting layer.
+
+---
+
+## Proposed Table Name
+
+**`race_candidates`**
+
+Rationale: Matches the naming style of existing tables (`wy_legislators`,
+`townhall_topics`, `survey_versions`). Short, readable, and unambiguous.
+`race_candidate_map` adds unnecessary verbosity. `election_race_candidates` is
+too long. `candidate_races` inverts the primary noun.
+
+---
+
+## Proposed Columns
+
+```sql
+CREATE TABLE IF NOT EXISTS race_candidates (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  -- Race identity
+  race_slug     TEXT NOT NULL,   -- e.g. 'us-senate-2026'; matches UI route and
+                                 --   optionally surveys.slug
+  race_title    TEXT NOT NULL,   -- e.g. 'U.S. Senate, Wyoming, 2026'
+  election_year INTEGER NOT NULL,
+  office_name   TEXT NOT NULL,   -- e.g. 'U.S. Senator'
+  race_category TEXT NOT NULL,   -- 'Federal' | 'Statewide' | 'State Legislature'
+                                 --   | 'County' | 'Local Board' | 'Judicial Retention'
+  jurisdiction  TEXT NOT NULL,   -- e.g. 'Wyoming' or county name
+  district_type TEXT,            -- 'state_house' | 'state_senate' | null for statewide
+  district_number TEXT,          -- e.g. '01'; TEXT to match wy_legislators.district
+
+  -- Candidate identity
+  candidate_name TEXT NOT NULL,
+  candidate_slug TEXT NOT NULL,  -- e.g. 'candidate-a'; used for sub-keys in poll
+  filing_status  TEXT,           -- 'declared' | 'exploratory' | 'placeholder'
+
+  -- Candidate campaign contact (nullable — placeholder until verified).
+  -- Do not populate these fields from wy_legislators contact data.
+  campaign_website TEXT,
+  public_email     TEXT,
+  public_phone     TEXT,
+
+  -- Source tracking
+  source_url   TEXT,
+  source_note  TEXT,
+
+  -- Existing data links (nullable)
+  -- Match to wy_legislators by name plus derived chamber/district context
+  wy_legislator_name TEXT,       -- denormalized name for display; do NOT copy contact info
+  -- Match to surveys.slug when this race uses the survey system for polling
+  survey_slug  TEXT REFERENCES surveys(slug),
+
+  -- Display and lifecycle
+  display_order INTEGER NOT NULL DEFAULT 0,
+  is_active     INTEGER NOT NULL DEFAULT 1,  -- 0 = retired / placeholder hidden
+  last_reviewed_at TEXT,
+  created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Columns omitted and why
+
+| Column considered | Decision |
+|-------------------|----------|
+| `legislator_id` (FK to `wy_legislators`) | `wy_legislators` has no integer PK; match by name + chamber + district at query time |
+| `candidate_statement` | Long text; belongs in the JSONC survey source or a separate content file, not in a mapping table |
+| `party` | Intentionally omitted to keep the table neutral; add only if needed for display filtering |
+| `photo_url` | Belongs in a content or asset layer, not a mapping table |
+
+---
+
+## Indexes
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_race_candidates_race_slug
+  ON race_candidates (race_slug, is_active, display_order);
+
+CREATE INDEX IF NOT EXISTS idx_race_candidates_candidate_slug
+  ON race_candidates (race_slug, candidate_slug);
+
+CREATE INDEX IF NOT EXISTS idx_race_candidates_survey_slug
+  ON race_candidates (survey_slug);
+
+CREATE INDEX IF NOT EXISTS idx_race_candidates_legislator_name
+  ON race_candidates (wy_legislator_name)
+  WHERE wy_legislator_name IS NOT NULL;
+```
+
+---
+
+## How Verified Voter Results Will Be Reported
+
+No new columns are needed. The existing mechanism is:
+
+1. `user.is_verified_voter = 1` is set when a voter match is confirmed.
+2. At submission time, `responses.verified_flag` is set to `1`.
+3. `response_aggregates` stores counts by `tier`. Tier 1 = all; Tier 2 = geo-bucketed.
+
+For the race results page, the existing `/api/results/summary` route already
+returns counts that include the `verified_flag`. The results display should
+show two numbers: total responses and verified Wyoming voter responses. The
+candidate support poll slug passed to that route is whatever `survey_slug` is
+stored in `race_candidates`.
+
+---
+
+## How Legislator Data Will Be Linked
+
+`wy_legislators` has no integer primary key. The link is soft:
+
+- `race_candidates.wy_legislator_name` stores the legislator's name from
+  `wy_legislators.name`.
+- At display time, the race page can query `wy_legislators` by `name` plus
+  race context. For state legislative races, derive `chamber` from
+  `district_type` (`state_house` -> `House`, `state_senate` -> `Senate`) and
+  match `district` to `district_number`.
+- This prevents stale denormalization: if legislator contact info changes, the
+  race card re-reads the live row.
+- Candidate campaign contact fields in `race_candidates` are for candidate or
+  campaign-provided public contact only. Do not copy `wy_legislators.phone`,
+  `wy_legislators.email`, `campaign_website`, or `official_profile_url` into
+  `race_candidates`.
+
+---
+
+## How Candidate Data Will Be Reviewed and Updated
+
+Candidate records in `race_candidates` are managed via:
+
+1. **Seed script** (preferred): Add a seeding path to
+   `scripts/seed-surveys-from-jsonc.mjs` or a new `scripts/seed-races.mjs` that
+   reads from a JSONC or JSON source file in `surveys/` or a new `races/`
+   directory.
+2. **`last_reviewed_at` column**: Update this timestamp when a human reviews
+   the record against a public source. The `source_url` and `source_note`
+   columns document where the data came from.
+3. **`is_active = 0`**: Retire placeholder rows when real candidate data is
+   available, rather than deleting them.
+
+When a race poll survey is created, also update `public/data/surveys.json` if
+the race poll should appear in existing survey browse/list surfaces. That file
+uses JSONC conventions, including a top `// public/data/surveys.json` comment,
+so scripts must strip comments before parsing rather than using raw
+`JSON.parse`.
+
+---
+
+## Local and Production Testing Notes
+
+### Apply local migration
+
+```bash
+npx wrangler d1 migrations apply wy_local --local --config wrangler.jsonc
+```
+
+### Verify table exists locally
+
+```bash
+npx wrangler d1 execute wy_local --local --config wrangler.jsonc \
+  --command "SELECT name FROM sqlite_master WHERE type='table' AND name='race_candidates';"
+```
+
+### Seed a test row locally
+
+```bash
+npx wrangler d1 execute wy_local --local --config wrangler.jsonc \
+  --command "INSERT INTO race_candidates (race_slug, race_title, election_year, office_name, race_category, jurisdiction, candidate_name, candidate_slug, filing_status, source_note, survey_slug, is_active) VALUES ('us-senate-2026', 'U.S. Senate, Wyoming, 2026', 2026, 'U.S. Senator', 'Federal', 'Wyoming', 'Candidate A', 'candidate-a', 'placeholder', 'Placeholder for layout testing', null, 1);"
+```
+
+### Check migration list before applying to production
+
+```bash
+npx wrangler d1 migrations list wy --remote --env production --config wrangler.jsonc
+```
+
+Confirm `0033_race_candidates.sql` is listed as pending before applying it.
+
+### Apply to production only after local verification
+
+```bash
+npx wrangler d1 migrations apply wy --remote --env production --config wrangler.jsonc
+```
+
+---
+
+## What Existing Data Will Be Reused
+
+| Existing system | How it is reused |
+|-----------------|-----------------|
+| `surveys` + `survey_versions` | Race poll question JSON stored here via existing seed path |
+| `responses` + `response_answers` | Poll submissions stored here with no changes |
+| `response_aggregates` + `aggregate_rollups` | Aggregate results computed here |
+| `responses.verified_flag` | Distinguishes verified Wyoming voter responses |
+| `wy_legislators` | Linked by name lookup to display incumbent contact info |
+| `WY_VOTERS_DB` / voter verification flow | Unchanged — handles voter ID matching |
+| `/api/surveys/:slug/submit` | Race poll submission uses this existing route |
+| `/api/results/summary` | Race result display uses this existing route |
+
+## What Will Not Be Duplicated
+
+- Voter data (no copy in `race_candidates`)
+- Response data (no copy in `race_candidates`)
+- Legislator contact info (read at query time from `wy_legislators`)
+- Aggregate counts (computed by existing aggregate path)
