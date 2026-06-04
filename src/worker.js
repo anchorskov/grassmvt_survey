@@ -6668,6 +6668,7 @@ export default {
            LEFT JOIN responses r
              ON r.survey_version_id = v.id
             AND r.user_id = ?
+           WHERE s.slug NOT LIKE 'race-%'
            ORDER BY s.created_at DESC`
         )
           .bind(userId)
@@ -9122,6 +9123,179 @@ export default {
       }
     }
 
+    // POST /api/candidates/preview — public (no session) candidate lookup by name+city.
+    // Returns only public race/candidate summaries — never voter_id, address, phone, or email.
+    // Voter-file match (by fn+ln+city) is primary; Census geocoder is fallback when voter
+    // match fails and a street address is provided.
+    if (
+      request.method === 'POST' &&
+      pathParts[0] === 'api' &&
+      pathParts[1] === 'candidates' &&
+      pathParts[2] === 'preview' &&
+      !pathParts[3]
+    ) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'Database not available' }, { status: 503 });
+
+        const body = await parseJsonBody(request);
+        const firstName = (body.first_name || '').trim();
+        const lastName  = (body.last_name  || '').trim();
+        const city      = (body.city       || '').trim();
+        const street    = (body.street     || '').trim();
+        const zip       = normalizeZip(body.zip || '');
+
+        if (!firstName || !lastName || !city) {
+          return jsonResponse(
+            { ok: false, error: 'first_name, last_name, and city are required.' },
+            { status: 400, headers: { 'cache-control': 'no-store' } }
+          );
+        }
+
+        // Turnstile validation (bypassed in local env via TURNSTILE_BYPASS=true)
+        if (!shouldBypassTurnstile(env)) {
+          const turnstileToken = body.turnstile_token || '';
+          const tsResult = await verifyTurnstile(turnstileToken, request, env);
+          if (!tsResult.ok) {
+            return jsonResponse(
+              { ok: false, error: tsResult.error || 'Bot check failed.' },
+              { status: 403, headers: { 'cache-control': 'no-store' } }
+            );
+          }
+        }
+
+        const fnKey   = firstName.toLowerCase();
+        const lnKey   = lastName.toLowerCase();
+        const cityKey = city.toLowerCase();
+
+        // ── Path A: Voter-file match via city_county_id join ────────────────────
+        // Join through wy_city_county so matching uses the canonical resolved city+county,
+        // not the raw voter-file city string. This avoids cross-county false matches where
+        // van.city may contain a city name that resolves to a different county (e.g. a voter
+        // physically near Powell, WY whose record resolves to Ranchester/Sheridan county).
+        let matchStatus = 'not_found';
+        let houseDist = null;
+        let senateDist = null;
+
+        if (env.WY_VOTERS_DB) {
+          const candidates = await env.WY_VOTERS_DB.prepare(
+            `SELECT van.house, van.senate, van.addr_raw
+             FROM voters_addr_norm van
+             JOIN wy_city_county wcc ON wcc.id = van.city_county_id
+             WHERE lower(van.fn) = ? AND lower(van.ln) = ? AND lower(wcc.city) = ?
+             LIMIT 10`
+          ).bind(fnKey, lnKey, cityKey).all();
+
+          const rows = candidates.results || [];
+
+          if (rows.length === 1) {
+            matchStatus = 'matched';
+            houseDist  = rows[0].house  ? String(rows[0].house)  : null;
+            senateDist = rows[0].senate ? String(rows[0].senate) : null;
+          } else if (rows.length > 1) {
+            // Try to disambiguate by street house number first
+            if (street) {
+              const houseNumMatch = street.match(/^(\d+)/);
+              const houseNum = houseNumMatch ? houseNumMatch[1] : null;
+              const narrowed = houseNum
+                ? rows.filter((r) => (r.addr_raw || '').match(/^(\d+)/)?.[1] === houseNum)
+                : [];
+              if (narrowed.length === 1) {
+                matchStatus = 'matched';
+                houseDist  = narrowed[0].house  ? String(narrowed[0].house)  : null;
+                senateDist = narrowed[0].senate ? String(narrowed[0].senate) : null;
+              } else {
+                matchStatus = 'ambiguous';
+              }
+            } else {
+              // Check whether all results agree on the same house+senate district.
+              // If so, treat as matched — the voter is in the same district regardless
+              // of which exact address they share the name with.
+              const uniqueHouse  = new Set(rows.map((r) => r.house));
+              const uniqueSenate = new Set(rows.map((r) => r.senate));
+              if (uniqueHouse.size === 1 && uniqueSenate.size === 1) {
+                matchStatus = 'matched';
+                houseDist  = rows[0].house  ? String(rows[0].house)  : null;
+                senateDist = rows[0].senate ? String(rows[0].senate) : null;
+              } else {
+                matchStatus = 'ambiguous';
+              }
+            }
+          }
+        }
+
+        // ── Path B: Census geocoder fallback ─────────────────────────────────
+        // Used when voter-file match fails and a street address is provided.
+        if (matchStatus === 'not_found' && street) {
+          try {
+            const coords = await fetchGeocodeByAddress({ street, city, state: 'WY', zip });
+            if (coords.sldl || coords.sldu) {
+              matchStatus = 'geocoded';
+              houseDist  = coords.sldl ? String(parseInt(coords.sldl, 10)) : null;
+              senateDist = coords.sldu ? String(parseInt(coords.sldu, 10)) : null;
+            }
+          } catch (_geocodeErr) {
+            // Geocoder failure is non-fatal — fall through to not_found
+          }
+        }
+
+        // ── Return early for non-match states ────────────────────────────────
+        if (matchStatus === 'ambiguous') {
+          return jsonResponse(
+            { ok: true, match_status: 'ambiguous', needs_street: true,
+              notes: ['Multiple records found. Please include your street address to narrow the match.'] },
+            { headers: { 'cache-control': 'no-store' } }
+          );
+        }
+        if (matchStatus === 'not_found') {
+          return jsonResponse(
+            { ok: true, match_status: 'not_found',
+              notes: ['No match found. Browse all Wyoming races to find candidates in your area.'] },
+            { headers: { 'cache-control': 'no-store' } }
+          );
+        }
+
+        // ── Build public race summaries ───────────────────────────────────────
+        const hd = houseDist  ? formatDistrictNumber(houseDist,  2) : null;
+        const sd = senateDist ? formatDistrictNumber(senateDist, 2) : null;
+
+        const raceRows = await env.DB.prepare(
+          `SELECT race_slug, race_title, election_year, office_name, race_category,
+                  jurisdiction, district_type, district_number,
+                  MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count
+           FROM race_candidates
+           WHERE is_active = 1
+             AND (
+               race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+               OR (district_type = 'state_house'  AND district_number = ?)
+               OR (district_type = 'state_senate' AND district_number = ?)
+             )
+           GROUP BY race_slug, race_title, election_year, office_name,
+                    race_category, jurisdiction, district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).bind(hd || '', sd || '').all();
+
+        const notes = [
+          matchStatus === 'geocoded'
+            ? 'District matched by address lookup. Voter verification provides a more accurate match.'
+            : 'Preview based on voter record. Sign in to submit poll responses.',
+          'County and local board matching is not yet available.',
+        ];
+
+        return jsonResponse({
+          ok: true,
+          match_status: matchStatus,
+          house_district:  hd,
+          senate_district: sd,
+          races: raceRows.results || [],
+          notes,
+        }, { headers: { 'cache-control': 'no-store' } });
+
+      } catch (error) {
+        console.error('[/api/candidates/preview] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
     // GET /api/races/my — races matched to the verified user's districts
     // Uses existing: getSessionUser, getAddressVerification, formatDistrictNumber
     if (
@@ -9397,15 +9571,14 @@ export default {
 
   <section id="results" class="bg-white" aria-labelledby="results-title">
     <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
-      <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Results concept</p>
-      <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Aggregate sentiment</h2>
+      <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Aggregate sentiment</p>
+      <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support results</h2>
       <p class="mb-6 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
         This is a public sentiment poll, not an election prediction.
       </p>
-      <p class="text-wy-charcoal/75">
-        Results will appear here when responses are available.
-        <a class="underline text-wy-rust" href="/surveys/results/" data-survey-link="results">View results</a>
-      </p>
+      <div id="race-results-root">
+        <p class="race-results-pending">Results will appear here when the poll is active and responses are available.</p>
+      </div>
     </div>
   </section>
 
@@ -9422,8 +9595,9 @@ export default {
   var slug = ${JSON.stringify(raceSlug)};
   function init() {
     window.RaceHub && window.RaceHub.loadRaceCandidates(slug, {
-      candidateGridId: 'candidates-grid',
-      pollContainerId: 'poll-fieldsets'
+      candidateGridId:    'candidates-grid',
+      pollContainerId:    'poll-fieldsets',
+      resultsContainerId: 'race-results-root',
     });
   }
   if (document.readyState === 'loading') {

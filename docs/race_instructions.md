@@ -391,3 +391,40 @@ Before enabling submission on any race page:
 - Use one `h1` per page; keep heading order logical
 - All form controls must have associated labels
 - All buttons and links must have clear visible text
+
+---
+
+## Find Your Candidates Flow
+
+### User-facing language
+
+The primary phrase is **"Find Your Candidates."** The primary CTA is **"Find My Candidates."** Do not revert to "Find My Races" — that language is retired.
+
+### Public browsing
+
+All races and candidate cards remain publicly visible without authentication. An account is never required to browse or preview.
+
+### Candidate preview (unauthenticated)
+
+Public users can enter their name and ZIP code on `/races/my` to receive a candidate preview without creating an account. The preview is powered by `POST /api/candidates/preview`.
+
+- **Voter-file path (primary):** Looks up `voters_addr_norm` in `WY_VOTERS_DB` using normalized first name, last name, and ZIP. If a unique match is found, `house` and `senate` district fields from the voter record are used directly.
+- **Geocoder fallback:** If no voter match is found and a street address is provided, `fetchGeocodeByAddress` (worker.js ~line 400) is called server-side. It returns `sldl` (State House) and `sldu` (State Senate) from the Census Geocoder. This is never called from client-side code.
+- **Ambiguous match:** If multiple voter records match name+ZIP, the endpoint returns `match_status: 'ambiguous'` and asks for the street address to narrow the result.
+- **Not found:** If no voter record and no geocoder match, `match_status: 'not_found'` is returned with a browse-all link.
+
+### Poll submission requires an account
+
+Submitting any candidate support poll requires a signed-in account. The existing `requireSessionUser` guard on all `/api/surveys/*/submit` routes enforces this server-side. On the client, the unauthenticated preview displays: "Sign in to submit poll responses."
+
+### Verified results
+
+After signing in, users who complete voter verification through the existing `/verify-voter` flow have `responses.verified_flag = 1`. Verified and unverified results can be reported separately via `/api/results/summary`.
+
+### Private voter data is never returned
+
+`POST /api/candidates/preview` never returns `voter_id`, `addr_raw`, phone, email, or any raw voter file field. It returns only `match_status`, `house_district`, `senate_district`, and public race/candidate summaries.
+
+### Email/text opt-in is optional and separate
+
+Email and text updates are never required for polling or verification. The opt-in note in `/races/my` is informational only.

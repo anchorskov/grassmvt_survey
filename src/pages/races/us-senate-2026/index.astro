@@ -69,12 +69,14 @@ import {
 
     <section id="results" class="bg-white" aria-labelledby="results-title">
       <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
-        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Results concept</p>
-        <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Aggregate sentiment</h2>
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Aggregate sentiment</p>
+        <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support results</h2>
         <p class="mb-8 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
           This is a public sentiment poll, not an election prediction.
         </p>
-        <p class="text-wy-charcoal/75">Results will appear here when responses are available. <a class="underline text-wy-rust" href="/surveys/results/" data-survey-link="results">View results</a></p>
+        <div id="race-results-root">
+          <p class="race-results-pending">Results will appear here when the poll is active and responses are available.</p>
+        </div>
       </div>
     </section>
   </main>

@@ -250,6 +250,48 @@ The importer leaves `survey_slug` null until matching race poll surveys are
 created and seeded into `surveys`. This avoids violating the
 `race_candidates.survey_slug` foreign key before the SurveyJS race polls exist.
 
+## Remaining Race Data Source Files
+
+Additional race source work uses ignored CSV inputs under `races/source/` and
+generated review output under `races/generated/`. These files are staging data
+for the existing `race_candidates` import path; they do not require a new
+database, migration, voter-data copy, legislator-data copy, or survey response
+table.
+
+Current source files:
+
+- `races/source/2026_WY_Primary_Election_Candidates.csv` — Wyoming Secretary
+  of State candidate roster base source for federal, statewide, and state
+  legislative candidates.
+- `races/source/wy_county_election_source_checklist.csv` — county clerk and
+  county election source-review tracker for all 23 Wyoming counties.
+- `races/source/sos_2026_offices_up_for_election.csv` — SOS race-definition
+  reference for 2026 offices up for election.
+- `races/source/sos_2026_judicial_retention.csv` — SOS judicial retention
+  candidate source file.
+- `races/source/wy_county_candidates_2026.csv` — county race candidate staging
+  file; headers only until county candidate sources are verified.
+- `races/source/wy_local_board_candidates_2026.csv` — local board candidate
+  staging file; headers only because local board candidate filing may open
+  later than statewide filing.
+
+Generated review files must keep mailing addresses out. The
+`race_candidates` table should receive only public candidate/race fields needed
+for display and polling, including race identity, candidate identity, campaign
+website, public email/phone, source traceability, display order, lifecycle
+state, optional `wy_legislator_name`, and optional `survey_slug`.
+
+County and local board candidate imports should stay in `status =
+needs_review` until the county or local source URL is verified. Judicial
+retention rows marked `needs_review` should not be imported as final display
+records until source discrepancies are resolved against the final official SOS
+retention roster.
+
+Every race source CSV should keep simple, stable headers and include
+`source_url`, `source_note`, `status`, and `last_checked` so review state is
+visible before any import. Only reviewed rows should be upserted into
+`race_candidates`.
+
 ---
 
 ## Local and Production Testing Notes
@@ -309,3 +351,74 @@ npx wrangler d1 migrations apply wy --remote --env production --config wrangler.
 - Response data (no copy in `race_candidates`)
 - Legislator contact info (read at query time from `wy_legislators`)
 - Aggregate counts (computed by existing aggregate path)
+
+---
+
+## Candidate Matching Data Flow
+
+### Overview
+
+Candidate matching runs server-side only. Two paths are supported: voter-file match (primary) and Census geocoder fallback. Both paths return only public race summaries — no voter data is passed to the browser.
+
+### Voter-file lookup path
+
+Route: `POST /api/candidates/preview`
+
+1. Accept `{ first_name, last_name, zip, street? }` from the browser.
+2. Normalize inputs (`lower(fn)`, `lower(ln)`, `zip`).
+3. Query `voters_addr_norm` in `WY_VOTERS_DB`:
+   ```sql
+   SELECT house, senate, addr_raw
+   FROM voters_addr_norm
+   WHERE lower(fn) = ? AND lower(ln) = ? AND zip = ?
+   LIMIT 10
+   ```
+4. If exactly 1 result: use `row.house` (State House district) and `row.senate` (State Senate district). Set `match_status: 'matched'`.
+5. If >1 result: check `addr_raw` against the provided street house number. If narrowed to 1: `match_status: 'matched'`. Still >1: `match_status: 'ambiguous'`.
+6. If 0 results: proceed to geocoder fallback if `street` is provided.
+
+`voters_addr_norm.house` and `voters_addr_norm.senate` are the authoritative district sources. These match the format used in `race_candidates.district_number` after zero-padding with `formatDistrictNumber`.
+
+### Geocoder fallback path
+
+Used only when voter-file matching fails and a street address is provided.
+
+Function: `fetchGeocodeByAddress({ street, city: '', state: 'WY', zip })` at worker.js ~line 400.
+
+Returns: `{ sldu, sldl }` where `sldu` = State Senate district and `sldl` = State House district.
+
+Source: [Census Geocoder](https://geocoding.geo.census.gov/geocoder/) — `geographies/address` endpoint with `2024 State Legislative Districts` vintage.
+
+`match_status: 'geocoded'` indicates the match came from the geocoder rather than the voter file. This is surfaced to the user with a note to verify their voter information for a more accurate match.
+
+### House district matching
+
+- Voter-file path: `voters_addr_norm.house` → zero-pad to 2 digits → match `race_candidates.district_number` WHERE `district_type = 'state_house'`
+- Geocoder path: `sldl` field from Census → same zero-padding and matching
+
+### Senate district matching
+
+- Voter-file path: `voters_addr_norm.senate` → zero-pad to 2 digits → match `race_candidates.district_number` WHERE `district_type = 'state_senate'`
+- Geocoder path: `sldu` field from Census → same zero-padding and matching
+
+### Statewide and federal races
+
+Always included regardless of district match. Filter: `race_category IN ('Federal', 'Statewide', 'Judicial Retention')`.
+
+### County matching
+
+Not yet implemented. `race_candidates` rows with `race_category = 'County'` are excluded from preview results until county from voter-file or geocoder is wired. Notes array returns: "County and local board matching is not yet available."
+
+### Account-only poll submission
+
+`requireSessionUser` in worker.js gates all `/api/surveys/*/submit` routes. Preview results are read-only. A "Sign in to submit poll responses" note is shown in the preview UI.
+
+### Privacy boundaries
+
+- `POST /api/candidates/preview` returns: `match_status`, `house_district`, `senate_district`, `races[]`, `notes[]`
+- Never returns: `voter_id`, `addr_raw`, full address, phone, email, or any raw voter file field
+- `GET /api/races/my` (session-based) follows the same privacy rules
+
+### Future: local board matching
+
+Local board races require a city or special district identifier not yet present in the match pipeline. When county and city fields are available from the voter file or geocoder, `race_category = 'Local Board'` rows can be included. Until then, they are excluded with a note.

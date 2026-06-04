@@ -8,7 +8,6 @@ import {
   SUPPORT_CHOICES,
   SUPPORT_QUESTION,
   RACE_POLL_QUESTIONS,
-  RESULT_ROWS,
 } from '../../../data/races.js';
 ---
 
@@ -67,25 +66,13 @@ import {
 
     <section id="results" class="bg-white" aria-labelledby="results-title">
       <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
-        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Results concept</p>
-        <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Aggregate sentiment</h2>
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Aggregate sentiment</p>
+        <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support results</h2>
         <p class="mb-8 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
           This is a public sentiment poll, not an election prediction.
         </p>
-        <div class="grid gap-5 lg:grid-cols-2">
-          {US_HOUSE_2026_CANDIDATES.map((c) => (
-            <article class="rounded-lg border border-wy-dust bg-white p-5">
-              <h3 class="mb-4 font-serif text-xl font-semibold text-wy-charcoal">{c.name}</h3>
-              <dl class="divide-y divide-wy-dust/60">
-                {RESULT_ROWS.map(([label, value]) => (
-                  <div class="grid grid-cols-[1fr_auto] gap-4 py-3">
-                    <dt class="text-wy-charcoal/75">{label}</dt>
-                    <dd class="font-semibold text-wy-charcoal">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </article>
-          ))}
+        <div id="race-results-root">
+          <p class="race-results-pending">Results will appear here when the poll is active and responses are available.</p>
         </div>
       </div>
     </section>
