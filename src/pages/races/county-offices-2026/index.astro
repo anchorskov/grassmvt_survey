@@ -34,7 +34,7 @@ import {
         <p class="mb-8 max-w-3xl text-wy-charcoal/75">
           Candidate information will be organized by county and office after verified public-source review. Each county and office will have its own candidate support poll once candidates are confirmed.
         </p>
-        <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3" id="county-grid">
           {COUNTY_OFFICES_2026_CARDS.map((c) => (
             <CandidateCard
               name={c.name}
@@ -78,3 +78,39 @@ import {
     </section>
   </main>
 </BaseLayout>
+
+<script is:inline src="/js/races.js"></script>
+<script>
+(function () {
+  async function loadCountyRaces() {
+    const grid = document.getElementById('county-grid');
+    if (!grid) return;
+    let data;
+    try {
+      const res = await fetch('/api/races');
+      if (!res.ok) return;
+      data = await res.json();
+    } catch (_e) { return; }
+    const races = (data.races || []).filter(function (r) {
+      return r.race_category === 'County';
+    });
+    if (races.length === 0) return;
+    function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    grid.innerHTML = races.map(function (r) {
+      const count = r.candidate_count === 1 ? '1 candidate' : r.candidate_count + ' candidates';
+      return (
+        '<article class="rounded-lg border border-wy-dust bg-wy-bone/40 p-5">' +
+        '<h3 class="mb-2 font-serif text-lg font-semibold text-wy-charcoal">' + escH(r.race_title) + '</h3>' +
+        '<p class="mb-3 text-sm text-wy-charcoal/70">' + escH(count) + '</p>' +
+        '<a class="button button--secondary text-sm" href="/races/' + encodeURIComponent(r.race_slug) + '">View race</a>' +
+        '</article>'
+      );
+    }).join('');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadCountyRaces);
+  } else {
+    loadCountyRaces();
+  }
+})();
+</script>

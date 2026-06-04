@@ -2,7 +2,7 @@
 {
   "source_file": "races/source/2026_WY_Primary_Election_Candidates.csv",
   "source_url": "https://sos.wyo.gov/Elections/2026ElectionInformation.aspx",
-  "generated_at": "2026-06-04T15:05:44.032Z",
+  "generated_at": "2026-06-04T15:23:22.439Z",
   "note": "Transformed SOS candidate rows for review. Mailing address fields are intentionally omitted.",
   "summary": {
     "totalRowsRead": 203,

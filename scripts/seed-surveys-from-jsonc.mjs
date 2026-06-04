@@ -139,6 +139,22 @@ const surveySources = {
     file: 'surveys/surveys_security_feedback_v1.jsonc',
     scope: 'public',
   },
+  // Race polls — linked to race_candidates via survey_slug
+  'race-us-senate-2026-v1': {
+    slug: 'race-us-senate-2026',
+    file: 'surveys/race_us-senate-2026_v1.jsonc',
+    scope: 'wy',
+  },
+  'race-us-house-2026-v1': {
+    slug: 'race-us-house-2026',
+    file: 'surveys/race_us-house-2026_v1.jsonc',
+    scope: 'wy',
+  },
+  'race-governor-2026-v1': {
+    slug: 'race-governor-2026',
+    file: 'surveys/race_governor-2026_v1.jsonc',
+    scope: 'wy',
+  },
 };
 
 const parseArgs = (argv) => {

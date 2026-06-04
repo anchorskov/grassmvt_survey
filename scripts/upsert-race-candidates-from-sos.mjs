@@ -408,8 +408,9 @@ const legislatorExpression = (row) => {
   return `(SELECT name FROM wy_legislators WHERE lower(name) = lower(${sqlValue(row.candidate_name)}) AND chamber = ${sqlValue(chamber)} AND district = ${sqlValue(row.district_number)} LIMIT 1)`;
 };
 
-const buildSql = (rows) => {
-  let sql = '-- scripts/upsert-race-candidates-from-sos.mjs generated SQL\nBEGIN TRANSACTION;\n';
+const buildSql = (rows, { useTransaction = true } = {}) => {
+  let sql = '-- scripts/upsert-race-candidates-from-sos.mjs generated SQL\n';
+  if (useTransaction) sql += 'BEGIN TRANSACTION;\n';
   rows.forEach((row) => {
     const legislator = legislatorExpression(row);
     sql += `
@@ -493,7 +494,7 @@ WHERE NOT EXISTS (
 );
 `;
   });
-  sql += '\nCOMMIT;\n';
+  if (useTransaction) sql += '\nCOMMIT;\n';
   return sql;
 };
 
@@ -568,7 +569,7 @@ const main = () => {
   }
 
   console.log(`Applying upsert to ${dbTarget} D1...`);
-  runWranglerSql({ dbTarget, sql: buildSql(rows) });
+  runWranglerSql({ dbTarget, sql: buildSql(rows, { useTransaction: dbTarget === 'local' }) });
   console.log('Race candidate upsert complete.');
 };
 
