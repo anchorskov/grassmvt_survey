@@ -182,6 +182,54 @@ candidate cards.
 
 ---
 
+## User-Centered Race Flow
+
+This section documents how the user-centered "My Races" flow works.
+
+### Flow overview
+
+1. A citizen visits `/races`. The hero asks them to **Find My Races** or browse all races.
+2. **Find My Races** links to `/races/my` — a static page that fetches `/api/races/my` via client-side JS.
+3. **Browse All Wyoming Races** scrolls to the `#browse-all` section on the same page.
+
+### /api/races/my — race filtering logic
+
+`GET /api/races/my` uses existing Worker helpers with no new auth code:
+- `getSessionUser(request, env)` — reads the existing session cookie
+- `getAddressVerification(env.DB, user.id)` — reads `user_address_verification.state_house_dist` and `state_senate_dist`
+- `formatDistrictNumber(value, 2)` — zero-pads the district number to match `race_candidates.district_number`
+
+**Filtering rules by verification state:**
+
+| State | Races returned |
+|---|---|
+| Not authenticated | Empty list + sign-in note |
+| Authenticated, not verified | Federal + Statewide + Judicial Retention only |
+| Verified | Federal + Statewide + Judicial Retention + matched House district + matched Senate district |
+
+**What is deferred:** County and local board races require a county field in `user_address_verification` that does not yet exist. These are excluded and a note is returned in the `notes` array.
+
+### District number matching
+
+`user_address_verification.state_house_dist` and `state_senate_dist` are stored as raw integer strings (e.g., `"5"`, `"57"`). `race_candidates.district_number` is zero-padded two-digit text (e.g., `"05"`, `"57"`). The API uses `formatDistrictNumber(value, 2)` — already in use at line 5637 of `src/worker.js` for geo-context matching — before comparing.
+
+### Privacy rules
+
+- `/api/races/my` never exposes voter ID, address, phone, email, or any raw field from `user_address_verification`.
+- Only the derived district labels (`house_district`, `senate_district`) are returned, and only after verification.
+- Public race fields and candidate counts are all that is returned.
+
+### Hub card behavior
+
+- Cards with a real `raceSlug` (individual pollable races): show "Take Poll", "View Candidates", "View Results".
+- Cards with `raceSlug: null` (group/category pages): show "Browse Races" only — no poll link. These pages do not have a single poll.
+
+### Email and text opt-in
+
+Email and text updates are optional and separate from verification. `/races/my` shows an informational note; there is no opt-in form. Participation in polling must never require opting in to campaign or movement messages.
+
+---
+
 ## Dynamic Race Data Method
 
 This section documents how race cards and candidate cards load live data from `race_candidates`.

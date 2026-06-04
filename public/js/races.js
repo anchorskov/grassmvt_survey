@@ -127,4 +127,102 @@ async function loadRaceCandidates(raceSlug, opts) {
   }
 }
 
-window.RaceHub = { enrichHubCards, loadRaceCandidates };
+/* ── My Races loader ─────────────────────────────────────────────────────── */
+// Fetches /api/races/my and renders into containerId.
+// /api/races/my uses the existing session cookie — no extra auth needed.
+// District data comes from existing getSessionUser + getAddressVerification
+// server-side (same helpers used by /api/auth/me and geo-context routes).
+
+const CATEGORY_ORDER = ['Federal', 'Statewide', 'State Legislature', 'Judicial Retention', 'County', 'Local Board'];
+
+const raceCardHtml = (race) => {
+  const pollBtn = race.survey_slug
+    ? `<a class="button button--primary" href="/surveys/${encodeURIComponent(race.survey_slug)}">Take Poll</a>`
+    : `<span class="inline-block rounded-md border border-wy-dust bg-wy-bone px-3 py-2 text-sm font-semibold text-wy-charcoal/60">Poll coming soon</span>`;
+  const viewBtn = `<a class="button button--secondary" href="/races/${encodeURIComponent(race.race_slug)}#candidates">View Candidates</a>`;
+  const resultBtn = race.survey_slug
+    ? `<a class="button button--secondary" href="/surveys/results/?slug=${encodeURIComponent(race.survey_slug)}">View Results</a>`
+    : '';
+  const count = race.candidate_count === 1 ? '1 candidate' : `${race.candidate_count} candidates`;
+  return `<article class="rounded-lg border border-wy-dust bg-white p-5">
+  <p class="mb-2 text-xs font-bold uppercase tracking-widest text-wy-rust">${escH(race.race_category)}</p>
+  <h3 class="mb-3 font-serif text-xl font-semibold leading-snug text-wy-charcoal">${escH(race.race_title)}</h3>
+  <p class="mb-4 text-sm text-wy-charcoal/60">${escH(count)}</p>
+  <div class="flex flex-wrap gap-2">${pollBtn} ${viewBtn} ${resultBtn}</div>
+</article>`;
+};
+
+async function loadMyRaces(containerId) {
+  const root = document.getElementById(containerId);
+  if (!root) return;
+
+  let data;
+  try {
+    const res = await fetch('/api/races/my', { credentials: 'include', cache: 'no-store' });
+    if (!res.ok) throw new Error('API error');
+    data = await res.json();
+  } catch (_e) {
+    root.innerHTML = '<p class="text-wy-charcoal/75">Unable to load races. Please try again.</p>';
+    return;
+  }
+
+  if (!data.authenticated) {
+    root.innerHTML = `<div class="rounded-lg border border-wy-dust bg-wy-bone p-6 max-w-lg">
+      <p class="font-semibold text-wy-charcoal mb-3">Sign in to find your races</p>
+      <p class="text-wy-charcoal/75 mb-4 text-sm">Create an account or sign in, then verify your Wyoming voter information to see races connected to your voting area.</p>
+      <button class="button button--primary" type="button" data-auth-open>Sign in or create account</button>
+    </div>`;
+    return;
+  }
+
+  if (!data.verified) {
+    const statewideHtml = (data.races || []).map(raceCardHtml).join('');
+    root.innerHTML = `<div class="mb-8 rounded-lg border border-wy-amber-300 bg-amber-50 p-5 max-w-lg">
+      <p class="font-semibold text-wy-charcoal mb-2">Verify to see your district races</p>
+      <p class="text-wy-charcoal/75 mb-4 text-sm">Your voter information hasn't been verified yet. Statewide races are shown below. Verify to also see your State House and Senate district races.</p>
+      <a class="button button--primary" href="/verify-voter">Verify voter information</a>
+    </div>
+    <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Statewide races</p>
+    <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">${statewideHtml}</div>`;
+    return;
+  }
+
+  // Verified — group races by category in display order
+  const races = data.races || [];
+  const grouped = {};
+  CATEGORY_ORDER.forEach((cat) => { grouped[cat] = []; });
+  races.forEach((r) => {
+    if (grouped[r.race_category]) grouped[r.race_category].push(r);
+    else grouped[r.race_category] = [r];
+  });
+
+  let html = '';
+  // Show district label at top
+  const distLabel = [
+    data.house_district ? `HD-${parseInt(data.house_district, 10)}` : null,
+    data.senate_district ? `SD-${parseInt(data.senate_district, 10)}` : null,
+  ].filter(Boolean).join(' • ');
+  if (distLabel) {
+    html += `<p class="mb-8 text-sm text-wy-charcoal/60">Showing races for your verified voting area: <strong class="text-wy-charcoal">${escH(distLabel)}</strong></p>`;
+  }
+
+  CATEGORY_ORDER.forEach((cat) => {
+    const catRaces = grouped[cat] || [];
+    if (catRaces.length === 0) return;
+    html += `<div class="mb-10">
+      <p class="mb-4 text-sm font-semibold uppercase tracking-widest text-wy-rust">${escH(cat)}</p>
+      <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">${catRaces.map(raceCardHtml).join('')}</div>
+    </div>`;
+  });
+
+  // Deferred notes
+  if (data.notes && data.notes.length) {
+    html += `<div class="mt-4 rounded-md border border-wy-dust bg-wy-bone px-4 py-3 text-sm text-wy-charcoal/75">
+      ${data.notes.map((n) => `<p>${escH(n)}</p>`).join('')}
+    </div>`;
+  }
+
+  root.innerHTML = html;
+}
+
+window.RaceHub = { enrichHubCards, loadRaceCandidates, loadMyRaces };

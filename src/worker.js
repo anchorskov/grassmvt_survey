@@ -9044,6 +9044,97 @@ export default {
       }
     }
 
+    // GET /api/races/my — races matched to the verified user's districts
+    // Uses existing: getSessionUser, getAddressVerification, formatDistrictNumber
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'api' &&
+      pathParts[1] === 'races' &&
+      pathParts[2] === 'my' &&
+      !pathParts[3]
+    ) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'Database not available' }, { status: 503 });
+
+        const sessionResult = await getSessionUser(request, env);
+        if (sessionResult.status !== 'valid') {
+          return jsonResponse({
+            authenticated: false,
+            verified: false,
+            races: [],
+            notes: ['Sign in and verify your Wyoming voter information to see your races.'],
+          });
+        }
+
+        const user = sessionResult.user;
+        const addressVerification = await getAddressVerification(env.DB, user.id);
+        const isVerified = Number(user.is_verified_voter || 0) === 1 && !!addressVerification?.verified_at;
+
+        const statewideQ = `
+          SELECT race_slug, race_title, election_year, office_name, race_category,
+                 jurisdiction, district_type, district_number,
+                 MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count,
+                 MAX(last_reviewed_at) AS last_reviewed_at
+          FROM race_candidates
+          WHERE is_active = 1
+            AND race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+          GROUP BY race_slug, race_title, election_year, office_name,
+                   race_category, jurisdiction, district_type, district_number
+          ORDER BY race_category, office_name`;
+
+        if (!isVerified) {
+          const rows = await env.DB.prepare(statewideQ).all();
+          return jsonResponse({
+            authenticated: true,
+            verified: false,
+            house_district: null,
+            senate_district: null,
+            races: rows.results,
+            notes: ['Verify your voter information to see your legislative district races.'],
+          });
+        }
+
+        // formatDistrictNumber already exists in this file — reuse it directly
+        const hd = addressVerification.state_house_dist
+          ? formatDistrictNumber(addressVerification.state_house_dist, 2)
+          : null;
+        const sd = addressVerification.state_senate_dist
+          ? formatDistrictNumber(addressVerification.state_senate_dist, 2)
+          : null;
+
+        const rows = await env.DB.prepare(
+          `SELECT race_slug, race_title, election_year, office_name, race_category,
+                  jurisdiction, district_type, district_number,
+                  MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count,
+                  MAX(last_reviewed_at) AS last_reviewed_at
+           FROM race_candidates
+           WHERE is_active = 1
+             AND (
+               race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+               OR (district_type = 'state_house' AND district_number = ?)
+               OR (district_type = 'state_senate' AND district_number = ?)
+             )
+           GROUP BY race_slug, race_title, election_year, office_name,
+                    race_category, jurisdiction, district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).bind(hd || '', sd || '').all();
+
+        return jsonResponse({
+          authenticated: true,
+          verified: true,
+          house_district: hd,
+          senate_district: sd,
+          races: rows.results,
+          notes: [
+            'County and local board race matching is not yet available. Browse all races to see county and local board options.',
+          ],
+        });
+      } catch (error) {
+        console.error('[/api/races/my] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
     // GET /api/races — active race summaries grouped by race_slug
     if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'races' && !pathParts[2]) {
       try {
