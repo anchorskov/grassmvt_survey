@@ -1,0 +1,80 @@
+---
+// src/pages/races/state-legislature-2026/index.astro
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import CandidateCard from '../../../components/races/CandidateCard.astro';
+import SupportPollPreview from '../../../components/races/SupportPollPreview.astro';
+import {
+  STATE_LEGISLATURE_2026_CARDS,
+  SUPPORT_CHOICES,
+  SUPPORT_QUESTION,
+  RACE_POLL_QUESTIONS,
+} from '../../../data/races.js';
+---
+
+<BaseLayout title="Wyoming State Legislature, 2026 | Grassroots Movement" description="Review district information and share public sentiment for Wyoming's 2026 State House and State Senate races.">
+  <main>
+    <section class="bg-wy-charcoal text-white" aria-labelledby="race-title">
+      <div class="mx-auto max-w-5xl px-6 py-16 md:py-20">
+        <p class="mb-3 text-xs font-bold uppercase tracking-widest text-wy-sandstone">State legislature</p>
+        <h1 id="race-title" class="mb-5 font-serif text-4xl font-bold leading-tight md:text-5xl">Wyoming State Legislature, 2026</h1>
+        <p class="mb-8 max-w-3xl text-lg leading-relaxed text-white/85">
+          Wyoming has 60 State House districts and 30 State Senate districts. This page will gather public input for each district race as candidates are confirmed. Sample district cards are shown below.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <a class="button button--primary" href="#support-poll">View Poll Preview</a>
+          <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#candidates">Review District Cards</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="candidates" class="bg-white" aria-labelledby="districts-title">
+      <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">District information</p>
+        <h2 id="districts-title" class="mb-3 font-serif text-3xl font-bold text-wy-charcoal">District cards</h2>
+        <p class="mb-8 max-w-3xl text-wy-charcoal/75">
+          Sample district cards are shown below. All 60 House and 30 Senate districts will be added as candidates are confirmed from verified public sources.
+        </p>
+        <div class="grid gap-5 md:grid-cols-2">
+          {STATE_LEGISLATURE_2026_CARDS.map((c) => (
+            <CandidateCard
+              name={c.name}
+              office={c.office}
+              status={c.status}
+              statement={c.statement}
+              sourceNote={c.sourceNote}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="support-poll" class="bg-wy-bone" aria-labelledby="poll-title">
+      <div class="mx-auto max-w-5xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Poll preview</p>
+        <h2 id="poll-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support poll</h2>
+        <p class="mb-8 max-w-3xl text-wy-charcoal/75">
+          Candidate support polls will be available here by district once candidates are confirmed. Each poll will use the standard support question and answer scale.
+        </p>
+        <SupportPollPreview
+          candidates={[]}
+          choices={SUPPORT_CHOICES}
+          questionText={SUPPORT_QUESTION}
+          pollQuestions={RACE_POLL_QUESTIONS}
+        />
+      </div>
+    </section>
+
+    <section id="results" class="bg-white" aria-labelledby="results-title">
+      <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Results concept</p>
+        <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Aggregate sentiment</h2>
+        <p class="mb-4 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
+          This is a public sentiment poll, not an election prediction.
+        </p>
+        <p class="text-wy-charcoal/75">
+          Aggregate results will be displayed here by district and candidate once polls are active and candidates are confirmed.
+        </p>
+      </div>
+    </section>
+  </main>
+</BaseLayout>

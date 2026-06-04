@@ -1,0 +1,100 @@
+---
+// src/pages/races/judicial-retention-2026/index.astro
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import CandidateCard from '../../../components/races/CandidateCard.astro';
+import SupportPollPreview from '../../../components/races/SupportPollPreview.astro';
+import {
+  JUDICIAL_RETENTION_2026_PERSONS,
+  RETENTION_CHOICES,
+  RETENTION_QUESTION,
+  RACE_POLL_QUESTIONS,
+  RETENTION_RESULT_ROWS,
+} from '../../../data/races.js';
+---
+
+<BaseLayout title="Wyoming Judicial Retention, 2026 | Grassroots Movement" description="Review justice and judge information and share public sentiment on judicial retention for Wyoming's 2026 ballot.">
+  <main>
+    <section class="bg-wy-charcoal text-white" aria-labelledby="race-title">
+      <div class="mx-auto max-w-5xl px-6 py-16 md:py-20">
+        <p class="mb-3 text-xs font-bold uppercase tracking-widest text-wy-sandstone">Judicial retention</p>
+        <h1 id="race-title" class="mb-5 font-serif text-4xl font-bold leading-tight md:text-5xl">Wyoming Judicial Retention, 2026</h1>
+        <p class="mb-8 max-w-3xl text-lg leading-relaxed text-white/85">
+          Judicial retention polls collect public sentiment on whether a justice or judge should continue to serve. This is not a standard candidate election. Citizens indicate whether they support or oppose retaining each person on the bench.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <a class="button button--primary" href="#support-poll">Take the Retention Poll</a>
+          <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#candidates">Review Justice Info</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white" aria-labelledby="retention-explainer-title">
+      <div class="mx-auto max-w-5xl px-6 py-12 md:py-14">
+        <h2 id="retention-explainer-title" class="mb-4 font-serif text-2xl font-bold text-wy-charcoal">How judicial retention works</h2>
+        <p class="max-w-3xl text-lg leading-relaxed text-wy-charcoal/80">
+          Wyoming justices and judges are appointed, then face periodic retention votes. A retention poll asks: should this person continue to serve? Citizens vote yes or no. GrassrootsMVT gathers public input through the same aggregate reporting approach used for candidate races. Individual responses are never published.
+        </p>
+      </div>
+    </section>
+
+    <section id="candidates" class="bg-wy-bone" aria-labelledby="persons-title">
+      <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Justice and judge information</p>
+        <h2 id="persons-title" class="mb-3 font-serif text-3xl font-bold text-wy-charcoal">Retention cards</h2>
+        <p class="mb-8 max-w-3xl text-wy-charcoal/75">
+          Person details will be added after verified public-source review. Retention cards use the same layout as candidate cards.
+        </p>
+        <div class="grid gap-5 lg:grid-cols-2">
+          {JUDICIAL_RETENTION_2026_PERSONS.map((p) => (
+            <CandidateCard
+              name={p.name}
+              office={p.office}
+              status={p.status}
+              statement={p.statement}
+              sourceNote={p.sourceNote}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="support-poll" class="bg-white" aria-labelledby="poll-title">
+      <div class="mx-auto max-w-5xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Poll preview</p>
+        <h2 id="poll-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Retention poll</h2>
+        <p class="mb-8 max-w-3xl text-wy-charcoal/75">This preview shows the retention poll structure. Responses are not submitted yet.</p>
+        <SupportPollPreview
+          candidates={JUDICIAL_RETENTION_2026_PERSONS.map((p) => ({ name: p.name, slug: p.slug }))}
+          choices={RETENTION_CHOICES}
+          questionText={RETENTION_QUESTION}
+          pollQuestions={RACE_POLL_QUESTIONS}
+        />
+      </div>
+    </section>
+
+    <section id="results" class="bg-wy-bone" aria-labelledby="results-title">
+      <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Results concept</p>
+        <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Aggregate sentiment</h2>
+        <p class="mb-8 inline-block rounded-md border border-wy-dust bg-white px-4 py-3 font-semibold text-wy-charcoal">
+          This is a public sentiment poll, not an election prediction.
+        </p>
+        <div class="grid gap-5 lg:grid-cols-2">
+          {JUDICIAL_RETENTION_2026_PERSONS.map((p) => (
+            <article class="rounded-lg border border-wy-dust bg-white p-5">
+              <h3 class="mb-4 font-serif text-xl font-semibold text-wy-charcoal">{p.name}</h3>
+              <dl class="divide-y divide-wy-dust/60">
+                {RETENTION_RESULT_ROWS.map(([label, value]) => (
+                  <div class="grid grid-cols-[1fr_auto] gap-4 py-3">
+                    <dt class="text-wy-charcoal/75">{label}</dt>
+                    <dd class="font-semibold text-wy-charcoal">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+</BaseLayout>

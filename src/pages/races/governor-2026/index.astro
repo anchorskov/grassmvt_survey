@@ -1,10 +1,10 @@
 ---
-// src/pages/races/us-senate-2026/index.astro
+// src/pages/races/governor-2026/index.astro
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import CandidateCard from '../../../components/races/CandidateCard.astro';
 import SupportPollPreview from '../../../components/races/SupportPollPreview.astro';
 import {
-  US_SENATE_2026_CANDIDATES,
+  GOVERNOR_2026_CANDIDATES,
   SUPPORT_CHOICES,
   SUPPORT_QUESTION,
   RACE_POLL_QUESTIONS,
@@ -12,14 +12,14 @@ import {
 } from '../../../data/races.js';
 ---
 
-<BaseLayout title="U.S. Senate, Wyoming, 2026 | Grassroots Movement" description="Review candidate information and preview the public sentiment poll for the U.S. Senate race in Wyoming.">
+<BaseLayout title="Governor, Wyoming, 2026 | Grassroots Movement" description="Review candidate information and share public sentiment for the Wyoming gubernatorial race in 2026.">
   <main>
     <section class="bg-wy-charcoal text-white" aria-labelledby="race-title">
       <div class="mx-auto max-w-5xl px-6 py-16 md:py-20">
-        <p class="mb-3 text-xs font-bold uppercase tracking-widest text-wy-sandstone">Federal race</p>
-        <h1 id="race-title" class="mb-5 font-serif text-4xl font-bold leading-tight md:text-5xl">U.S. Senate, Wyoming, 2026</h1>
+        <p class="mb-3 text-xs font-bold uppercase tracking-widest text-wy-sandstone">Statewide race</p>
+        <h1 id="race-title" class="mb-5 font-serif text-4xl font-bold leading-tight md:text-5xl">Governor, Wyoming, 2026</h1>
         <p class="mb-8 max-w-3xl text-lg leading-relaxed text-white/85">
-          This page gathers public input for this race. Citizens can review candidate information, answer a short support poll, and see aggregate sentiment as the race develops.
+          This page gathers public input for the Wyoming gubernatorial race. Citizens can review candidate information, take a short support poll, and see aggregate sentiment as the race develops.
         </p>
         <div class="flex flex-wrap gap-3">
           <a class="button button--primary" href="#support-poll">Take the Candidate Support Poll</a>
@@ -32,8 +32,8 @@ import {
       <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
         <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Candidate information</p>
         <h2 id="candidates-title" class="mb-8 font-serif text-3xl font-bold text-wy-charcoal">Candidate cards</h2>
-        <div class="grid gap-5 lg:grid-cols-3">
-          {US_SENATE_2026_CANDIDATES.map((c) => (
+        <div class="grid gap-5 lg:grid-cols-2">
+          {GOVERNOR_2026_CANDIDATES.map((c) => (
             <CandidateCard
               name={c.name}
               office={c.office}
@@ -54,7 +54,7 @@ import {
         <h2 id="poll-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support poll</h2>
         <p class="mb-8 max-w-3xl text-wy-charcoal/75">This preview shows the poll structure. Responses are not submitted yet.</p>
         <SupportPollPreview
-          candidates={US_SENATE_2026_CANDIDATES.map((c) => ({ name: c.name, slug: c.slug }))}
+          candidates={GOVERNOR_2026_CANDIDATES.map((c) => ({ name: c.name, slug: c.slug }))}
           choices={SUPPORT_CHOICES}
           questionText={SUPPORT_QUESTION}
           pollQuestions={RACE_POLL_QUESTIONS}
@@ -69,8 +69,8 @@ import {
         <p class="mb-8 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
           This is a public sentiment poll, not an election prediction.
         </p>
-        <div class="grid gap-5 lg:grid-cols-3">
-          {US_SENATE_2026_CANDIDATES.map((c) => (
+        <div class="grid gap-5 lg:grid-cols-2">
+          {GOVERNOR_2026_CANDIDATES.map((c) => (
             <article class="rounded-lg border border-wy-dust bg-white p-5">
               <h3 class="mb-4 font-serif text-xl font-semibold text-wy-charcoal">{c.name}</h3>
               <dl class="divide-y divide-wy-dust/60">

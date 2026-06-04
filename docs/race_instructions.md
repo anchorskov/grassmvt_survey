@@ -136,6 +136,11 @@ bindings.
   `wy_legislators`, not copied.
 - **Voter data**: The `WY_VOTERS_DB` binding and existing verification flow are
   unchanged.
+- **SOS candidate import**: Candidate rows can be seeded from the Wyoming
+  Secretary of State roster with
+  `scripts/upsert-race-candidates-from-sos.mjs`. Raw CSV files live under the
+  ignored `races/source/` folder, and the generated review file omits mailing
+  addresses.
 
 ### Race page data loading pattern
 
@@ -169,3 +174,95 @@ candidate cards.
 - Keep candidate cards and support scales consistent across races.
 - Do not add dependencies unless an existing dependency clearly fits the task.
 - If database submission is added later, verify privacy, aggregate reporting, and voter verification behavior before release.
+
+---
+
+## Race Page Build Method
+
+This section documents how race pages are built so future agents can follow the same pattern consistently.
+
+### Reference template
+
+Use `/races/us-senate-2026` as the primary template for all single-race pages. For group pages (covering multiple offices or districts), use `/races/statewide-offices-2026` as the secondary template.
+
+### Shared components and data
+
+All race pages import from two shared locations:
+
+- `src/data/races.js` — placeholder candidate data, support choices, retention choices, poll questions, result rows
+- `src/components/races/CandidateCard.astro` — renders one candidate or office card
+- `src/components/races/SupportPollPreview.astro` — renders the support poll fieldsets and race-level questions
+
+When real candidate data is available from `race_candidates`, replace the static imports with a Worker API fetch at build time or render time.
+
+### Required support question and answer scale
+
+Every candidate race page must use this exact question:
+
+> "Based on what you know today, do you support this candidate for this office?"
+
+Required answer choices (same order on every page):
+1. Strongly support
+2. Lean support
+3. Neutral or undecided
+4. Lean oppose
+5. Strongly oppose
+6. I need more information
+7. I am unfamiliar with this candidate
+
+**Judicial retention exception:** Use the adapted question "Based on what you know today, do you support retaining this person in this role?" with `RETENTION_CHOICES` from `src/data/races.js`. Do not use the standard candidate choices on retention pages.
+
+### Required page sections (in order)
+
+Every race page must include these sections with these anchor IDs:
+
+1. Hero — race title, short purpose text, CTAs linking to `#support-poll` and `#candidates`
+2. `id="candidates"` — candidate or office cards using `CandidateCard`
+3. `id="support-poll"` — poll preview using `SupportPollPreview`
+4. `id="results"` — aggregate sentiment display or placeholder note
+
+Always include this label in the results section:
+
+> "This is a public sentiment poll, not an election prediction."
+
+### Group pages
+
+Pages covering multiple offices or districts (statewide offices, state legislature, county offices, local boards) use office-level cards in the candidates section rather than named candidate cards. For these pages:
+
+- Pass an empty array to `SupportPollPreview` — the component displays a "polls coming soon" note
+- Show the race-level questions fieldset so citizens can still provide issue input
+- Explain in the results section that results will appear by office or district once candidates are confirmed
+
+### Candidate data lifecycle
+
+Placeholder data lives in `src/data/races.js`. Real candidate data will come from `race_candidates` via the Worker API. When wiring up live data:
+
+1. Query `race_candidates WHERE race_slug = ? AND is_active = 1 ORDER BY display_order` from `DB`
+2. If `survey_slug` is set, use `/api/results/summary?slug=<survey_slug>` for aggregate results
+3. Use `/api/surveys/<survey_slug>/submit` for poll submission
+4. For incumbent state legislative candidates, join to `wy_legislators` by name and district
+
+### Data and privacy rules
+
+- Never expose `race_candidates.id`, internal `user_id` values, or individual response records
+- Do not copy legislator contact fields from `wy_legislators` into `race_candidates`; read them live
+- Report results as aggregate only — never show individual responses
+- Always label results as public sentiment, not an election prediction
+
+### Wiring live poll submission
+
+Before enabling submission on any race page:
+1. Create the SurveyJS JSONC race poll source file under `surveys/` or `races/`
+2. Seed it into D1 using the existing seed script path
+3. Connect the form `action` to `/api/surveys/<survey_slug>/submit`
+4. Verify Turnstile and auth behavior match the existing survey submission flow
+5. Confirm `responses.verified_flag` is set correctly for verified Wyoming voters
+
+### File conventions
+
+- Add a top-of-file path comment (`// src/pages/races/...`) to every new or modified file
+- No inline CSS
+- All asset paths are absolute (`/css/site.css`, not `../css/site.css`)
+- Use one `h1` per page; keep heading order logical
+- All form controls must have associated labels
+- All buttons and links must have clear visible text
