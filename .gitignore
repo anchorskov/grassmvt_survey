@@ -19,5 +19,6 @@ wrangler/.wrangler/
 Thumbs.db
 docs
 races/source/
+races/generated/legislative_polls_seed.sql
 scripts/admin_create_verified_user.sh
 .codex

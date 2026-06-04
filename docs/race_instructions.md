@@ -141,6 +141,11 @@ bindings.
   `scripts/upsert-race-candidates-from-sos.mjs`. Raw CSV files live under the
   ignored `races/source/` folder, and the generated review file omits mailing
   addresses.
+- **Race source files**: Race data source files live in `races/source`.
+  Generated review files live in `races/generated`. The `race_candidates` table
+  should only receive public candidate/race fields needed for display and
+  polling. Mailing addresses stay out of generated files and out of the
+  database.
 
 ### Race page data loading pattern
 
@@ -180,6 +185,10 @@ candidate cards.
 ## Dynamic Race Data Method
 
 This section documents how race cards and candidate cards load live data from `race_candidates`.
+
+### Town Hall topics
+
+Race polls use `skipTownhall: true` in their `surveySources` entry. The seed script skips Town Hall topic creation for race polls. Race polls are candidate support polls, not community issue discussions. If a future race type needs a discussion topic, remove `skipTownhall` from that entry.
 
 ### Data source
 
@@ -248,6 +257,10 @@ This section documents how race pages are built so future agents can follow the 
 ### Reference template
 
 Use `/races/us-senate-2026` as the primary template for all single-race pages. For group pages (covering multiple offices or districts), use `/races/statewide-offices-2026` as the secondary template.
+
+### Legislative district polls
+
+State legislative district polls are generated and seeded programmatically by `scripts/seed-legislative-polls.mjs`, not by individual JSONC files. Read that script for the poll structure. To add or refresh district polls, run the script with `--dry-run` first, then `--apply`. The script reads from `races/generated/2026_sos_race_candidates.jsonc` and skips withdrawn candidates. It does not create Town Hall topics.
 
 ### Shared components and data
 
