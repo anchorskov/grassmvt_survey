@@ -152,13 +152,18 @@ const raceCardHtml = (race) => {
 </article>`;
 };
 
-async function loadMyRaces(containerId) {
+async function loadMyRaces(containerId, opts) {
   const root = document.getElementById(containerId);
   if (!root) return;
 
+  // Build API URL — forward dev bypass params when present (local only)
+  const apiUrl = new URL('/api/races/my', window.location.origin);
+  if (opts && opts.devHouse) apiUrl.searchParams.set('_dev_house', opts.devHouse);
+  if (opts && opts.devSenate) apiUrl.searchParams.set('_dev_senate', opts.devSenate);
+
   let data;
   try {
-    const res = await fetch('/api/races/my', { credentials: 'include', cache: 'no-store' });
+    const res = await fetch(apiUrl.toString(), { credentials: 'include', cache: 'no-store' });
     if (!res.ok) throw new Error('API error');
     data = await res.json();
   } catch (_e) {

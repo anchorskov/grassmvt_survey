@@ -8974,6 +8974,84 @@ export default {
       }
     }
 
+    // GET /api/admin/races/overview — race coverage: candidate counts and poll seeding status
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'api' && pathParts[1] === 'admin' &&
+      pathParts[2] === 'races' && pathParts[3] === 'overview'
+    ) {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+        if (!isAdmin) return jsonResponse({ error: 'Forbidden' }, { status: 403 });
+
+        const rows = await env.DB.prepare(
+          `SELECT race_slug, race_title, race_category, office_name,
+                  district_type, district_number,
+                  MAX(survey_slug) AS survey_slug,
+                  COUNT(*) AS candidate_count,
+                  SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_count,
+                  MAX(last_reviewed_at) AS last_reviewed_at
+           FROM race_candidates
+           GROUP BY race_slug, race_title, race_category, office_name,
+                    district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).all();
+        return jsonResponse({ ok: true, races: rows.results });
+      } catch (error) {
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/admin/races/preview?house=05&senate=03 — simulate verified-user race list
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'api' && pathParts[1] === 'admin' &&
+      pathParts[2] === 'races' && pathParts[3] === 'preview'
+    ) {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+        if (!isAdmin) return jsonResponse({ error: 'Forbidden' }, { status: 403 });
+
+        const hd = url.searchParams.get('house')
+          ? formatDistrictNumber(url.searchParams.get('house'), 2)
+          : null;
+        const sd = url.searchParams.get('senate')
+          ? formatDistrictNumber(url.searchParams.get('senate'), 2)
+          : null;
+
+        const rows = await env.DB.prepare(
+          `SELECT race_slug, race_title, election_year, office_name, race_category,
+                  jurisdiction, district_type, district_number,
+                  MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count,
+                  MAX(last_reviewed_at) AS last_reviewed_at
+           FROM race_candidates
+           WHERE is_active = 1
+             AND (
+               race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+               OR (district_type = 'state_house' AND district_number = ?)
+               OR (district_type = 'state_senate' AND district_number = ?)
+             )
+           GROUP BY race_slug, race_title, election_year, office_name,
+                    race_category, jurisdiction, district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).bind(hd || '', sd || '').all();
+
+        return jsonResponse({
+          ok: true,
+          house_district: hd,
+          senate_district: sd,
+          race_count: rows.results.length,
+          races: rows.results,
+        });
+      } catch (error) {
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
     // Admin endpoint to backfill aggregates from existing responses
     if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'backfill-aggregates') {
       // Only allow from localhost or with proper auth
@@ -9055,6 +9133,46 @@ export default {
     ) {
       try {
         if (!env.DB) return jsonResponse({ error: 'Database not available' }, { status: 503 });
+
+        // Dev bypass: local env only — skip auth and use query-param districts.
+        // Mirrors existing shouldBypassAddressVerification / TURNSTILE_BYPASS patterns.
+        // Never active in production (isLocalEnv guards it).
+        if (isLocalEnv(env)) {
+          const devHouse = url.searchParams.get('_dev_house');
+          const devSenate = url.searchParams.get('_dev_senate');
+          if (devHouse || devSenate) {
+            const hd = devHouse ? formatDistrictNumber(devHouse, 2) : null;
+            const sd = devSenate ? formatDistrictNumber(devSenate, 2) : null;
+            const devRows = await env.DB.prepare(
+              `SELECT race_slug, race_title, election_year, office_name, race_category,
+                      jurisdiction, district_type, district_number,
+                      MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count,
+                      MAX(last_reviewed_at) AS last_reviewed_at
+               FROM race_candidates
+               WHERE is_active = 1
+                 AND (
+                   race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+                   OR (district_type = 'state_house' AND district_number = ?)
+                   OR (district_type = 'state_senate' AND district_number = ?)
+                 )
+               GROUP BY race_slug, race_title, election_year, office_name,
+                        race_category, jurisdiction, district_type, district_number
+               ORDER BY race_category, office_name, district_number`
+            ).bind(hd || '', sd || '').all();
+            return jsonResponse({
+              authenticated: true,
+              verified: true,
+              dev_bypass: true,
+              house_district: hd,
+              senate_district: sd,
+              races: devRows.results,
+              notes: [
+                '[DEV] Auth bypassed via query params. Only works in local environment.',
+                'County and local board race matching is not yet available.',
+              ],
+            });
+          }
+        }
 
         const sessionResult = await getSessionUser(request, env);
         if (sessionResult.status !== 'valid') {

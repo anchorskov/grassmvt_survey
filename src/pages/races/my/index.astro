@@ -76,7 +76,11 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 <script>
 (function () {
   function init() {
-    (window as any).RaceHub && (window as any).RaceHub.loadMyRaces('my-races-root');
+    // Forward _dev_house / _dev_senate query params to the API (local only bypass).
+    const sp = new URLSearchParams(window.location.search);
+    const devHouse = sp.get('_dev_house');
+    const devSenate = sp.get('_dev_senate');
+    (window as any).RaceHub && (window as any).RaceHub.loadMyRaces('my-races-root', { devHouse, devSenate });
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
