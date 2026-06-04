@@ -18,5 +18,6 @@ wrangler/.wrangler/
 .DS_Store
 Thumbs.db
 docs
+races/source/
 scripts/admin_create_verified_user.sh
 .codex

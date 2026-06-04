@@ -34,7 +34,7 @@ import {
         <p class="mb-8 max-w-3xl text-wy-charcoal/75">
           Sample district cards are shown below. All 60 House and 30 Senate districts will be added as candidates are confirmed from verified public sources.
         </p>
-        <div class="grid gap-5 md:grid-cols-2">
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" id="districts-grid">
           {STATE_LEGISLATURE_2026_CARDS.map((c) => (
             <CandidateCard
               name={c.name}
@@ -78,3 +78,49 @@ import {
     </section>
   </main>
 </BaseLayout>
+
+<script is:inline src="/js/races.js"></script>
+<script>
+(function () {
+  async function loadLegislatureRaces() {
+    const grid = document.getElementById('districts-grid');
+    if (!grid) return;
+    let data;
+    try {
+      const res = await fetch('/api/races');
+      if (!res.ok) return;
+      data = await res.json();
+    } catch (_e) {
+      return;
+    }
+    const races = (data.races || []).filter(function (r) {
+      return r.race_category === 'State Legislature';
+    });
+    if (races.length === 0) return;
+    grid.innerHTML = races
+      .map(function (r) {
+        const slug = r.race_slug;
+        const title = r.race_title;
+        const count = r.candidate_count;
+        const countLabel = count === 1 ? '1 candidate' : count + ' candidates';
+        return (
+          '<article class="rounded-lg border border-wy-dust bg-wy-bone/40 p-5">' +
+          '<h3 class="mb-2 font-serif text-lg font-semibold text-wy-charcoal">' + escH(title) + '</h3>' +
+          '<p class="mb-3 text-sm text-wy-charcoal/70">' + escH(countLabel) + '</p>' +
+          '<a class="button button--secondary text-sm" href="/races/' + encodeURIComponent(slug) + '">View race</a>' +
+          '</article>'
+        );
+      })
+      .join('');
+    function escH(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadLegislatureRaces);
+  } else {
+    loadLegislatureRaces();
+  }
+})();
+</script>

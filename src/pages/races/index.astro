@@ -8,56 +8,56 @@ const raceCards = [
     category: 'Federal',
     description: 'Review candidate information and share public sentiment through a short support poll.',
     href: '/races/us-senate-2026',
-    active: true,
+    raceSlug: 'us-senate-2026',
   },
   {
     title: 'U.S. House, Wyoming, 2026',
     category: 'Federal',
     description: 'Review candidate information and share public sentiment for Wyoming\'s at-large House seat.',
     href: '/races/us-house-2026',
-    active: true,
+    raceSlug: 'us-house-2026',
   },
   {
     title: 'Governor, Wyoming, 2026',
     category: 'Statewide',
     description: 'Review candidate information and share public sentiment for the Wyoming gubernatorial race.',
     href: '/races/governor-2026',
-    active: true,
+    raceSlug: 'governor-2026',
   },
   {
     title: 'Wyoming Statewide Offices, 2026',
     category: 'Statewide',
     description: 'Secretary of State, Treasurer, Auditor, and Superintendent of Public Instruction.',
     href: '/races/statewide-offices-2026',
-    active: true,
+    raceSlug: null,
   },
   {
     title: 'Wyoming State Legislature, 2026',
     category: 'State Legislature',
     description: 'State House and State Senate district races organized by district number.',
     href: '/races/state-legislature-2026',
-    active: true,
+    raceSlug: null,
   },
   {
     title: 'Wyoming County Offices, 2026',
     category: 'County',
     description: 'County commission, clerk, sheriff, treasurer, and attorney races across Wyoming\'s 23 counties.',
     href: '/races/county-offices-2026',
-    active: true,
+    raceSlug: null,
   },
   {
     title: 'Wyoming Local Boards, 2026',
     category: 'Local Board',
     description: 'School boards, city and town councils, special districts, and other local boards.',
     href: '/races/local-boards-2026',
-    active: true,
+    raceSlug: null,
   },
   {
     title: 'Wyoming Judicial Retention, 2026',
     category: 'Judicial Retention',
     description: 'Public sentiment on whether Wyoming justices and judges should be retained.',
     href: '/races/judicial-retention-2026',
-    active: true,
+    raceSlug: null,
   },
 ];
 ---
@@ -135,10 +135,11 @@ const raceCards = [
         <h2 id="race-cards-title" class="mb-8 font-serif text-3xl font-bold text-wy-charcoal">Available race pages</h2>
         <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3" id="race-cards-grid">
           {raceCards.map((race) => (
-            <article class="flex min-h-64 flex-col rounded-lg border border-wy-dust bg-white p-5" data-category={race.category}>
+            <article class="flex min-h-64 flex-col rounded-lg border border-wy-dust bg-white p-5" data-category={race.category} data-race-slug={race.raceSlug}>
               <p class="mb-2 text-xs font-bold uppercase tracking-widest text-wy-rust">{race.category}</p>
               <h3 class="mb-3 font-serif text-xl font-semibold leading-snug text-wy-charcoal">{race.title}</h3>
-              <p class="mb-5 flex-1 text-wy-charcoal/75">{race.description}</p>
+              <p class="mb-4 flex-1 text-wy-charcoal/75">{race.description}</p>
+              <p class="mb-4 race-candidate-count is-hidden text-xs font-semibold text-wy-charcoal/60"></p>
               <div class="flex flex-wrap gap-2">
                 <a class="button button--primary" href={`${race.href}#support-poll`}>Take Poll</a>
                 <a class="button button--secondary" href={`${race.href}#candidates`}>View Candidates</a>
@@ -152,17 +153,24 @@ const raceCards = [
   </main>
 </BaseLayout>
 
+<script is:inline src="/js/races.js"></script>
 <script>
 (function () {
   const sel = document.getElementById('race-category');
   const grid = document.getElementById('race-cards-grid');
-  if (!sel || !grid) return;
-  sel.addEventListener('change', function () {
-    const chosen = (sel as HTMLSelectElement).value;
-    grid.querySelectorAll('article[data-category]').forEach(function (card) {
-      const match = !chosen || card.getAttribute('data-category') === chosen;
-      (card as HTMLElement).style.display = match ? '' : 'none';
+  if (sel && grid) {
+    sel.addEventListener('change', function () {
+      const chosen = (sel as HTMLSelectElement).value;
+      grid.querySelectorAll('article[data-category]').forEach(function (card) {
+        const match = !chosen || card.getAttribute('data-category') === chosen;
+        (card as HTMLElement).style.display = match ? '' : 'none';
+      });
     });
-  });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { (window as any).RaceHub && (window as any).RaceHub.enrichHubCards(); });
+  } else {
+    (window as any).RaceHub && (window as any).RaceHub.enrichHubCards();
+  }
 })();
 </script>

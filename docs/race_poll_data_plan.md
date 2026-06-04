@@ -211,6 +211,47 @@ so scripts must strip comments before parsing rather than using raw
 
 ---
 
+## SOS Candidate Import Workflow
+
+Wyoming Secretary of State candidate roster imports use:
+
+```bash
+node scripts/upsert-race-candidates-from-sos.mjs --db=local --dry-run
+node scripts/upsert-race-candidates-from-sos.mjs --db=local --apply
+```
+
+Default source:
+
+```text
+races/source/2026_WY_Primary_Election_Candidates.csv
+```
+
+The raw `races/source/` folder is ignored because it may contain CSV input with
+mailing addresses. The importer never writes mailing address columns to
+`race_candidates` and never includes them in generated review data.
+
+Generated review file:
+
+```text
+races/generated/2026_sos_race_candidates.jsonc
+```
+
+The generated review file groups transformed rows by `race_slug` and keeps only
+candidate campaign contact fields, source traceability, race metadata, and
+display metadata. It is safe to review for candidate-card import purposes.
+
+The script performs an application-generated upsert without requiring a unique
+constraint: it updates by `race_slug + candidate_slug`, then inserts when no
+matching row exists. Remote writes are refused unless both `--apply` and
+`--remote-confirm` are present. Do not apply this workflow to production until
+local import and race-page rendering have been verified.
+
+The importer leaves `survey_slug` null until matching race poll surveys are
+created and seeded into `surveys`. This avoids violating the
+`race_candidates.survey_slug` foreign key before the SurveyJS race polls exist.
+
+---
+
 ## Local and Production Testing Notes
 
 ### Apply local migration

@@ -32,7 +32,7 @@ import {
       <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
         <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Candidate information</p>
         <h2 id="candidates-title" class="mb-8 font-serif text-3xl font-bold text-wy-charcoal">Candidate cards</h2>
-        <div class="grid gap-5 lg:grid-cols-2">
+        <div class="grid gap-5 lg:grid-cols-2" id="candidates-grid">
           {US_HOUSE_2026_CANDIDATES.map((c) => (
             <CandidateCard
               name={c.name}
@@ -53,12 +53,14 @@ import {
         <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Poll preview</p>
         <h2 id="poll-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support poll</h2>
         <p class="mb-8 max-w-3xl text-wy-charcoal/75">This preview shows the poll structure. Responses are not submitted yet.</p>
-        <SupportPollPreview
-          candidates={US_HOUSE_2026_CANDIDATES.map((c) => ({ name: c.name, slug: c.slug }))}
-          choices={SUPPORT_CHOICES}
-          questionText={SUPPORT_QUESTION}
-          pollQuestions={RACE_POLL_QUESTIONS}
-        />
+        <div id="poll-fieldsets">
+          <SupportPollPreview
+            candidates={US_HOUSE_2026_CANDIDATES.map((c) => ({ name: c.name, slug: c.slug }))}
+            choices={SUPPORT_CHOICES}
+            questionText={SUPPORT_QUESTION}
+            pollQuestions={RACE_POLL_QUESTIONS}
+          />
+        </div>
       </div>
     </section>
 
@@ -88,3 +90,20 @@ import {
     </section>
   </main>
 </BaseLayout>
+
+<script is:inline src="/js/races.js"></script>
+<script>
+(function () {
+  function init() {
+    (window as any).RaceHub && (window as any).RaceHub.loadRaceCandidates('us-house-2026', {
+      candidateGridId: 'candidates-grid',
+      pollContainerId: 'poll-fieldsets',
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>

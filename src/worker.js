@@ -9044,6 +9044,157 @@ export default {
       }
     }
 
+    // GET /api/races — active race summaries grouped by race_slug
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'races' && !pathParts[2]) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'Database not available' }, { status: 503 });
+        const rows = await env.DB.prepare(
+          `SELECT
+             race_slug,
+             race_title,
+             election_year,
+             office_name,
+             race_category,
+             jurisdiction,
+             district_type,
+             district_number,
+             MAX(survey_slug) AS survey_slug,
+             COUNT(*) AS candidate_count,
+             MAX(last_reviewed_at) AS last_reviewed_at
+           FROM race_candidates
+           WHERE is_active = 1
+           GROUP BY race_slug, race_title, election_year, office_name,
+                    race_category, jurisdiction, district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).all();
+        return jsonResponse({ races: rows.results });
+      } catch (error) {
+        console.error('[/api/races] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/races/:slug/candidates — active candidates for one race
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'api' &&
+      pathParts[1] === 'races' &&
+      pathParts[2] &&
+      pathParts[3] === 'candidates'
+    ) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'Database not available' }, { status: 503 });
+        const raceSlug = decodeURIComponent(pathParts[2]);
+        const meta = await env.DB.prepare(
+          `SELECT race_slug, race_title, election_year, office_name, race_category,
+                  jurisdiction, district_type, district_number, MAX(survey_slug) AS survey_slug
+           FROM race_candidates
+           WHERE race_slug = ? AND is_active = 1
+           LIMIT 1`
+        ).bind(raceSlug).first();
+        if (!meta) return jsonResponse({ error: 'Race not found' }, { status: 404 });
+        const candidates = await env.DB.prepare(
+          `SELECT candidate_name, candidate_slug, filing_status,
+                  campaign_website, public_email, public_phone,
+                  source_url, source_note, wy_legislator_name,
+                  survey_slug, last_reviewed_at
+           FROM race_candidates
+           WHERE race_slug = ? AND is_active = 1
+           ORDER BY display_order, candidate_name`
+        ).bind(raceSlug).all();
+        return jsonResponse({ race: meta, candidates: candidates.results });
+      } catch (error) {
+        console.error('[/api/races/:slug/candidates] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // GET /races/:slug — generic Worker-rendered page for race slugs without a static page
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'races' &&
+      pathParts[1] &&
+      !pathParts[2]
+    ) {
+      const raceSlug = decodeURIComponent(pathParts[1]);
+      // Let static pages (already in dist/) take priority via ASSETS.
+      // This handler only triggers when ASSETS returns 404 — but since we fall through
+      // to ASSETS below for any unhandled route, add an explicit DB check first.
+      try {
+        if (!env.DB) {
+          // If no DB, fall through to ASSETS (static page may exist)
+        } else {
+          const raceMeta = await env.DB.prepare(
+            `SELECT race_slug, race_title, office_name, race_category
+             FROM race_candidates WHERE race_slug = ? AND is_active = 1 LIMIT 1`
+          ).bind(raceSlug).first();
+          if (raceMeta) {
+            const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(raceMeta.race_title)} | Grassroots Movement</title>
+<link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+<div id="app-root">
+  <p style="padding:2rem">Loading race data&hellip;</p>
+</div>
+<script>
+(async function() {
+  const slug = ${JSON.stringify(raceSlug)};
+  const root = document.getElementById('app-root');
+  try {
+    const res = await fetch('/api/races/' + slug + '/candidates');
+    if (!res.ok) { root.innerHTML = '<p style="padding:2rem">Race data not available.</p>'; return; }
+    const data = await res.json();
+    const race = data.race;
+    const candidates = data.candidates || [];
+    let html = '<main style="max-width:56rem;margin:0 auto;padding:2rem">';
+    html += '<p style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#b85c3a">' + escH(race.race_category) + '</p>';
+    html += '<h1 style="font-family:Georgia,serif;font-size:2rem;font-weight:700;margin:.5rem 0 1rem">' + escH(race.race_title) + '</h1>';
+    if (candidates.length === 0) {
+      html += '<p>Candidate data for this race is pending review.</p>';
+    } else {
+      html += '<h2 style="font-family:Georgia,serif;font-size:1.5rem;margin-bottom:1rem">Candidates</h2>';
+      html += '<div style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(18rem,1fr))">';
+      candidates.forEach(function(c) {
+        html += '<div style="border:1px solid #d4c9b5;border-radius:.5rem;padding:1.25rem;background:#faf8f4">';
+        html += '<h3 style="font-family:Georgia,serif;font-size:1.25rem;margin:0 0 .75rem">' + escH(c.candidate_name) + '</h3>';
+        html += '<dl style="font-size:.875rem">';
+        if (c.filing_status) html += '<dt style="font-weight:700;text-transform:uppercase;font-size:.75rem;color:#b85c3a">Status</dt><dd style="margin:.25rem 0 .75rem">' + escH(c.filing_status) + '</dd>';
+        if (c.campaign_website) html += '<dt style="font-weight:700;text-transform:uppercase;font-size:.75rem;color:#b85c3a">Website</dt><dd style="margin:.25rem 0 .75rem"><a href="' + escH(c.campaign_website) + '" rel="noopener noreferrer">' + escH(c.campaign_website) + '</a></dd>';
+        if (c.public_phone) html += '<dt style="font-weight:700;text-transform:uppercase;font-size:.75rem;color:#b85c3a">Phone</dt><dd style="margin:.25rem 0 .75rem">' + escH(c.public_phone) + '</dd>';
+        if (c.public_email) html += '<dt style="font-weight:700;text-transform:uppercase;font-size:.75rem;color:#b85c3a">Email</dt><dd style="margin:.25rem 0 .75rem">' + escH(c.public_email) + '</dd>';
+        html += '</dl></div>';
+      });
+      html += '</div>';
+    }
+    html += '<p style="margin-top:2rem"><a href="/races/">&larr; All races</a></p>';
+    html += '</main>';
+    root.innerHTML = html;
+    document.title = escH(race.race_title) + ' | Grassroots Movement';
+  } catch(e) {
+    root.innerHTML = '<p style="padding:2rem">Unable to load race data.</p>';
+  }
+  function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+})();
+</script>
+</body>
+</html>`;
+            return new Response(html, {
+              status: 200,
+              headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[/races/:slug] Error:', error.message);
+      }
+      // Fall through to ASSETS — static page may exist (e.g. /races/us-senate-2026)
+    }
+
     // Serve static assets from /public
     if (env.ASSETS && typeof env.ASSETS.fetch === 'function') {
       return env.ASSETS.fetch(request);

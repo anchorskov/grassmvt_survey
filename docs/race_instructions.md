@@ -177,6 +177,70 @@ candidate cards.
 
 ---
 
+## Dynamic Race Data Method
+
+This section documents how race cards and candidate cards load live data from `race_candidates`.
+
+### Data source
+
+`race_candidates` is the single source of truth for race identity and candidate metadata. It is populated from the Wyoming Secretary of State candidate roster via `scripts/upsert-race-candidates-from-sos.mjs`. Cards update when the import is re-run and applied.
+
+### API routes
+
+| Route | Purpose |
+|---|---|
+| `GET /api/races` | Returns active race summaries grouped by `race_slug`. Includes `candidate_count`, `race_category`, `survey_slug`, and `last_reviewed_at`. |
+| `GET /api/races/:slug/candidates` | Returns active candidates for one race in `display_order`. Includes public contact fields, `survey_slug`, and `source_note`. |
+
+Both routes read only `is_active = 1` rows. Retired or placeholder candidates do not appear.
+
+### Client-side loading
+
+All race pages are static Astro pages. Dynamic content is loaded client-side by `public/js/races.js`:
+
+- `RaceHub.enrichHubCards()` — fetches `/api/races` and adds live candidate counts to the `/races` hub cards.
+- `RaceHub.loadRaceCandidates(slug, opts)` — fetches `/api/races/:slug/candidates` and replaces placeholder cards and poll fieldsets with live data.
+
+Race pages call these functions on `DOMContentLoaded`. The static placeholder cards remain visible until the fetch resolves, so the page is never empty.
+
+### Worker-rendered generic race page
+
+For race slugs that do not have a static Astro page (e.g., `state-house-01-2026`, `secretary-of-state-2026`), the Worker intercepts `GET /races/:slug`, queries `race_candidates`, and serves a minimal HTML page that displays the race title and candidate cards. Unknown slugs fall through to `ASSETS` (and return 404 if no static file exists).
+
+### `survey_slug` controls poll and results links
+
+When a race has a `survey_slug` set in `race_candidates`:
+- The poll link should point to `/surveys/{survey_slug}` (the existing SurveyJS route).
+- The results link should point to `/surveys/results/?slug={survey_slug}`.
+- `races.js` updates `[data-survey-link="poll"]` and `[data-survey-link="results"]` elements automatically when `survey_slug` is present.
+
+When `survey_slug` is null, the poll and results links remain as static preview anchors.
+
+### Privacy rules
+
+1. No mailing addresses in `race_candidates` — the SOS import script deliberately omits them.
+2. No voter data on any public race page.
+3. No individual response records exposed — only aggregate counts via `/api/results/summary`.
+4. Results are always labeled as public sentiment, not an election prediction.
+
+### SOS import workflow
+
+```bash
+# Dry run — generates review file, does not write to DB
+node scripts/upsert-race-candidates-from-sos.mjs --db=local --dry-run
+
+# Apply to local D1
+node scripts/upsert-race-candidates-from-sos.mjs --db=local --apply
+
+# Apply to production (requires both flags)
+node scripts/upsert-race-candidates-from-sos.mjs --db=remote --apply --remote-confirm
+```
+
+Source CSV: `races/source/2026_WY_Primary_Election_Candidates.csv` (gitignored — may contain mailing addresses).
+Review file: `races/generated/2026_sos_race_candidates.jsonc` (safe to commit — mailing address fields omitted).
+
+---
+
 ## Race Page Build Method
 
 This section documents how race pages are built so future agents can follow the same pattern consistently.
