@@ -139,13 +139,14 @@ const buildSqlForRace = (race, { version, publish, changelog }) => {
   const jsonText = JSON.stringify(survey);
   const hash = jsonHash(jsonText);
   const publishedAt = publish ? "datetime('now')" : 'NULL';
+  const flowMeta = sqlEsc(JSON.stringify(survey.x_meta));
 
   let sql = `\n-- ${race.race_title} (${surveySlug})\n`;
 
   sql += `INSERT OR IGNORE INTO surveys (slug, scope, title, status, flow_type, flow_meta, created_at)
-VALUES (${sqlEsc(surveySlug)}, 'wy', ${sqlEsc(survey.title)}, 'active', 'standard', NULL, datetime('now'));
+VALUES (${sqlEsc(surveySlug)}, 'wy', ${sqlEsc(survey.title)}, 'active', 'standard', ${flowMeta}, datetime('now'));
 
-UPDATE surveys SET title = ${sqlEsc(survey.title)}, scope = 'wy', flow_type = 'standard', flow_meta = NULL
+UPDATE surveys SET title = ${sqlEsc(survey.title)}, scope = 'wy', flow_type = 'standard', flow_meta = ${flowMeta}
 WHERE slug = ${sqlEsc(surveySlug)};
 
 INSERT INTO survey_versions (survey_id, version, json_text, json_hash, changelog, created_at, published_at)
