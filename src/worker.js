@@ -9229,47 +9229,90 @@ export default {
 <link rel="stylesheet" href="/css/site.css">
 </head>
 <body>
-<div id="app-root">
-  <p style="padding:2rem">Loading race data&hellip;</p>
-</div>
+<header class="site-header bg-wy-charcoal text-white">
+  <div class="site-header__inner max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+    <a class="site-brand font-serif font-bold text-lg text-white hover:text-wy-sandstone transition-colors" href="/">Grassroots Movement</a>
+    <div class="flex items-center gap-3 text-sm">
+      <a class="text-white/80 hover:text-white transition-colors" href="/races/my">My Races</a>
+      <a class="text-white/80 hover:text-white transition-colors" href="/races">All Races</a>
+    </div>
+  </div>
+</header>
+<main>
+  <section class="bg-wy-charcoal text-white" aria-labelledby="race-title">
+    <div class="mx-auto max-w-5xl px-6 py-16 md:py-20">
+      <p class="mb-3 text-xs font-bold uppercase tracking-widest text-wy-sandstone">${escapeHtml(raceMeta.race_category)}</p>
+      <h1 id="race-title" class="mb-5 font-serif text-4xl font-bold leading-tight md:text-5xl">${escapeHtml(raceMeta.race_title)}</h1>
+      <p class="mb-8 max-w-3xl text-lg leading-relaxed text-white/85">
+        Review candidate information and share public sentiment through a short support poll.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <a class="button button--primary" href="#support-poll" data-survey-link="poll">Take the Candidate Support Poll</a>
+        <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#candidates">Review Candidate Info</a>
+        <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#results" data-survey-link="results">View Results</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="candidates" class="bg-white" aria-labelledby="candidates-title">
+    <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+      <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Candidate information</p>
+      <h2 id="candidates-title" class="mb-8 font-serif text-3xl font-bold text-wy-charcoal">Candidate cards</h2>
+      <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3" id="candidates-grid">
+        <p class="text-wy-charcoal/60">Loading candidates&hellip;</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="support-poll" class="bg-wy-bone" aria-labelledby="poll-title">
+    <div class="mx-auto max-w-5xl px-6 py-14 md:py-16">
+      <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Poll preview</p>
+      <h2 id="poll-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support poll</h2>
+      <p class="mb-8 max-w-3xl text-wy-charcoal/75">This preview shows the poll structure. Responses are not submitted yet.</p>
+      <form class="space-y-6">
+        <div id="poll-fieldsets">
+          <p class="text-wy-charcoal/60">Loading poll&hellip;</p>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="results" class="bg-white" aria-labelledby="results-title">
+    <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+      <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Results concept</p>
+      <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Aggregate sentiment</h2>
+      <p class="mb-6 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
+        This is a public sentiment poll, not an election prediction.
+      </p>
+      <p class="text-wy-charcoal/75">
+        Results will appear here when responses are available.
+        <a class="underline text-wy-rust" href="/surveys/results/" data-survey-link="results">View results</a>
+      </p>
+    </div>
+  </section>
+
+  <div class="bg-wy-bone px-6 py-8 border-t border-wy-dust">
+    <div class="mx-auto max-w-5xl flex flex-wrap gap-4 text-sm">
+      <a class="text-wy-rust hover:underline" href="/races/my">&larr; My Races</a>
+      <a class="text-wy-rust hover:underline" href="/races">All Wyoming Races</a>
+    </div>
+  </div>
+</main>
+<script src="/js/races.js"></script>
 <script>
-(async function() {
-  const slug = ${JSON.stringify(raceSlug)};
-  const root = document.getElementById('app-root');
-  try {
-    const res = await fetch('/api/races/' + slug + '/candidates');
-    if (!res.ok) { root.innerHTML = '<p style="padding:2rem">Race data not available.</p>'; return; }
-    const data = await res.json();
-    const race = data.race;
-    const candidates = data.candidates || [];
-    let html = '<main style="max-width:56rem;margin:0 auto;padding:2rem">';
-    html += '<p style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#b85c3a">' + escH(race.race_category) + '</p>';
-    html += '<h1 style="font-family:Georgia,serif;font-size:2rem;font-weight:700;margin:.5rem 0 1rem">' + escH(race.race_title) + '</h1>';
-    if (candidates.length === 0) {
-      html += '<p>Candidate data for this race is pending review.</p>';
-    } else {
-      html += '<h2 style="font-family:Georgia,serif;font-size:1.5rem;margin-bottom:1rem">Candidates</h2>';
-      html += '<div style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(18rem,1fr))">';
-      candidates.forEach(function(c) {
-        html += '<div style="border:1px solid #d4c9b5;border-radius:.5rem;padding:1.25rem;background:#faf8f4">';
-        html += '<h3 style="font-family:Georgia,serif;font-size:1.25rem;margin:0 0 .75rem">' + escH(c.candidate_name) + '</h3>';
-        html += '<dl style="font-size:.875rem">';
-        if (c.filing_status) html += '<dt style="font-weight:700;text-transform:uppercase;font-size:.75rem;color:#b85c3a">Status</dt><dd style="margin:.25rem 0 .75rem">' + escH(c.filing_status) + '</dd>';
-        if (c.campaign_website) html += '<dt style="font-weight:700;text-transform:uppercase;font-size:.75rem;color:#b85c3a">Website</dt><dd style="margin:.25rem 0 .75rem"><a href="' + escH(c.campaign_website) + '" rel="noopener noreferrer">' + escH(c.campaign_website) + '</a></dd>';
-        if (c.public_phone) html += '<dt style="font-weight:700;text-transform:uppercase;font-size:.75rem;color:#b85c3a">Phone</dt><dd style="margin:.25rem 0 .75rem">' + escH(c.public_phone) + '</dd>';
-        if (c.public_email) html += '<dt style="font-weight:700;text-transform:uppercase;font-size:.75rem;color:#b85c3a">Email</dt><dd style="margin:.25rem 0 .75rem">' + escH(c.public_email) + '</dd>';
-        html += '</dl></div>';
-      });
-      html += '</div>';
-    }
-    html += '<p style="margin-top:2rem"><a href="/races/">&larr; All races</a></p>';
-    html += '</main>';
-    root.innerHTML = html;
-    document.title = escH(race.race_title) + ' | Grassroots Movement';
-  } catch(e) {
-    root.innerHTML = '<p style="padding:2rem">Unable to load race data.</p>';
+(function() {
+  var slug = ${JSON.stringify(raceSlug)};
+  function init() {
+    window.RaceHub && window.RaceHub.loadRaceCandidates(slug, {
+      candidateGridId: 'candidates-grid',
+      pollContainerId: 'poll-fieldsets'
+    });
   }
-  function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
 </script>
 </body>

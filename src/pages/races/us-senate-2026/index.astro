@@ -22,8 +22,9 @@ import {
           This page gathers public input for this race. Citizens can review candidate information, answer a short support poll, and see aggregate sentiment as the race develops.
         </p>
         <div class="flex flex-wrap gap-3">
-          <a class="button button--primary" href="#support-poll">Take the Candidate Support Poll</a>
+          <a class="button button--primary" href="#support-poll" data-survey-link="poll">Take the Candidate Support Poll</a>
           <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#candidates">Review Candidate Info</a>
+          <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#results" data-survey-link="results">View Results</a>
         </div>
       </div>
     </section>
@@ -73,7 +74,7 @@ import {
         <p class="mb-8 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
           This is a public sentiment poll, not an election prediction.
         </p>
-        <p class="text-wy-charcoal/75">Results will appear here when the poll is published and responses are available.</p>
+        <p class="text-wy-charcoal/75">Results will appear here when responses are available. <a class="underline text-wy-rust" href="/surveys/results/" data-survey-link="results">View results</a></p>
       </div>
     </section>
   </main>
