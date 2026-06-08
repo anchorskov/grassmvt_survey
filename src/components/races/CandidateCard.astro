@@ -1,0 +1,52 @@
+---
+// src/components/races/CandidateCard.astro
+interface Props {
+  name: string;
+  office: string;
+  status?: string;
+  website?: string | null;
+  contact?: string | null;
+  statement?: string;
+  sourceNote?: string;
+}
+const { name, office, status, website, contact, statement, sourceNote } = Astro.props;
+---
+<article class="rounded-lg border border-wy-dust bg-wy-bone/40 p-5">
+  <h3 class="mb-4 font-serif text-2xl font-semibold text-wy-charcoal">{name}</h3>
+  <dl class="space-y-3 text-sm">
+    <div>
+      <dt class="font-bold uppercase tracking-wide text-wy-rust">Office</dt>
+      <dd class="mt-1 text-wy-charcoal">{office}</dd>
+    </div>
+    {status && (
+      <div>
+        <dt class="font-bold uppercase tracking-wide text-wy-rust">Status</dt>
+        <dd class="mt-1 text-wy-charcoal">{status}</dd>
+      </div>
+    )}
+    {website !== undefined && (
+      <div>
+        <dt class="font-bold uppercase tracking-wide text-wy-rust">Campaign website</dt>
+        <dd class="mt-1 text-wy-charcoal">{website ?? 'Not added yet'}</dd>
+      </div>
+    )}
+    {contact !== undefined && (
+      <div>
+        <dt class="font-bold uppercase tracking-wide text-wy-rust">Public contact</dt>
+        <dd class="mt-1 text-wy-charcoal">{contact ?? 'Not added yet'}</dd>
+      </div>
+    )}
+    {statement && (
+      <div>
+        <dt class="font-bold uppercase tracking-wide text-wy-rust">Statement</dt>
+        <dd class="mt-1 text-wy-charcoal">{statement}</dd>
+      </div>
+    )}
+    {sourceNote && (
+      <div>
+        <dt class="font-bold uppercase tracking-wide text-wy-rust">Source note</dt>
+        <dd class="mt-1 text-wy-charcoal/70 italic">{sourceNote}</dd>
+      </div>
+    )}
+  </dl>
+</article>

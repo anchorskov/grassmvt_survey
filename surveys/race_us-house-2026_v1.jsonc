@@ -1,0 +1,224 @@
+// surveys/race_us-house-2026_v1.jsonc
+// slug: race-us-house-2026
+// version: v1 | 2026-06-04
+// title: U.S. House, Wyoming, 2026 — Candidate Support Poll
+{
+  "title": "U.S. House, Wyoming, 2026 — Candidate Support Poll",
+  "description": "Share public sentiment on each candidate for Wyoming's 2026 at-large U.S. House race. This is a public sentiment poll, not an election prediction. Results are reported in aggregate only.",
+  "completedHtml": "<p>Thank you. Your response has been recorded as public sentiment for this race.</p>",
+  "showQuestionNumbers": "off",
+  "questionTitleLocation": "top",
+  "completeText": "Submit",
+  "x_meta": {
+    "flow": "standard",
+    "path": null,
+    "category_slug": "race-us-house-2026",
+    "estimated_minutes": 5,
+    "featured": false,
+    "race_slug": "us-house-2026"
+  },
+  "pages": [
+    {
+      "name": "candidate_support",
+      "title": "Candidate support",
+      "description": "Answer for each candidate you know. If you are unfamiliar with a candidate, select \"I am unfamiliar with this candidate.\"",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "support_elena_del_real",
+          "title": "Elena Del Real — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_lisa_kinney",
+          "title": "Lisa Kinney — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_bo_biteman",
+          "title": "Bo Biteman — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_chuck_gray",
+          "title": "Chuck Gray — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_david_giralt",
+          "title": "David Giralt — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_frank_chapman",
+          "title": "Frank Chapman — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_jillian_balow",
+          "title": "Jillian Balow — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_keith_b_goodenough",
+          "title": "Keith B. Goodenough — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_kevin_christensen",
+          "title": "Kevin Christensen — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_reid_rasner",
+          "title": "Reid Rasner — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_richard_dodson",
+          "title": "Richard Dodson — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "support_steve_friess",
+          "title": "Steve Friess — U.S. House, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "race_questions",
+      "title": "Race questions",
+      "description": "These questions are optional. Your answers help show what issues and qualities matter most in this race.",
+      "elements": [
+        {
+          "type": "text",
+          "name": "issue_most",
+          "title": "Which issue matters most in this race?"
+        },
+        {
+          "type": "text",
+          "name": "quality_most",
+          "title": "What quality matters most in a candidate for this office?"
+        },
+        {
+          "type": "text",
+          "name": "candidate_question",
+          "title": "What question should every candidate in this race answer?"
+        },
+        {
+          "type": "comment",
+          "name": "wyoming_comment",
+          "title": "Optional comment: What should candidates in this race understand about Wyoming?"
+        }
+      ]
+    }
+  ]
+}

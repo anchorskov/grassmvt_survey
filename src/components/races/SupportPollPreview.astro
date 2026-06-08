@@ -1,0 +1,53 @@
+---
+// src/components/races/SupportPollPreview.astro
+// Renders a preview-only candidate support poll. Does not submit responses.
+// Pass an empty candidates array to show a "polls coming soon" note instead
+// of individual candidate fieldsets.
+interface Props {
+  candidates: Array<{ name: string; slug: string }>;
+  choices: string[];
+  questionText: string;
+  pollQuestions: Array<{ name: string; label: string; type: string }>;
+}
+const { candidates, choices, questionText, pollQuestions } = Astro.props;
+---
+<form class="space-y-6">
+  {candidates.length === 0 ? (
+    <p class="rounded-lg border border-wy-dust bg-white p-5 text-wy-charcoal/75">
+      Candidate support polls will be available here when candidates are confirmed for this race.
+    </p>
+  ) : (
+    candidates.map((candidate) => (
+      <fieldset class="rounded-lg border border-wy-dust bg-white p-5">
+        <legend class="px-1 font-serif text-xl font-semibold text-wy-charcoal">{candidate.name}</legend>
+        <p class="mb-4 mt-2 text-wy-charcoal">{questionText}</p>
+        <div class="grid gap-2 sm:grid-cols-2">
+          {choices.map((choice) => (
+            <label class="flex items-start gap-3 rounded-md border border-wy-dust/70 bg-wy-bone/30 px-3 py-2 text-wy-charcoal">
+              <input class="mt-1" type="radio" name={`support-${candidate.slug}`} value={choice} />
+              <span>{choice}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    ))
+  )}
+
+  <fieldset class="rounded-lg border border-wy-dust bg-white p-5">
+    <legend class="px-1 font-serif text-xl font-semibold text-wy-charcoal">Race questions</legend>
+    <div class="mt-4 grid gap-5">
+      {pollQuestions.map((q) => (
+        <label class="block">
+          <span class="mb-2 block font-semibold text-wy-charcoal">{q.label}</span>
+          {q.type === 'textarea' ? (
+            <textarea class="min-h-32 w-full rounded-md border border-wy-dust px-4 py-3" name={q.name}></textarea>
+          ) : (
+            <input class="w-full rounded-md border border-wy-dust px-4 py-3" type="text" name={q.name} />
+          )}
+        </label>
+      ))}
+    </div>
+  </fieldset>
+
+  <button class="button button--primary" type="button">Preview only — responses are not submitted</button>
+</form>

@@ -6668,6 +6668,7 @@ export default {
            LEFT JOIN responses r
              ON r.survey_version_id = v.id
             AND r.user_id = ?
+           WHERE s.slug NOT LIKE 'race-%'
            ORDER BY s.created_at DESC`
         )
           .bind(userId)
@@ -8974,6 +8975,84 @@ export default {
       }
     }
 
+    // GET /api/admin/races/overview — race coverage: candidate counts and poll seeding status
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'api' && pathParts[1] === 'admin' &&
+      pathParts[2] === 'races' && pathParts[3] === 'overview'
+    ) {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+        if (!isAdmin) return jsonResponse({ error: 'Forbidden' }, { status: 403 });
+
+        const rows = await env.DB.prepare(
+          `SELECT race_slug, race_title, race_category, office_name,
+                  district_type, district_number,
+                  MAX(survey_slug) AS survey_slug,
+                  COUNT(*) AS candidate_count,
+                  SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_count,
+                  MAX(last_reviewed_at) AS last_reviewed_at
+           FROM race_candidates
+           GROUP BY race_slug, race_title, race_category, office_name,
+                    district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).all();
+        return jsonResponse({ ok: true, races: rows.results });
+      } catch (error) {
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/admin/races/preview?house=05&senate=03 — simulate verified-user race list
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'api' && pathParts[1] === 'admin' &&
+      pathParts[2] === 'races' && pathParts[3] === 'preview'
+    ) {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+        if (!isAdmin) return jsonResponse({ error: 'Forbidden' }, { status: 403 });
+
+        const hd = url.searchParams.get('house')
+          ? formatDistrictNumber(url.searchParams.get('house'), 2)
+          : null;
+        const sd = url.searchParams.get('senate')
+          ? formatDistrictNumber(url.searchParams.get('senate'), 2)
+          : null;
+
+        const rows = await env.DB.prepare(
+          `SELECT race_slug, race_title, election_year, office_name, race_category,
+                  jurisdiction, district_type, district_number,
+                  MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count,
+                  MAX(last_reviewed_at) AS last_reviewed_at
+           FROM race_candidates
+           WHERE is_active = 1
+             AND (
+               race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+               OR (district_type = 'state_house' AND district_number = ?)
+               OR (district_type = 'state_senate' AND district_number = ?)
+             )
+           GROUP BY race_slug, race_title, election_year, office_name,
+                    race_category, jurisdiction, district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).bind(hd || '', sd || '').all();
+
+        return jsonResponse({
+          ok: true,
+          house_district: hd,
+          senate_district: sd,
+          race_count: rows.results.length,
+          races: rows.results,
+        });
+      } catch (error) {
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
     // Admin endpoint to backfill aggregates from existing responses
     if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'backfill-aggregates') {
       // Only allow from localhost or with proper auth
@@ -9042,6 +9121,504 @@ export default {
       } catch (error) {
         return jsonResponse({ error: error.message }, { status: 500 });
       }
+    }
+
+    // POST /api/candidates/preview — public (no session) candidate lookup by name+city.
+    // Returns only public race/candidate summaries — never voter_id, address, phone, or email.
+    // Voter-file match (by fn+ln+city) is primary; Census geocoder is fallback when voter
+    // match fails and a street address is provided.
+    if (
+      request.method === 'POST' &&
+      pathParts[0] === 'api' &&
+      pathParts[1] === 'candidates' &&
+      pathParts[2] === 'preview' &&
+      !pathParts[3]
+    ) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'Database not available' }, { status: 503 });
+
+        const body = await parseJsonBody(request);
+        const firstName = (body.first_name || '').trim();
+        const lastName  = (body.last_name  || '').trim();
+        const city      = (body.city       || '').trim();
+        const street    = (body.street     || '').trim();
+        const zip       = normalizeZip(body.zip || '');
+
+        if (!firstName || !lastName || !city) {
+          return jsonResponse(
+            { ok: false, error: 'first_name, last_name, and city are required.' },
+            { status: 400, headers: { 'cache-control': 'no-store' } }
+          );
+        }
+
+        // Turnstile validation (bypassed in local env via TURNSTILE_BYPASS=true)
+        if (!shouldBypassTurnstile(env)) {
+          const turnstileToken = body.turnstile_token || '';
+          const tsResult = await verifyTurnstile(turnstileToken, request, env);
+          if (!tsResult.ok) {
+            return jsonResponse(
+              { ok: false, error: tsResult.error || 'Bot check failed.' },
+              { status: 403, headers: { 'cache-control': 'no-store' } }
+            );
+          }
+        }
+
+        const fnKey   = firstName.toLowerCase();
+        const lnKey   = lastName.toLowerCase();
+        const cityKey = city.toLowerCase();
+
+        // ── Path A: Voter-file match via city_county_id join ────────────────────
+        // Join through wy_city_county so matching uses the canonical resolved city+county,
+        // not the raw voter-file city string. This avoids cross-county false matches where
+        // van.city may contain a city name that resolves to a different county (e.g. a voter
+        // physically near Powell, WY whose record resolves to Ranchester/Sheridan county).
+        let matchStatus = 'not_found';
+        let houseDist = null;
+        let senateDist = null;
+
+        if (env.WY_VOTERS_DB) {
+          const candidates = await env.WY_VOTERS_DB.prepare(
+            `SELECT van.house, van.senate, van.addr_raw
+             FROM voters_addr_norm van
+             JOIN wy_city_county wcc ON wcc.id = van.city_county_id
+             WHERE lower(van.fn) = ? AND lower(van.ln) = ? AND lower(wcc.city) = ?
+             LIMIT 10`
+          ).bind(fnKey, lnKey, cityKey).all();
+
+          const rows = candidates.results || [];
+
+          if (rows.length === 1) {
+            matchStatus = 'matched';
+            houseDist  = rows[0].house  ? String(rows[0].house)  : null;
+            senateDist = rows[0].senate ? String(rows[0].senate) : null;
+          } else if (rows.length > 1) {
+            // Try to disambiguate by street house number first
+            if (street) {
+              const houseNumMatch = street.match(/^(\d+)/);
+              const houseNum = houseNumMatch ? houseNumMatch[1] : null;
+              const narrowed = houseNum
+                ? rows.filter((r) => (r.addr_raw || '').match(/^(\d+)/)?.[1] === houseNum)
+                : [];
+              if (narrowed.length === 1) {
+                matchStatus = 'matched';
+                houseDist  = narrowed[0].house  ? String(narrowed[0].house)  : null;
+                senateDist = narrowed[0].senate ? String(narrowed[0].senate) : null;
+              } else {
+                matchStatus = 'ambiguous';
+              }
+            } else {
+              // Check whether all results agree on the same house+senate district.
+              // If so, treat as matched — the voter is in the same district regardless
+              // of which exact address they share the name with.
+              const uniqueHouse  = new Set(rows.map((r) => r.house));
+              const uniqueSenate = new Set(rows.map((r) => r.senate));
+              if (uniqueHouse.size === 1 && uniqueSenate.size === 1) {
+                matchStatus = 'matched';
+                houseDist  = rows[0].house  ? String(rows[0].house)  : null;
+                senateDist = rows[0].senate ? String(rows[0].senate) : null;
+              } else {
+                matchStatus = 'ambiguous';
+              }
+            }
+          }
+        }
+
+        // ── Path B: Census geocoder fallback ─────────────────────────────────
+        // Used when voter-file match fails and a street address is provided.
+        if (matchStatus === 'not_found' && street) {
+          try {
+            const coords = await fetchGeocodeByAddress({ street, city, state: 'WY', zip });
+            if (coords.sldl || coords.sldu) {
+              matchStatus = 'geocoded';
+              houseDist  = coords.sldl ? String(parseInt(coords.sldl, 10)) : null;
+              senateDist = coords.sldu ? String(parseInt(coords.sldu, 10)) : null;
+            }
+          } catch (_geocodeErr) {
+            // Geocoder failure is non-fatal — fall through to not_found
+          }
+        }
+
+        // ── Return early for non-match states ────────────────────────────────
+        if (matchStatus === 'ambiguous') {
+          return jsonResponse(
+            { ok: true, match_status: 'ambiguous', needs_street: true,
+              notes: ['Multiple records found. Please include your street address to narrow the match.'] },
+            { headers: { 'cache-control': 'no-store' } }
+          );
+        }
+        if (matchStatus === 'not_found') {
+          return jsonResponse(
+            { ok: true, match_status: 'not_found',
+              notes: ['No match found. Browse all Wyoming races to find candidates in your area.'] },
+            { headers: { 'cache-control': 'no-store' } }
+          );
+        }
+
+        // ── Build public race summaries ───────────────────────────────────────
+        const hd = houseDist  ? formatDistrictNumber(houseDist,  2) : null;
+        const sd = senateDist ? formatDistrictNumber(senateDist, 2) : null;
+
+        const raceRows = await env.DB.prepare(
+          `SELECT race_slug, race_title, election_year, office_name, race_category,
+                  jurisdiction, district_type, district_number,
+                  MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count
+           FROM race_candidates
+           WHERE is_active = 1
+             AND (
+               race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+               OR (district_type = 'state_house'  AND district_number = ?)
+               OR (district_type = 'state_senate' AND district_number = ?)
+             )
+           GROUP BY race_slug, race_title, election_year, office_name,
+                    race_category, jurisdiction, district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).bind(hd || '', sd || '').all();
+
+        const notes = [
+          matchStatus === 'geocoded'
+            ? 'District matched by address lookup. Voter verification provides a more accurate match.'
+            : 'Preview based on voter record. Sign in to submit poll responses.',
+          'County and local board matching is not yet available.',
+        ];
+
+        return jsonResponse({
+          ok: true,
+          match_status: matchStatus,
+          house_district:  hd,
+          senate_district: sd,
+          races: raceRows.results || [],
+          notes,
+        }, { headers: { 'cache-control': 'no-store' } });
+
+      } catch (error) {
+        console.error('[/api/candidates/preview] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/races/my — races matched to the verified user's districts
+    // Uses existing: getSessionUser, getAddressVerification, formatDistrictNumber
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'api' &&
+      pathParts[1] === 'races' &&
+      pathParts[2] === 'my' &&
+      !pathParts[3]
+    ) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'Database not available' }, { status: 503 });
+
+        // Dev bypass: local env only — skip auth and use query-param districts.
+        // Mirrors existing shouldBypassAddressVerification / TURNSTILE_BYPASS patterns.
+        // Never active in production (isLocalEnv guards it).
+        if (isLocalEnv(env)) {
+          const devHouse = url.searchParams.get('_dev_house');
+          const devSenate = url.searchParams.get('_dev_senate');
+          if (devHouse || devSenate) {
+            const hd = devHouse ? formatDistrictNumber(devHouse, 2) : null;
+            const sd = devSenate ? formatDistrictNumber(devSenate, 2) : null;
+            const devRows = await env.DB.prepare(
+              `SELECT race_slug, race_title, election_year, office_name, race_category,
+                      jurisdiction, district_type, district_number,
+                      MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count,
+                      MAX(last_reviewed_at) AS last_reviewed_at
+               FROM race_candidates
+               WHERE is_active = 1
+                 AND (
+                   race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+                   OR (district_type = 'state_house' AND district_number = ?)
+                   OR (district_type = 'state_senate' AND district_number = ?)
+                 )
+               GROUP BY race_slug, race_title, election_year, office_name,
+                        race_category, jurisdiction, district_type, district_number
+               ORDER BY race_category, office_name, district_number`
+            ).bind(hd || '', sd || '').all();
+            return jsonResponse({
+              authenticated: true,
+              verified: true,
+              dev_bypass: true,
+              house_district: hd,
+              senate_district: sd,
+              races: devRows.results,
+              notes: [
+                '[DEV] Auth bypassed via query params. Only works in local environment.',
+                'County and local board race matching is not yet available.',
+              ],
+            });
+          }
+        }
+
+        const sessionResult = await getSessionUser(request, env);
+        if (sessionResult.status !== 'valid') {
+          return jsonResponse({
+            authenticated: false,
+            verified: false,
+            races: [],
+            notes: ['Sign in and verify your Wyoming voter information to see your races.'],
+          });
+        }
+
+        const user = sessionResult.user;
+        const addressVerification = await getAddressVerification(env.DB, user.id);
+        const isVerified = Number(user.is_verified_voter || 0) === 1 && !!addressVerification?.verified_at;
+
+        const statewideQ = `
+          SELECT race_slug, race_title, election_year, office_name, race_category,
+                 jurisdiction, district_type, district_number,
+                 MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count,
+                 MAX(last_reviewed_at) AS last_reviewed_at
+          FROM race_candidates
+          WHERE is_active = 1
+            AND race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+          GROUP BY race_slug, race_title, election_year, office_name,
+                   race_category, jurisdiction, district_type, district_number
+          ORDER BY race_category, office_name`;
+
+        if (!isVerified) {
+          const rows = await env.DB.prepare(statewideQ).all();
+          return jsonResponse({
+            authenticated: true,
+            verified: false,
+            house_district: null,
+            senate_district: null,
+            races: rows.results,
+            notes: ['Verify your voter information to see your legislative district races.'],
+          });
+        }
+
+        // formatDistrictNumber already exists in this file — reuse it directly
+        const hd = addressVerification.state_house_dist
+          ? formatDistrictNumber(addressVerification.state_house_dist, 2)
+          : null;
+        const sd = addressVerification.state_senate_dist
+          ? formatDistrictNumber(addressVerification.state_senate_dist, 2)
+          : null;
+
+        const rows = await env.DB.prepare(
+          `SELECT race_slug, race_title, election_year, office_name, race_category,
+                  jurisdiction, district_type, district_number,
+                  MAX(survey_slug) AS survey_slug, COUNT(*) AS candidate_count,
+                  MAX(last_reviewed_at) AS last_reviewed_at
+           FROM race_candidates
+           WHERE is_active = 1
+             AND (
+               race_category IN ('Federal', 'Statewide', 'Judicial Retention')
+               OR (district_type = 'state_house' AND district_number = ?)
+               OR (district_type = 'state_senate' AND district_number = ?)
+             )
+           GROUP BY race_slug, race_title, election_year, office_name,
+                    race_category, jurisdiction, district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).bind(hd || '', sd || '').all();
+
+        return jsonResponse({
+          authenticated: true,
+          verified: true,
+          house_district: hd,
+          senate_district: sd,
+          races: rows.results,
+          notes: [
+            'County and local board race matching is not yet available. Browse all races to see county and local board options.',
+          ],
+        });
+      } catch (error) {
+        console.error('[/api/races/my] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/races — active race summaries grouped by race_slug
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'races' && !pathParts[2]) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'Database not available' }, { status: 503 });
+        const rows = await env.DB.prepare(
+          `SELECT
+             race_slug,
+             race_title,
+             election_year,
+             office_name,
+             race_category,
+             jurisdiction,
+             district_type,
+             district_number,
+             MAX(survey_slug) AS survey_slug,
+             COUNT(*) AS candidate_count,
+             MAX(last_reviewed_at) AS last_reviewed_at
+           FROM race_candidates
+           WHERE is_active = 1
+           GROUP BY race_slug, race_title, election_year, office_name,
+                    race_category, jurisdiction, district_type, district_number
+           ORDER BY race_category, office_name, district_number`
+        ).all();
+        return jsonResponse({ races: rows.results });
+      } catch (error) {
+        console.error('[/api/races] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/races/:slug/candidates — active candidates for one race
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'api' &&
+      pathParts[1] === 'races' &&
+      pathParts[2] &&
+      pathParts[3] === 'candidates'
+    ) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'Database not available' }, { status: 503 });
+        const raceSlug = decodeURIComponent(pathParts[2]);
+        const meta = await env.DB.prepare(
+          `SELECT race_slug, race_title, election_year, office_name, race_category,
+                  jurisdiction, district_type, district_number, MAX(survey_slug) AS survey_slug
+           FROM race_candidates
+           WHERE race_slug = ? AND is_active = 1
+           LIMIT 1`
+        ).bind(raceSlug).first();
+        if (!meta) return jsonResponse({ error: 'Race not found' }, { status: 404 });
+        const candidates = await env.DB.prepare(
+          `SELECT candidate_name, candidate_slug, filing_status,
+                  campaign_website, public_email, public_phone,
+                  source_url, source_note, wy_legislator_name,
+                  survey_slug, last_reviewed_at
+           FROM race_candidates
+           WHERE race_slug = ? AND is_active = 1
+           ORDER BY display_order, candidate_name`
+        ).bind(raceSlug).all();
+        return jsonResponse({ race: meta, candidates: candidates.results });
+      } catch (error) {
+        console.error('[/api/races/:slug/candidates] Error:', error.message);
+        return jsonResponse({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // GET /races/:slug — generic Worker-rendered page for race slugs without a static page
+    if (
+      request.method === 'GET' &&
+      pathParts[0] === 'races' &&
+      pathParts[1] &&
+      !pathParts[2]
+    ) {
+      const raceSlug = decodeURIComponent(pathParts[1]);
+      // Let static pages (already in dist/) take priority via ASSETS.
+      // This handler only triggers when ASSETS returns 404 — but since we fall through
+      // to ASSETS below for any unhandled route, add an explicit DB check first.
+      try {
+        if (!env.DB) {
+          // If no DB, fall through to ASSETS (static page may exist)
+        } else {
+          const raceMeta = await env.DB.prepare(
+            `SELECT race_slug, race_title, office_name, race_category
+             FROM race_candidates WHERE race_slug = ? AND is_active = 1 LIMIT 1`
+          ).bind(raceSlug).first();
+          if (raceMeta) {
+            const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(raceMeta.race_title)} | Grassroots Movement</title>
+<link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+<header class="site-header bg-wy-charcoal text-white">
+  <div class="site-header__inner max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+    <a class="site-brand font-serif font-bold text-lg text-white hover:text-wy-sandstone transition-colors" href="/">Grassroots Movement</a>
+    <div class="flex items-center gap-3 text-sm">
+      <a class="text-white/80 hover:text-white transition-colors" href="/races/my">My Races</a>
+      <a class="text-white/80 hover:text-white transition-colors" href="/races">All Races</a>
+    </div>
+  </div>
+</header>
+<main>
+  <section class="bg-wy-charcoal text-white" aria-labelledby="race-title">
+    <div class="mx-auto max-w-5xl px-6 py-16 md:py-20">
+      <p class="mb-3 text-xs font-bold uppercase tracking-widest text-wy-sandstone">${escapeHtml(raceMeta.race_category)}</p>
+      <h1 id="race-title" class="mb-5 font-serif text-4xl font-bold leading-tight md:text-5xl">${escapeHtml(raceMeta.race_title)}</h1>
+      <p class="mb-8 max-w-3xl text-lg leading-relaxed text-white/85">
+        Review candidate information and share public sentiment through a short support poll.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <a class="button button--primary" href="#support-poll" data-survey-link="poll">Take the Candidate Support Poll</a>
+        <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#candidates">Review Candidate Info</a>
+        <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#results" data-survey-link="results">View Results</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="candidates" class="bg-white" aria-labelledby="candidates-title">
+    <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+      <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Candidate information</p>
+      <h2 id="candidates-title" class="mb-8 font-serif text-3xl font-bold text-wy-charcoal">Candidate cards</h2>
+      <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3" id="candidates-grid">
+        <p class="text-wy-charcoal/60">Loading candidates&hellip;</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="support-poll" class="bg-wy-bone" aria-labelledby="poll-title">
+    <div class="mx-auto max-w-5xl px-6 py-14 md:py-16">
+      <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Poll preview</p>
+      <h2 id="poll-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support poll</h2>
+      <p class="mb-8 max-w-3xl text-wy-charcoal/75">This preview shows the poll structure. Responses are not submitted yet.</p>
+      <form class="space-y-6">
+        <div id="poll-fieldsets">
+          <p class="text-wy-charcoal/60">Loading poll&hellip;</p>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="results" class="bg-white" aria-labelledby="results-title">
+    <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+      <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Aggregate sentiment</p>
+      <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support results</h2>
+      <p class="mb-6 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
+        This is a public sentiment poll, not an election prediction.
+      </p>
+      <div id="race-results-root">
+        <p class="race-results-pending">Results will appear here when the poll is active and responses are available.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="bg-wy-bone px-6 py-8 border-t border-wy-dust">
+    <div class="mx-auto max-w-5xl flex flex-wrap gap-4 text-sm">
+      <a class="text-wy-rust hover:underline" href="/races/my">&larr; My Races</a>
+      <a class="text-wy-rust hover:underline" href="/races">All Wyoming Races</a>
+    </div>
+  </div>
+</main>
+<script src="/js/races.js"></script>
+<script>
+(function() {
+  var slug = ${JSON.stringify(raceSlug)};
+  function init() {
+    window.RaceHub && window.RaceHub.loadRaceCandidates(slug, {
+      candidateGridId:    'candidates-grid',
+      pollContainerId:    'poll-fieldsets',
+      resultsContainerId: 'race-results-root',
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>`;
+            return new Response(html, {
+              status: 200,
+              headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[/races/:slug] Error:', error.message);
+      }
+      // Fall through to ASSETS — static page may exist (e.g. /races/us-senate-2026)
     }
 
     // Serve static assets from /public

@@ -74,6 +74,11 @@ const surveySources = {
     file: 'surveys/surveys_wy_primary_election_participation_v1.jsonc',
     scope: 'wy',
   },
+  'wy-data-centers-v1': {
+    slug: 'wy-data-centers',
+    file: 'surveys/surveys_wy_data_centers_v1.jsonc',
+    scope: 'wy',
+  },
   'cost-of-living-v1': {
     slug: 'cost-of-living',
     file: 'surveys/surveys_cost_of_living_v1.jsonc',
@@ -138,6 +143,50 @@ const surveySources = {
     slug: 'security-feedback',
     file: 'surveys/surveys_security_feedback_v1.jsonc',
     scope: 'public',
+  },
+  // Race polls — skipTownhall: true prevents Town Hall topic creation.
+  // Race polls are candidate support polls, not community issue discussions.
+  'race-us-senate-2026-v1': {
+    slug: 'race-us-senate-2026',
+    file: 'surveys/race_us-senate-2026_v1.jsonc',
+    scope: 'wy',
+    skipTownhall: true,
+  },
+  'race-us-house-2026-v1': {
+    slug: 'race-us-house-2026',
+    file: 'surveys/race_us-house-2026_v1.jsonc',
+    scope: 'wy',
+    skipTownhall: true,
+  },
+  'race-governor-2026-v1': {
+    slug: 'race-governor-2026',
+    file: 'surveys/race_governor-2026_v1.jsonc',
+    scope: 'wy',
+    skipTownhall: true,
+  },
+  'race-secretary-of-state-2026-v1': {
+    slug: 'race-secretary-of-state-2026',
+    file: 'surveys/race_secretary-of-state-2026_v1.jsonc',
+    scope: 'wy',
+    skipTownhall: true,
+  },
+  'race-state-treasurer-2026-v1': {
+    slug: 'race-state-treasurer-2026',
+    file: 'surveys/race_state-treasurer-2026_v1.jsonc',
+    scope: 'wy',
+    skipTownhall: true,
+  },
+  'race-state-auditor-2026-v1': {
+    slug: 'race-state-auditor-2026',
+    file: 'surveys/race_state-auditor-2026_v1.jsonc',
+    scope: 'wy',
+    skipTownhall: true,
+  },
+  'race-superintendent-2026-v1': {
+    slug: 'race-superintendent-2026',
+    file: 'surveys/race_superintendent-2026_v1.jsonc',
+    scope: 'wy',
+    skipTownhall: true,
   },
 };
 
@@ -285,6 +334,7 @@ const buildSql = ({
   publish,
   changelog,
   topicId,
+  skipTownhall,
 }) => {
   const publishedAt = publish ? "datetime('now')" : 'NULL';
   const flowMetaValue = flowMeta ? `'${flowMeta.replace(/'/g, "''")}'` : 'NULL';
@@ -326,6 +376,7 @@ ON CONFLICT(survey_id, version) DO UPDATE SET
   changelog = excluded.changelog,
   published_at = ${publishedAt};
 
+${skipTownhall ? '' : `
 INSERT OR IGNORE INTO townhall_topics (
   id,
   survey_id,
@@ -359,6 +410,7 @@ SET survey_id = (SELECT id FROM surveys WHERE slug = '${slug.replace(/'/g, "''")
     updated_at = datetime('now')
 WHERE survey_slug = '${slug.replace(/'/g, "''")}'
    OR survey_id = (SELECT id FROM surveys WHERE slug = '${slug.replace(/'/g, "''")}');
+`}
 `;
 };
 
@@ -505,6 +557,7 @@ const main = () => {
       publish,
       changelog,
       topicId: crypto.randomUUID(),
+      skipTownhall: Boolean(source.skipTownhall),
     });
     console.log(
       `Prepared ${survey.slug} v${version} hash ${survey.jsonHash} length ${survey.jsonText.length}`

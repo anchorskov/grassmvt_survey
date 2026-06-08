@@ -2159,3 +2159,226 @@ textarea#statement-body {
     text-align: center;
   }
 }
+
+/* ── Race results — summary score bar + detail cards ─────────────────────── */
+
+/* Summary section wrapper */
+.rrs-summary {
+  margin-bottom: 2rem;
+}
+
+/* One row per candidate */
+.rrs-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.625rem;
+}
+
+/* Candidate name — links to detail card */
+.rrs-name {
+  flex-shrink: 0;
+  width: 11rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2c2c2c;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rrs-name:hover {
+  text-decoration: underline;
+  color: #b84c2a;
+}
+
+/* Track */
+.rrs-bar-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.rrs-bar-track {
+  position: relative;
+  height: 1.5rem;
+  background: #f0ebe3;
+  border-radius: 0.25rem;
+  overflow: hidden;
+  cursor: default;
+}
+/* Centre divider */
+.rrs-bar-track::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  bottom: 10%;
+  width: 1px;
+  background: rgba(0,0,0,0.18);
+  z-index: 1;
+}
+/* Fill — positive (green, extends right from centre) */
+.rrs-bar-fill--pos {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  background: #2a6b3a;
+  border-radius: 0 0.2rem 0.2rem 0;
+  transition: width 0.45s ease;
+}
+/* Fill — negative (rust, extends left from centre) */
+.rrs-bar-fill--neg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 50%;
+  background: #b84c2a;
+  border-radius: 0.2rem 0 0 0.2rem;
+  transition: width 0.45s ease;
+}
+
+/* Net score number */
+.rrs-score {
+  flex-shrink: 0;
+  width: 3.5rem;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #6b6154;
+}
+.rrs-score--pos { color: #2a6b3a; }
+.rrs-score--neg { color: #b84c2a; }
+
+.rrs-meta {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: #9b8f84;
+}
+
+/* Details disclosure */
+.rrs-details {
+  margin-top: 1rem;
+}
+.rrs-details__toggle {
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #b84c2a;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0;
+}
+.rrs-details__toggle::before {
+  content: '▸';
+  font-size: 0.7rem;
+  transition: transform 0.15s;
+}
+details[open] .rrs-details__toggle::before {
+  transform: rotate(90deg);
+}
+.rrs-details__toggle::-webkit-details-marker { display: none; }
+
+@media (max-width: 600px) {
+  .rrs-row {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .rrs-name {
+    width: 100%;
+    white-space: normal;
+  }
+  .rrs-score {
+    width: auto;
+    order: -1;
+    font-size: 0.8125rem;
+  }
+}
+
+/* ── Race results bar charts ──────────────────────────────────────────────── */
+
+.race-results-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .race-results-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.race-results-card {
+  border: 1px solid #ede5da;
+  border-radius: 0.5rem;
+  background: #fff;
+  padding: 1.25rem;
+}
+
+.race-results-card__name {
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #2c2c2c;
+  margin: 0 0 1rem;
+}
+
+.race-results-bar {
+  margin-bottom: 0.75rem;
+}
+
+.race-results-bar__label {
+  font-size: 0.8125rem;
+  color: #6b6154;
+  margin-bottom: 0.25rem;
+}
+
+.race-results-bar__track {
+  height: 0.625rem;
+  background: #f0ebe3;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-bottom: 0.2rem;
+}
+
+.race-results-bar__fill {
+  height: 100%;
+  background: #b84c2a;
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+.race-results-bar__value {
+  font-size: 0.75rem;
+  color: #6b6154;
+}
+
+.race-results-meta {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #ede5da;
+  font-size: 0.8125rem;
+  color: #6b6154;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.race-results-meta__item strong {
+  color: #2c2c2c;
+}
+
+.race-results-pending {
+  color: #9b8f84;
+  font-size: 0.9375rem;
+}
+
+.race-results-suppressed {
+  font-size: 0.9375rem;
+  color: #6b6154;
+  border: 1px solid #ede5da;
+  border-radius: 0.5rem;
+  background: #faf7f3;
+  padding: 1rem 1.25rem;
+}

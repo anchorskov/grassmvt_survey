@@ -1,0 +1,69 @@
+// surveys/race_state-auditor-2026_v1.jsonc
+// slug: race-state-auditor-2026
+// version: v1 | 2026-06-04
+// title: State Auditor, Wyoming, 2026 — Candidate Support Poll
+{
+  "title": "State Auditor, Wyoming, 2026 — Candidate Support Poll",
+  "description": "Share public sentiment on the candidate for Wyoming's 2026 State Auditor race. This is a public sentiment poll, not an election prediction. Results are reported in aggregate only.",
+  "completedHtml": "<p>Thank you. Your response has been recorded as public sentiment for this race.</p>",
+  "showQuestionNumbers": "off",
+  "questionTitleLocation": "top",
+  "completeText": "Submit",
+  "x_meta": {
+    "flow": "standard",
+    "path": null,
+    "category_slug": "race-state-auditor-2026",
+    "estimated_minutes": 2,
+    "featured": false,
+    "race_slug": "state-auditor-2026"
+  },
+  "pages": [
+    {
+      "name": "candidate_support",
+      "title": "Candidate support",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "support_kristi_racines",
+          "title": "Kristi Racines — State Auditor, Wyoming, 2026\n\nBased on what you know today, do you support this candidate for this office?",
+          "choices": [
+            "Strongly support",
+            "Lean support",
+            "Neutral or undecided",
+            "Lean oppose",
+            "Strongly oppose",
+            "I need more information",
+            "I am unfamiliar with this candidate"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "race_questions",
+      "title": "Race questions",
+      "description": "These questions are optional. Your answers help show what issues and qualities matter most in this race.",
+      "elements": [
+        {
+          "type": "text",
+          "name": "issue_most",
+          "title": "Which issue matters most in this race?"
+        },
+        {
+          "type": "text",
+          "name": "quality_most",
+          "title": "What quality matters most in a candidate for this office?"
+        },
+        {
+          "type": "text",
+          "name": "candidate_question",
+          "title": "What question should every candidate in this race answer?"
+        },
+        {
+          "type": "comment",
+          "name": "wyoming_comment",
+          "title": "Optional comment: What should candidates in this race understand about Wyoming?"
+        }
+      ]
+    }
+  ]
+}

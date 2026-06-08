@@ -1,0 +1,259 @@
+---
+// src/pages/admin/races.astro
+// Admin race tools: coverage overview + district simulator.
+// Requires admin role — enforced by /api/admin/races/* routes.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Race Admin | Grassroots Movement">
+  <main class="max-w-5xl mx-auto px-4 py-10">
+    <div class="mb-6 flex items-center gap-4">
+      <a href="/admin/" class="text-wy-rust text-sm hover:underline">&larr; Admin tools</a>
+    </div>
+
+    <h1 class="font-serif text-3xl font-bold text-wy-charcoal mb-2">Race admin tools</h1>
+    <p class="text-wy-charcoal/70 mb-10">Race coverage overview and district race simulator. Data is live from local D1.</p>
+
+    {/* ── District simulator ── */}
+    <section class="mb-12">
+      <h2 class="font-serif text-xl font-bold text-wy-charcoal mb-1">District simulator</h2>
+      <p class="text-sm text-wy-charcoal/70 mb-5">
+        Preview which races a verified voter in any district would see on /races/my.
+        Uses <code class="bg-wy-bone px-1 rounded">/api/admin/races/preview</code> — same filtering logic as the live endpoint.
+      </p>
+      <div class="flex flex-wrap gap-3 items-end mb-5">
+        <label class="block">
+          <span class="block text-xs font-bold uppercase tracking-wide text-wy-charcoal mb-1">House District</span>
+          <select id="sim-house" class="w-48 rounded-md border border-wy-dust bg-white px-3 py-2 text-wy-charcoal">
+            <option value="">Select…</option>
+          </select>
+        </label>
+        <label class="block">
+          <span class="block text-xs font-bold uppercase tracking-wide text-wy-charcoal mb-1">Senate District</span>
+          <select id="sim-senate" class="w-48 rounded-md border border-wy-dust bg-white px-3 py-2 text-wy-charcoal">
+            <option value="">Select…</option>
+          </select>
+        </label>
+        <button id="sim-reset" class="button button--secondary" type="button">Clear</button>
+        <button id="sim-run" class="button button--primary" type="button">Preview races</button>
+      </div>
+      <div id="sim-result" class="hidden">
+        <p id="sim-meta" class="text-sm text-wy-charcoal/70 mb-4"></p>
+        <div id="sim-grid" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
+      </div>
+      <p id="sim-error" class="hidden text-red-700 text-sm"></p>
+    </section>
+
+    {/* ── Dev bypass reminder ── */}
+    <section class="mb-12 rounded-lg border border-wy-dust bg-wy-bone p-5">
+      <h2 class="font-serif text-lg font-bold text-wy-charcoal mb-2">Dev bypass (local only)</h2>
+      <p class="text-sm text-wy-charcoal/70 mb-3">
+        On localhost, <code class="bg-white px-1 rounded">/api/races/my</code> accepts
+        <code class="bg-white px-1 rounded">?_dev_house=05&amp;_dev_senate=03</code> to skip auth.
+        The <code class="bg-white px-1 rounded">/races/my</code> page accepts the same params and passes them through.
+        Never active in production — guarded by <code class="bg-white px-1 rounded">isLocalEnv(env)</code>.
+      </p>
+      <div class="flex flex-wrap gap-3 items-end">
+        <label class="block">
+          <span class="block text-xs font-bold uppercase tracking-wide text-wy-charcoal mb-1">House</span>
+          <select id="dev-house" class="w-48 rounded-md border border-wy-dust bg-white px-3 py-2 text-wy-charcoal">
+            <option value="">Select…</option>
+          </select>
+        </label>
+        <label class="block">
+          <span class="block text-xs font-bold uppercase tracking-wide text-wy-charcoal mb-1">Senate</span>
+          <select id="dev-senate" class="w-48 rounded-md border border-wy-dust bg-white px-3 py-2 text-wy-charcoal">
+            <option value="">Select…</option>
+          </select>
+        </label>
+        <button id="dev-reset" class="button button--secondary" type="button">Clear</button>
+        <a id="dev-link" href="/races/my" class="button button--secondary" target="_blank">Open /races/my with bypass</a>
+      </div>
+      <p class="text-xs text-wy-charcoal/50 mt-3">This link only works when running locally (wrangler dev). It has no effect in production.</p>
+    </section>
+
+    {/* ── Coverage overview ── */}
+    <section>
+      <div class="flex items-center gap-4 mb-5">
+        <h2 class="font-serif text-xl font-bold text-wy-charcoal">Race coverage overview</h2>
+        <button id="coverage-load" class="button button--secondary text-sm" type="button">Load</button>
+      </div>
+      <p id="coverage-meta" class="text-sm text-wy-charcoal/70 mb-4 hidden"></p>
+      <div class="overflow-x-auto">
+        <table id="coverage-table" class="hidden w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-wy-charcoal text-white text-left">
+              <th class="px-3 py-2 font-semibold">Race</th>
+              <th class="px-3 py-2 font-semibold">Category</th>
+              <th class="px-3 py-2 font-semibold">District</th>
+              <th class="px-3 py-2 font-semibold text-center">Candidates</th>
+              <th class="px-3 py-2 font-semibold text-center">Poll seeded</th>
+              <th class="px-3 py-2 font-semibold">Last reviewed</th>
+            </tr>
+          </thead>
+          <tbody id="coverage-body"></tbody>
+        </table>
+      </div>
+      <p id="coverage-error" class="hidden text-red-700 text-sm"></p>
+    </section>
+  </main>
+</BaseLayout>
+
+<script is:inline src="/js/districts.js"></script>
+
+<script>
+(function () {
+  function escH(s: any) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function showError(el: HTMLElement | null, msg: string) {
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  function hideError(el: HTMLElement | null) {
+    if (!el) return;
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
+
+  /* ── District simulator ── */
+  const simHouse  = document.getElementById('sim-house') as HTMLSelectElement;
+  const simSenate = document.getElementById('sim-senate') as HTMLSelectElement;
+  const simReset  = document.getElementById('sim-reset');
+  const simRun    = document.getElementById('sim-run');
+  const simResult = document.getElementById('sim-result');
+  const simMeta   = document.getElementById('sim-meta');
+  const simGrid   = document.getElementById('sim-grid');
+  const simError  = document.getElementById('sim-error');
+
+  /* ── Dev bypass ── */
+  const devHouse  = document.getElementById('dev-house') as HTMLSelectElement;
+  const devSenate = document.getElementById('dev-senate') as HTMLSelectElement;
+  const devReset  = document.getElementById('dev-reset');
+  const devLink   = document.getElementById('dev-link') as HTMLAnchorElement;
+
+  function updateDevLink() {
+    const params = new URLSearchParams();
+    if (devHouse?.value) params.set('_dev_house', devHouse.value);
+    if (devSenate?.value) params.set('_dev_senate', devSenate.value);
+    const qs = params.toString();
+    if (devLink) devLink.href = qs ? `/races/my?${qs}` : '/races/my';
+  }
+
+  /* Initialize both dropdown pairs once district data is loaded */
+  (window as any).WyDistricts.load().then(function (maps: any) {
+    /* Simulator dropdowns */
+    (window as any).WyDistricts.wireSelects(maps, simHouse, simSenate, {
+      onPairValid: function () { hideError(simError); },
+      onReset: function () { if (simResult) simResult.classList.add('hidden'); hideError(simError); },
+      onPartial: function () { hideError(simError); },
+    });
+
+    /* Dev bypass dropdowns */
+    (window as any).WyDistricts.wireSelects(maps, devHouse, devSenate, {
+      onPairValid: function () { updateDevLink(); },
+      onReset: function () { updateDevLink(); },
+      onPartial: function () { updateDevLink(); },
+    });
+
+    /* Simulator reset */
+    simReset && simReset.addEventListener('click', function () {
+      (window as any).WyDistricts.resetSelects(maps, simHouse, simSenate);
+      if (simResult) simResult.classList.add('hidden');
+      hideError(simError);
+    });
+
+    /* Dev bypass reset */
+    devReset && devReset.addEventListener('click', function () {
+      (window as any).WyDistricts.resetSelects(maps, devHouse, devSenate);
+      updateDevLink();
+    });
+
+    /* Simulator run */
+    simRun && simRun.addEventListener('click', async function () {
+      hideError(simError);
+      if (simResult) simResult.classList.add('hidden');
+      const house  = simHouse?.value  || '';
+      const senate = simSenate?.value || '';
+      if (!house && !senate) {
+        showError(simError, 'Select at least one district.');
+        return;
+      }
+      if (house && senate && !(window as any).WyDistricts.isPairValid(maps, house, senate)) {
+        showError(simError, `House District ${parseInt(house, 10)} and Senate District ${parseInt(senate, 10)} are not a valid pair for Wyoming.`);
+        return;
+      }
+      const params = new URLSearchParams();
+      if (house)  params.set('house',  house);
+      if (senate) params.set('senate', senate);
+      try {
+        const res = await fetch('/api/admin/races/preview?' + params.toString(), { credentials: 'include' });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || res.statusText); }
+        const data = await res.json();
+        const hLabel = data.house_district  ? 'HD-' + parseInt(data.house_district,  10) : '—';
+        const sLabel = data.senate_district ? 'SD-' + parseInt(data.senate_district, 10) : '—';
+        if (simMeta) simMeta.textContent = `${hLabel} / ${sLabel} → ${data.race_count} races`;
+        if (simGrid) {
+          simGrid.innerHTML = (data.races || []).map((r: any) => {
+            const poll = r.survey_slug
+              ? `<span class="text-green-700 font-semibold">✓ ${escH(r.survey_slug)}</span>`
+              : `<span class="text-amber-600">No poll</span>`;
+            return `<div class="rounded border border-wy-dust bg-wy-bone/40 p-3">
+              <p class="text-xs font-bold uppercase tracking-wide text-wy-rust mb-1">${escH(r.race_category)}</p>
+              <p class="font-semibold text-wy-charcoal text-sm mb-1">${escH(r.race_title)}</p>
+              <p class="text-xs text-wy-charcoal/60">${r.candidate_count} candidates &bull; ${poll}</p>
+            </div>`;
+          }).join('');
+        }
+        if (simResult) simResult.classList.remove('hidden');
+      } catch (e: any) {
+        showError(simError, e.message || 'Error loading preview.');
+      }
+    });
+  });
+
+  /* ── Coverage table ── */
+  const coverageLoad  = document.getElementById('coverage-load');
+  const coverageMeta  = document.getElementById('coverage-meta');
+  const coverageTable = document.getElementById('coverage-table');
+  const coverageBody  = document.getElementById('coverage-body');
+  const coverageError = document.getElementById('coverage-error');
+
+  coverageLoad && coverageLoad.addEventListener('click', async function () {
+    hideError(coverageError);
+    try {
+      const res = await fetch('/api/admin/races/overview', { credentials: 'include' });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || res.statusText); }
+      const data = await res.json();
+      const races = data.races || [];
+      const seeded = races.filter((r: any) => r.survey_slug).length;
+      if (coverageMeta) {
+        coverageMeta.textContent = `${races.length} races total — ${seeded} with poll seeded, ${races.length - seeded} without`;
+        coverageMeta.classList.remove('hidden');
+      }
+      if (coverageBody) {
+        coverageBody.innerHTML = races.map((r: any) => {
+          const distLabel = r.district_number ? `${r.district_type === 'state_house' ? 'HD' : 'SD'}-${parseInt(r.district_number, 10)}` : '—';
+          const pollCell = r.survey_slug
+            ? `<td class="px-3 py-2 text-center text-green-700">✓</td>`
+            : `<td class="px-3 py-2 text-center text-amber-600">✗</td>`;
+          return `<tr class="border-t border-wy-dust/50 hover:bg-wy-bone/30">
+            <td class="px-3 py-2 text-wy-charcoal">${escH(r.race_title)}</td>
+            <td class="px-3 py-2 text-wy-charcoal/70">${escH(r.race_category)}</td>
+            <td class="px-3 py-2 text-wy-charcoal/70">${escH(distLabel)}</td>
+            <td class="px-3 py-2 text-center text-wy-charcoal">${r.candidate_count}</td>
+            ${pollCell}
+            <td class="px-3 py-2 text-wy-charcoal/60 text-xs">${r.last_reviewed_at || '—'}</td>
+          </tr>`;
+        }).join('');
+      }
+      if (coverageTable) coverageTable.classList.remove('hidden');
+      if (coverageLoad) (coverageLoad as HTMLButtonElement).textContent = 'Reload';
+    } catch (e: any) {
+      showError(coverageError, e.message || 'Error');
+    }
+  });
+})();
+</script>

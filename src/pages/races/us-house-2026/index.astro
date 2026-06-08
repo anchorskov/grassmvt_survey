@@ -1,0 +1,97 @@
+---
+// src/pages/races/us-house-2026/index.astro
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import CandidateCard from '../../../components/races/CandidateCard.astro';
+import SupportPollPreview from '../../../components/races/SupportPollPreview.astro';
+import {
+  US_HOUSE_2026_CANDIDATES,
+  SUPPORT_CHOICES,
+  SUPPORT_QUESTION,
+  RACE_POLL_QUESTIONS,
+} from '../../../data/races.js';
+---
+
+<BaseLayout title="U.S. House, Wyoming, 2026 | Grassroots Movement" description="Review candidate information and share public sentiment for Wyoming's at-large U.S. House race in 2026.">
+  <main>
+    <section class="bg-wy-charcoal text-white" aria-labelledby="race-title">
+      <div class="mx-auto max-w-5xl px-6 py-16 md:py-20">
+        <p class="mb-3 text-xs font-bold uppercase tracking-widest text-wy-sandstone">Federal race</p>
+        <h1 id="race-title" class="mb-5 font-serif text-4xl font-bold leading-tight md:text-5xl">U.S. House, Wyoming, 2026</h1>
+        <p class="mb-8 max-w-3xl text-lg leading-relaxed text-white/85">
+          Wyoming has one at-large U.S. House seat. This page gathers public input for this race. Citizens can review candidate information, take a short support poll, and see aggregate sentiment as the race develops.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <a class="button button--primary" href="#support-poll" data-survey-link="poll">Take the Candidate Support Poll</a>
+          <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#candidates">Review Candidate Info</a>
+          <a class="button button--secondary border-white/40 text-white hover:bg-white/10" href="#results" data-survey-link="results">View Results</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="candidates" class="bg-white" aria-labelledby="candidates-title">
+      <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Candidate information</p>
+        <h2 id="candidates-title" class="mb-8 font-serif text-3xl font-bold text-wy-charcoal">Candidate cards</h2>
+        <div class="grid gap-5 lg:grid-cols-2" id="candidates-grid">
+          {US_HOUSE_2026_CANDIDATES.map((c) => (
+            <CandidateCard
+              name={c.name}
+              office={c.office}
+              status={c.status}
+              website={c.website}
+              contact={c.contact}
+              statement={c.statement}
+              sourceNote={c.sourceNote}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="support-poll" class="bg-wy-bone" aria-labelledby="poll-title">
+      <div class="mx-auto max-w-5xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Poll preview</p>
+        <h2 id="poll-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support poll</h2>
+        <p class="mb-8 max-w-3xl text-wy-charcoal/75">This preview shows the poll structure. Responses are not submitted yet.</p>
+        <div id="poll-fieldsets">
+          <SupportPollPreview
+            candidates={US_HOUSE_2026_CANDIDATES.map((c) => ({ name: c.name, slug: c.slug }))}
+            choices={SUPPORT_CHOICES}
+            questionText={SUPPORT_QUESTION}
+            pollQuestions={RACE_POLL_QUESTIONS}
+          />
+        </div>
+      </div>
+    </section>
+
+    <section id="results" class="bg-white" aria-labelledby="results-title">
+      <div class="mx-auto max-w-6xl px-6 py-14 md:py-16">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-wy-rust">Aggregate sentiment</p>
+        <h2 id="results-title" class="mb-4 font-serif text-3xl font-bold text-wy-charcoal">Candidate support results</h2>
+        <p class="mb-8 inline-block rounded-md border border-wy-dust bg-wy-bone px-4 py-3 font-semibold text-wy-charcoal">
+          This is a public sentiment poll, not an election prediction.
+        </p>
+        <div id="race-results-root">
+          <p class="race-results-pending">Results will appear here when the poll is active and responses are available.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</BaseLayout>
+
+<script is:inline src="/js/races.js"></script>
+<script>
+(function () {
+  function init() {
+    (window as any).RaceHub && (window as any).RaceHub.loadRaceCandidates('us-house-2026', {
+      candidateGridId: 'candidates-grid',
+      pollContainerId: 'poll-fieldsets',
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>

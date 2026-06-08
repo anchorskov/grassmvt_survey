@@ -1,0 +1,322 @@
+// surveys/surveys_wy_data_centers_v1.jsonc
+// slug: wy-data-centers
+// version: v1 | 2026-06-08
+// title: Wyoming Data Centers Survey
+// source: wy_data_centers_sources_background.pdf
+// source: wy_data_centers_purpose_privacy.pdf
+{
+  "title": "Wyoming Data Centers Survey",
+  "description": "Measure what Wyoming voters believe about standards for large data center development, including water use, electric infrastructure, public input, disclosure, and who should set the rules.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "completeText": "Submit survey",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "data-centers",
+    "estimated_minutes": 6,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey asks Wyoming voters what standards should guide large data center development in our state. The goal is to measure public input, not argue for or against any specific project.</p><p><a class=\"button button--small button--secondary\" href=\"/assets/wy_data_centers_sources_background.pdf\" target=\"_blank\" rel=\"noopener\">Sources and background</a> &nbsp; <a class=\"button button--small button--secondary\" href=\"/assets/wy_data_centers_purpose_privacy.pdf\" target=\"_blank\" rel=\"noopener\">Privacy and method</a></p><h3>How responses will be used</h3><ul><li>Results will be published in aggregate.</li><li>Exact question wording and response options will be published with the results.</li><li>Verified and unverified responses may be reported separately.</li><li>Individual responses will remain confidential.</li></ul><h3>Short background</h3><p>Wyoming is seeing increased interest in large data centers and other large-load facilities. These projects may bring investment, jobs, and tax revenue. They may also affect water, electric infrastructure, land use, local services, wildlife, housing, and utility costs. This survey asks what conditions Wyoming voters believe should apply before projects move forward.</p><h3>Definitions</h3><ul><li><strong>Data center:</strong> A facility with computer servers used to store, process, or move digital information.</li><li><strong>Large-load facility:</strong> A project requiring a large amount of electricity.</li><li><strong>Closed-loop cooling system:</strong> A system that reuses cooling water rather than relying on continuous new water use.</li></ul>"
+        }
+      ]
+    },
+    {
+      "name": "baseline_view",
+      "title": "Section 1: Familiarity and overall view",
+      "description": "Where you start — your familiarity with the issue and your current overall position.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "data_center_familiarity",
+          "title": "How familiar are you with data center development in Wyoming?",
+          "choices": [
+            "Very familiar",
+            "Somewhat familiar",
+            "Not very familiar",
+            "Not familiar",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "overall_view",
+          "title": "Which statement is closest to your overall view?",
+          "choices": [
+            "Wyoming should welcome data centers with ordinary review",
+            "Wyoming should welcome data centers only with clear safeguards",
+            "Wyoming should pause new large data center approvals until stronger rules are in place",
+            "Wyoming should generally discourage large data center development",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "benefits_and_concerns",
+      "title": "Section 2: Benefits and concerns",
+      "description": "What you see as the most important potential gains and the most serious potential drawbacks.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "benefits_most_important",
+          "title": "What potential benefits matter most to you? Pick up to 3.",
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Local jobs",
+            "Local tax revenue",
+            "Stronger electric infrastructure",
+            "Technology and workforce training",
+            "New private investment",
+            "Support for schools, counties, or towns",
+            "National security or digital infrastructure",
+            "I do not see major benefits",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other (write in)"
+        },
+        {
+          "type": "checkbox",
+          "name": "concerns_most_important",
+          "title": "What potential concerns matter most to you? Pick up to 3.",
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Water use",
+            "Water quality",
+            "Electric rates for homes and small businesses",
+            "Grid reliability",
+            "Noise",
+            "Wildlife and open space",
+            "Housing or local service pressure",
+            "Limited public input",
+            "Long-term site cleanup or reuse",
+            "I do not have major concerns",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other (write in)"
+        }
+      ]
+    },
+    {
+      "name": "infrastructure_and_costs",
+      "title": "Section 3: Infrastructure and costs",
+      "description": "Who should bear the cost of new power infrastructure built primarily for a data center.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "infrastructure_cost_responsibility",
+          "title": "Who should pay for new power infrastructure needed mainly for a data center?",
+          "choices": [
+            "The data center developer",
+            "The electric utility",
+            "State government",
+            "Local government",
+            "Shared cost, depending on public benefit",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "transparency",
+      "title": "Section 4: Public disclosure",
+      "description": "What information should be made public before a project is approved.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "public_disclosure_requirements",
+          "title": "Before approval, what information should be publicly disclosed? Pick up to 4.",
+          "maxSelectedChoices": 4,
+          "choices": [
+            "Estimated electric demand",
+            "Estimated water use",
+            "Water source and water-quality protections",
+            "Expected local jobs",
+            "Tax incentives or public costs",
+            "Backup power plans",
+            "Noise and light impact",
+            "Housing and road impact",
+            "Ownership and project partners",
+            "Site cleanup or reuse plan",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other (write in)"
+        }
+      ]
+    },
+    {
+      "name": "water_standards",
+      "title": "Section 5: Water standards",
+      "description": "How Wyoming should handle water use for large data centers.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "water_use_approach",
+          "title": "How should Wyoming handle water use for large data centers?",
+          "choices": [
+            "Require low-water or closed-loop cooling where practical",
+            "Allow water use if local water providers approve",
+            "Allow water use only if long-term supply is clearly protected",
+            "Let each local government decide",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "approval_process",
+      "title": "Section 6: Approval process",
+      "description": "How important public input is and which level of government should set the rules.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "public_input_importance",
+          "title": "How important is local public input before a large data center is approved?",
+          "choices": [
+            "Very important",
+            "Important",
+            "Somewhat important",
+            "Not important",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "approval_approach",
+          "title": "Which approval approach feels most appropriate?",
+          "choices": [
+            "Statewide rules should apply to all large data centers",
+            "Local governments should decide most conditions",
+            "State and local governments should share responsibility",
+            "Existing rules are enough",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "requirements_and_balance",
+      "title": "Section 7: Requirements and tradeoffs",
+      "description": "What Wyoming should require from approved projects and how to weigh competing interests.",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "required_conditions",
+          "title": "What should Wyoming require from approved data centers? Pick up to 3.",
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Protect residential and small-business electric rates",
+            "Use water-conserving technology",
+            "Publish annual water and power use",
+            "Fund local infrastructure tied to project impacts",
+            "Support local workforce training",
+            "Provide community benefit agreements",
+            "Protect wildlife, agriculture, and open space",
+            "Plan for site reuse if the project closes",
+            "No additional requirements",
+            "Not sure"
+          ],
+          "showOtherItem": true,
+          "otherText": "Other (write in)"
+        },
+        {
+          "type": "radiogroup",
+          "name": "benefits_vs_impacts_balance",
+          "title": "If a data center creates economic benefits but also creates local impacts, what should matter most?",
+          "choices": [
+            "Economic benefits should carry more weight",
+            "Local impacts should carry more weight",
+            "Benefits and impacts should be balanced case by case",
+            "Projects should move forward only with clear local support",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bottom_line",
+      "title": "Section 8: In your own words",
+      "description": "Optional open response — add context or anything not covered above.",
+      "elements": [
+        {
+          "type": "comment",
+          "name": "open_response_requirements",
+          "title": "In your own words, what should Wyoming require before a large data center is approved?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_demographics",
+      "title": "Optional demographics",
+      "description": "These questions help interpret results without identifying you personally.",
+      "elements": [
+        {
+          "type": "dropdown",
+          "name": "state",
+          "title": "State",
+          "searchEnabled": true,
+          "searchMode": "startsWith",
+          "choices": [
+            "Prefer not to answer"
+          ],
+          "choicesByUrl": {
+            "url": "/api/geo/us-states",
+            "valueName": "name",
+            "titleName": "name"
+          }
+        },
+        {
+          "type": "radiogroup",
+          "name": "age_range",
+          "title": "Age range",
+          "choices": [
+            "Under 18",
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "issue_connection",
+          "title": "Connection to this issue",
+          "choices": [
+            "Wyoming utility customer",
+            "Wyoming water rights holder",
+            "Wyoming landowner or rancher",
+            "Wyoming business owner or employer",
+            "Local elected official or staff",
+            "Wildlife, conservation, or open space advocate",
+            "Technology industry",
+            "Other Wyoming resident",
+            "Not sure",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}
