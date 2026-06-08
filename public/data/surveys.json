@@ -361,6 +361,21 @@
     "href": "/surveys/wy-primary-election-participation"
   },
   {
+    "id": "wy-data-centers",
+    "slug": "wy-data-centers",
+    "scope": "wy",
+    "title": "Wyoming Data Centers: What Standards Should We Require?",
+    "description": "Measure what Wyoming voters believe about standards for large data center development, including water use, electric infrastructure, public input, disclosure, and who should set the rules.",
+    "landing_blurb": "Wyoming is being asked to consider large data centers that may bring investment and jobs — and may affect water, electricity, land use, wildlife, and local services. This survey asks what safeguards voters want before projects move forward.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "data-centers",
+    "display_order": 33,
+    "estimated_minutes": 6,
+    "featured": true,
+    "href": "/surveys/wy-data-centers"
+  },
+  {
     "id": "military-force-ai",
     "slug": "military-force-ai",
     "scope": "public",

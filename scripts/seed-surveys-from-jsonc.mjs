@@ -74,6 +74,11 @@ const surveySources = {
     file: 'surveys/surveys_wy_primary_election_participation_v1.jsonc',
     scope: 'wy',
   },
+  'wy-data-centers-v1': {
+    slug: 'wy-data-centers',
+    file: 'surveys/surveys_wy_data_centers_v1.jsonc',
+    scope: 'wy',
+  },
   'cost-of-living-v1': {
     slug: 'cost-of-living',
     file: 'surveys/surveys_cost_of_living_v1.jsonc',
