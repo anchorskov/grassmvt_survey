@@ -79,6 +79,11 @@ const surveySources = {
     file: 'surveys/surveys_wy_data_centers_v1.jsonc',
     scope: 'wy',
   },
+  'wy-family-four-pillars-v1': {
+    slug: 'wy-family-four-pillars',
+    file: 'surveys/surveys_wy_family_four_pillars_v1.jsonc',
+    scope: 'wy',
+  },
   'cost-of-living-v1': {
     slug: 'cost-of-living',
     file: 'surveys/surveys_cost_of_living_v1.jsonc',

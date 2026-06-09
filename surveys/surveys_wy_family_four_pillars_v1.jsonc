@@ -1,0 +1,536 @@
+// surveys/surveys_wy_family_four_pillars_v1.jsonc
+// slug: wy-family-four-pillars
+// version: v1 | 2026-06-09
+// title: Wyoming Four Pillars Survey: Life, Religious Liberty, Family Values, and Education Freedom
+// source: wy_family_four_pillars_sources_background.pdf
+// source: wy_family_four_pillars_constitutional_review_summary.pdf
+{
+  "title": "Wyoming Four Pillars Survey",
+  "description": "Measure where Wyoming voters stand on four core policy areas — life, religious liberty, family values, and education freedom — including which questions may require a constitutional amendment to resolve.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "completeText": "Submit survey",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "four-pillars",
+    "estimated_minutes": 12,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey asks Wyoming voters where they stand on four core policy areas: life, religious liberty, family values, and education freedom. Some of the policies voters prefer may be achievable through ordinary legislation. Others may require a constitutional amendment. The goal is to measure the depth and direction of public support — including support for constitutional change — before lawmakers act.</p><p><a class=\"button button--small button--secondary\" href=\"/assets/wy_family_four_pillars_sources_background.pdf\" target=\"_blank\" rel=\"noopener\">Sources and background</a> &nbsp; <a class=\"button button--small button--secondary\" href=\"/assets/wy_family_four_pillars_constitutional_review_summary.pdf\" target=\"_blank\" rel=\"noopener\">Constitutional context</a></p><h3>How responses will be used</h3><ul><li>Results will be published in aggregate.</li><li>Exact question wording and response options will be published with the results.</li><li>Verified and unverified responses may be reported separately.</li><li>Individual responses will remain confidential.</li></ul><h3>Four pillars</h3><p>This survey is organized into four sections: <strong>Life</strong> (Q1–8), <strong>Religious Liberty</strong> (Q9–16), <strong>Family Values</strong> (Q17–24), and <strong>Education Freedom</strong> (Q25–32). Each section ends with a question about whether a constitutional amendment is needed to achieve your preferred policy. You may complete all four sections or stop after any section.</p>"
+        }
+      ]
+    },
+    {
+      "name": "pillar_life",
+      "title": "Pillar 1: Life",
+      "description": "Questions 1–8 — abortion policy, exceptions, and constitutional threshold.",
+      "elements": [
+        {
+          "type": "html",
+          "name": "life_intro",
+          "html": "<h3>Pillar 1: Life</h3><p>Wyoming has an active abortion statute and a constitutional provision at Article 1, Section 38 that protects health-care decisions. These questions measure where voters stand on the scope of any abortion restriction and whether a constitutional amendment would be needed to achieve their preferred policy.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q1_life_protection_start",
+          "title": "At what point should Wyoming law begin protecting a developing life?",
+          "choices": [
+            "At conception (fertilization)",
+            "At detectable heartbeat or cardiac activity (around 6 weeks)",
+            "At viability (when a fetus can survive outside the womb)",
+            "At birth",
+            "The law should not recognize a developing life as having legal protection before birth",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q2_overall_abortion_policy",
+          "title": "Which statement is closest to the abortion policy you want Wyoming law to have?",
+          "choices": [
+            "The law should generally allow abortion, with decisions left to the individual and clinician",
+            "The law should allow abortion in many situations, with defined legal limits",
+            "The law should allow abortion only in a few situations, with clear exceptions",
+            "The law should generally prohibit abortion, with narrow exceptions",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q3_timing_limits",
+          "title": "If abortion is allowed, what timing limit should apply?",
+          "choices": [
+            "Up to 6 weeks",
+            "Up to 12 weeks",
+            "Up to 24 weeks",
+            "No fixed limit — decisions should be based on medical judgment and circumstances",
+            "Abortion should be allowed only in specific, narrow exceptions regardless of timing",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "checkbox",
+          "name": "q4_exceptions",
+          "title": "If abortion is generally restricted, which situations should qualify as a legal exception? (Select all that apply)",
+          "choices": [
+            "Life-threatening risk to the pregnant person",
+            "Serious risk of major physical harm to the pregnant person",
+            "Pregnancy resulting from rape",
+            "Pregnancy resulting from incest",
+            "Lethal fetal condition (fetus expected to die shortly after birth)",
+            "Severe fetal anomaly likely to cause profound suffering",
+            "Serious risk to mental health, diagnosed by a licensed clinician",
+            "No exceptions — the restriction should apply in all cases",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q5_physician_conscience",
+          "title": "Should Wyoming law protect health care providers who decline to participate in abortion procedures based on conscience or religious belief?",
+          "choices": [
+            "Yes — all providers should be protected from compelled participation",
+            "Yes — with a limit, such as requiring referral to a willing provider",
+            "No — providers who accept public funding or hospital privileges should not be able to decline",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q6_waiting_period_counseling",
+          "title": "Should Wyoming law require a waiting period and written information before an abortion is performed?",
+          "choices": [
+            "Yes — a waiting period and written information should both be required",
+            "Yes — written information should be required, but no waiting period",
+            "No — these requirements create unnecessary barriers",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q7_enforcement_approach",
+          "title": "If Wyoming restricts abortion, who should have the primary role in enforcing those restrictions?",
+          "choices": [
+            "State law enforcement and prosecutors",
+            "Civil penalties and lawsuits, not criminal charges",
+            "Medical licensing boards",
+            "A combination of these",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q8_life_constitutional_amendment",
+          "title": "Wyoming's Constitution (Article 1, Section 38) protects health-care decisions. If the abortion policy you prefer in Q1–7 cannot be achieved through ordinary legislation because of that provision, do you support adding a constitutional amendment to allow the Legislature to regulate or prohibit abortion?",
+          "choices": [
+            "Yes — I support a constitutional amendment if it is needed to achieve my preferred abortion policy",
+            "No — I do not support a constitutional amendment on abortion",
+            "I am not sure whether an amendment is needed",
+            "I do not have a strong preference on abortion policy",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "life_comment",
+          "title": "Optional: Anything you would like to add about abortion policy or life protections?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "pillar_religious_liberty",
+      "title": "Pillar 2: Religious Liberty",
+      "description": "Questions 9–16 — religious freedom, conscience protections, and public funding for faith-based organizations.",
+      "elements": [
+        {
+          "type": "html",
+          "name": "religious_liberty_intro",
+          "html": "<h3>Pillar 2: Religious Liberty</h3><p>Wyoming's Constitution (Article 1, Sections 18 and 19) protects religious freedom and prohibits public funds from going directly to a sectarian or religious society or institution. Most religious liberty changes can begin through ordinary statute, but some may require a constitutional amendment if voters want broader accommodation of faith-based participation in public programs.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q9_government_neutrality",
+          "title": "How should Wyoming government treat religious belief and practice compared to nonreligious activity?",
+          "choices": [
+            "Strictly neutral — government should neither favor nor burden religion",
+            "Accommodating — government should make reasonable accommodations for religious practice",
+            "Supportive — government should actively affirm the role of religion in public life",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q10_conscience_exemptions",
+          "title": "Should Wyoming law allow individuals and small-business owners to decline services or employment actions that conflict with their sincere religious beliefs?",
+          "choices": [
+            "Yes — broad conscience protections should apply to individuals and businesses",
+            "Yes — but only for individuals, not businesses",
+            "Yes — but only where no comparable alternative service is unavailable",
+            "No — anti-discrimination law should apply regardless of religious belief",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q11_faith_based_public_funding",
+          "title": "Should Wyoming public funds be available to faith-based organizations that deliver social services (such as homeless shelters, addiction recovery programs, or foster care)?",
+          "choices": [
+            "Yes — on the same terms as nonreligious providers, with no religious-content restriction",
+            "Yes — on the same terms, but faith-based programming must remain separate from the government-funded portion",
+            "No — public funds should not go to organizations with religious affiliations",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q12_religious_displays_public_property",
+          "title": "Should Wyoming allow religious symbols or displays on government property (such as courthouses, parks, or public buildings)?",
+          "choices": [
+            "Yes — religious displays should be allowed alongside other cultural and historical displays",
+            "Yes — but only if the display is historical or ceremonial, not devotional",
+            "No — government property should remain religion-neutral",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q13_prayer_government_settings",
+          "title": "Should Wyoming explicitly protect voluntary, student-led prayer or religious expression in public schools and other government settings?",
+          "choices": [
+            "Yes — voluntary religious expression by students or participants should be explicitly protected in state law",
+            "It is already protected — no new Wyoming law is needed",
+            "No — the government setting makes any religious expression inappropriate",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q14_religious_exemptions_from_laws",
+          "title": "When a generally applicable Wyoming law conflicts with a person's sincere religious practice, what should happen?",
+          "choices": [
+            "The person should receive an exemption unless the government can show a compelling public-safety reason to deny it",
+            "Exemptions should be available for churches and religious institutions, but not for individuals",
+            "No exemptions — the same law should apply to everyone equally",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q15_chaplains_public_institutions",
+          "title": "Should Wyoming allow chaplains or religious counselors in government institutions such as prisons, hospitals, or public universities?",
+          "choices": [
+            "Yes — chaplains provide important support and should be allowed and publicly funded",
+            "Yes — but chaplains should be privately funded, not paid with public funds",
+            "No — government institutions should not employ or fund religious counselors",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q16_religious_liberty_law_or_constitution",
+          "title": "If Wyoming law currently prevents faith-based organizations from participating in public programs on the same terms as nonreligious organizations, do you support changing Wyoming law or the Wyoming Constitution to allow equal participation?",
+          "choices": [
+            "Yes — I support changing state law if needed to ensure equal access for faith-based organizations",
+            "Yes — and I support a constitutional amendment if a statute alone is not enough",
+            "No — the current limits on faith-based funding in the Wyoming Constitution should be preserved",
+            "I am not sure whether current law actually prevents equal participation",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "religious_liberty_comment",
+          "title": "Optional: Anything you would like to add about religious liberty?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "pillar_family_values",
+      "title": "Pillar 3: Family Values",
+      "description": "Questions 17–24 — parental rights, minors' online access, and family-policy priorities.",
+      "elements": [
+        {
+          "type": "html",
+          "name": "family_values_intro",
+          "html": "<h3>Pillar 3: Family Values</h3><p>Most family-values policies can begin through ordinary legislation or local school-board policy. A constitutional amendment becomes more likely if voters want an explicit parental-rights standard — one that creates a higher legal bar for government intervention in family decisions than ordinary statutes provide.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q17_parental_consent_medical",
+          "title": "Should Wyoming law require parental notification and consent before a minor receives non-emergency medical treatment?",
+          "choices": [
+            "Yes — parents should have the right to consent or refuse all non-emergency medical treatment for minors",
+            "Yes — with an exception when a court finds a parent is acting against the child's best interest",
+            "No — older minors should have the right to make certain medical decisions independently",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q18_parental_school_access",
+          "title": "Should Wyoming law give parents the explicit right to review all curriculum materials, instructional content, and school records for their minor children?",
+          "choices": [
+            "Yes — parents should have full access to all materials and records",
+            "Yes — with reasonable time and process limits to protect school operations",
+            "No — existing federal law (FERPA) already provides sufficient access rights",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q19_parental_rights_standard",
+          "title": "Should Wyoming establish a strong legal standard recognizing that parents have the primary right to direct the upbringing, education, and care of their children — requiring the government to meet a high bar before overriding that right?",
+          "choices": [
+            "Yes — and this standard should be written into Wyoming law as a statute",
+            "Yes — and this standard should be written into the Wyoming Constitution",
+            "The current legal standard is sufficient",
+            "No — a higher parental-rights standard could interfere with child-welfare protections",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q20_gender_social_transition_schools",
+          "title": "Should Wyoming law require parental notification and consent before a school employee or official takes action to socially transition a student to a different name, pronoun, or gender identity?",
+          "choices": [
+            "Yes — parents must be notified and give consent before any school-initiated social transition",
+            "Yes — with an exception for students who report a safety risk at home",
+            "No — student privacy and safety may outweigh mandatory parental notification in some cases",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q21_minors_online_access",
+          "title": "Should Wyoming law require online platforms and social media companies to verify user age and restrict minors' access to harmful content?",
+          "choices": [
+            "Yes — Wyoming should require age verification and content restrictions for minors",
+            "Yes — but parental consent and control tools are a better approach than government mandates",
+            "No — age verification raises privacy concerns and this is better handled at the federal level",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q22_parental_opt_out_instruction",
+          "title": "Should Wyoming law require public schools to allow parents to opt their minor children out of instruction that conflicts with the family's religious or moral beliefs?",
+          "choices": [
+            "Yes — parents should have a clear opt-out right for instruction on religious or moral grounds",
+            "Yes — but only for specific topics such as sex education or gender identity",
+            "No — uniform curriculum is important and opt-out decisions should remain with school boards",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q23_parental_vs_state_authority",
+          "title": "When the state believes a child's welfare is at risk, what standard should apply before the government can override a parent's medical, educational, or custody decision?",
+          "choices": [
+            "Government should be required to show clear and convincing evidence of serious danger before overriding a parent",
+            "The current best-interest-of-the-child standard is appropriate",
+            "Government should have broad authority to protect children when a serious risk is identified",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q24_who_drives_family_policy",
+          "title": "Who do you believe should primarily drive family-values policy changes in Wyoming?",
+          "choices": [
+            "Parents and families",
+            "Local school boards and educators",
+            "The Wyoming Legislature",
+            "Courts interpreting existing law",
+            "A balanced process involving all of these",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "family_values_comment",
+          "title": "Optional: Anything you would like to add about parental rights or family policy?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "pillar_education_freedom",
+      "title": "Pillar 4: Education Freedom",
+      "description": "Questions 25–32 — school choice, public funding for nonpublic options, accountability, and constitutional threshold.",
+      "elements": [
+        {
+          "type": "html",
+          "name": "education_freedom_intro",
+          "html": "<h3>Pillar 4: Education Freedom</h3><p>Wyoming's Constitution (Article 7, Section 8) prohibits public school funds from going to support or assist any private school, religious school, or institution controlled by a church or religious organization. Broad school choice funding — including education savings accounts, vouchers, or tuition payments to private or religious schools — most likely requires a constitutional amendment before the Legislature can enact it.</p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q25_school_choice_overall",
+          "title": "Overall, do you support giving Wyoming families more options for how to use their children's share of public education funding?",
+          "choices": [
+            "Yes — families should have broad freedom to choose the best education option for their child",
+            "Yes — with limits to protect public school funding levels and accountability",
+            "No — public education funding should remain in the public school system",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q26_public_funds_private_schools",
+          "title": "Should Wyoming public education funding follow the student to a private or charter school when a family chooses that option?",
+          "choices": [
+            "Yes — funding should follow the student to any accredited school the family chooses",
+            "Yes — but only to charter schools, not private or religious schools",
+            "No — public funds should remain in public schools",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q27_accountability_nonpublic",
+          "title": "If private or religious schools receive public funds, what accountability should they face?",
+          "choices": [
+            "The same academic standards and transparency requirements as public schools",
+            "Basic financial accountability and student outcome reporting, but not full public-school requirements",
+            "Minimal accountability — families choosing the school provide sufficient oversight",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q28_homeschool_funding",
+          "title": "Should Wyoming provide funding support (such as tax credits, education savings accounts, or direct stipends) to families who homeschool their children?",
+          "choices": [
+            "Yes — homeschooling families should receive the same per-pupil support as families using other options",
+            "Yes — but only for approved curriculum and materials, not a general per-pupil payment",
+            "No — families who choose to homeschool should not receive public education funds",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q29_transparency_reporting",
+          "title": "If public funds are used for nonpublic education options, should Wyoming require public reporting of how those funds are spent and what student outcomes result?",
+          "choices": [
+            "Yes — full public reporting comparable to what public schools provide",
+            "Yes — basic financial and outcome reporting, but not full public-school disclosure",
+            "No — detailed reporting requirements reduce the flexibility that makes school choice valuable",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q30_education_savings_accounts",
+          "title": "Should Wyoming create an Education Savings Account (ESA) or similar program that allows families to use a portion of per-pupil funding for approved education expenses — including private school tuition, tutoring, curriculum, or therapies?",
+          "choices": [
+            "Yes — a broad ESA open to all Wyoming families",
+            "Yes — but targeted to lower-income families or students with special needs",
+            "No — public funds should not be used for private education expenses",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q31_special_education_portability",
+          "title": "Should Wyoming allow families of students with disabilities to take their child's special education funding to a private or nonpublic setting if they believe it better serves their child's needs?",
+          "choices": [
+            "Yes — special education funding should be portable to any setting that meets the child's needs",
+            "Yes — but only to programs meeting the same standards as public special education services",
+            "No — special education services and funding should remain within the public school system",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q32_education_constitutional_amendment",
+          "title": "Wyoming's Constitution currently prohibits public education funds from supporting private or religious schools. If the school choice policies you prefer in Q25–31 require a constitutional amendment to enact, do you support adding one?",
+          "choices": [
+            "Yes — I support a constitutional amendment to allow public education funds to follow students to private schools, religious schools, homeschool programs, or other approved options",
+            "No — I do not support a constitutional amendment to expand school choice funding",
+            "I am not sure whether an amendment is needed for the policies I prefer",
+            "I do not have a strong preference on school choice funding",
+            "Not sure"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "education_freedom_comment",
+          "title": "Optional: Anything you would like to add about education funding or school choice?",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        }
+      ]
+    },
+    {
+      "name": "optional_demographics",
+      "title": "Optional demographics",
+      "description": "These questions help interpret results without identifying you personally.",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "age_range",
+          "title": "Age range",
+          "choices": [
+            "Under 18",
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "political_lean",
+          "title": "How would you describe your general political views?",
+          "choices": [
+            "Conservative",
+            "Lean conservative",
+            "Moderate / independent",
+            "Lean liberal",
+            "Liberal",
+            "Prefer not to answer"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "issue_connection",
+          "title": "Which best describes your connection to these issues?",
+          "choices": [
+            "Parent or guardian of a school-age child",
+            "Student or recent student",
+            "Educator, school staff, or administrator",
+            "Faith community member or leader",
+            "Elected official or government employee",
+            "Civic or advocacy organization member",
+            "Wyoming resident — no specific connection",
+            "Not a Wyoming resident",
+            "Prefer not to answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

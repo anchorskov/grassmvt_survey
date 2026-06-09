@@ -376,6 +376,21 @@
     "href": "/surveys/wy-data-centers"
   },
   {
+    "id": "wy-family-four-pillars",
+    "slug": "wy-family-four-pillars",
+    "scope": "wy",
+    "title": "Wyoming Four Pillars Survey",
+    "description": "Measure where Wyoming voters stand on life, religious liberty, family values, and education freedom — including which questions may require a constitutional amendment to resolve.",
+    "landing_blurb": "A Wyoming survey covering four core policy areas — life, religious liberty, family values, and education freedom — with questions on both ordinary legislation and constitutional change.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "four-pillars",
+    "display_order": 34,
+    "estimated_minutes": 12,
+    "featured": true,
+    "href": "/surveys/wy-family-four-pillars"
+  },
+  {
     "id": "military-force-ai",
     "slug": "military-force-ai",
     "scope": "public",
