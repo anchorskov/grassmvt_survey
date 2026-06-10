@@ -39,9 +39,9 @@ const surveySources = {
     file: 'surveys/surveys_wy_public_land_sales_v1.jsonc',
     scope: 'wy',
   },
-  'wy-roadless-areas-v1': {
+  'wy-roadless-areas-v2': {
     slug: 'wy-roadless-areas',
-    file: 'surveys/surveys_wy_roadless_areas_v1.jsonc',
+    file: 'surveys/surveys_wy_roadless_areas_v2.jsonc',
     scope: 'wy',
   },
   'grizzly-bear-delisting-v1': {

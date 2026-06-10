@@ -6631,15 +6631,6 @@ export default {
         const sessionResult = await getSessionUser(request, env);
         const user = sessionResult.status === 'valid' ? sessionResult.user : null;
         const userId = user ? user.id : '';
-        if (userId && !shouldBypassAddressVerification(env)) {
-          const addressVerification = await getAddressVerification(env.DB, userId);
-          if (!addressVerification?.verified_at) {
-            return jsonResponse(
-              { ok: false, code: 'ADDRESS_NOT_VERIFIED', message: 'Address verification required.' },
-              { status: 403, headers: sessionResult.headers || undefined }
-            );
-          }
-        }
         const result = await env.DB.prepare(
           `SELECT s.slug,
                   s.title,

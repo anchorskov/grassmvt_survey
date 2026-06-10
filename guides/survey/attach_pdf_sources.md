@@ -133,10 +133,12 @@ shareable URL.
 
 ## Current surveys with PDF sources
 
-| Survey slug              | PDF filename                                      | Status             |
-|--------------------------|---------------------------------------------------|--------------------|
-| wy-voter-access          | wyoming_voter_access_sources_explanation.pdf      | Linked in survey   |
-| abortion-v2              | Abortion Survey Draft revision (1) 2-1-2026.pdf   | Comment only — PDF in docs/survey/, no public link |
+| Survey slug              | PDF filename                                                | Status             |
+|--------------------------|-------------------------------------------------------------|--------------------|
+| wy-voter-access          | wyoming_voter_access_sources_explanation.pdf                | Linked in survey   |
+| wy-roadless-areas        | wy_roadless_areas_sources_background.pdf                    | Linked in survey (v2) |
+| wy-roadless-areas        | wy_roadless_areas_purpose_privacy_method.pdf                | Linked in survey (v2) |
+| abortion-v2              | Abortion Survey Draft revision (1) 2-1-2026.pdf             | Comment only — PDF in docs/survey/, no public link |
 
 The abortion survey PDF is not publicly served. If a live link is needed, move or
 copy the file to `public/assets/` and add the button link to the survey JSONC

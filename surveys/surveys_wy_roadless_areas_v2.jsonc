@@ -1,0 +1,269 @@
+// surveys/surveys_wy_roadless_areas_v2.jsonc
+// slug: wy-roadless-areas
+// version: v2 | 2026-06-10
+// source: wy_roadless_areas_sources_background.pdf
+// source: wy_roadless_areas_purpose_privacy_method.pdf
+{
+  "title": "Wyoming Roadless Survey",
+  "description": "An education-first Wyoming public input survey on standards for inventoried roadless areas on National Forest System lands.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "completeText": "Submit survey",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "roadless-areas",
+    "estimated_minutes": 8,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<div class=\"survey-intro\"><img src=\"/img/wy-roadless-areas.png\" alt=\"Wyoming Roadless Areas\" class=\"survey-intro__image\" style=\"max-width:100%;height:auto;margin-bottom:1rem;\"><h3>Purpose</h3><p>This survey is designed to help Wyoming voters learn the issue and share input on what standards should guide decisions about inventoried roadless areas on National Forest System lands in Wyoming.</p><p>The goal is to measure public input, not persuade toward a preferred answer.</p><p><a class=\"button button--small button--secondary\" href=\"/assets/wy_roadless_areas_sources_background.pdf\" target=\"_blank\" rel=\"noopener\">Sources &amp; background</a> <a class=\"button button--small button--secondary\" href=\"/assets/wy_roadless_areas_purpose_privacy_method.pdf\" target=\"_blank\" rel=\"noopener\">Purpose, privacy &amp; method</a></p><h3>Short educational background</h3><p>Inventoried roadless areas are National Forest lands identified as largely undeveloped and generally without permanent roads.</p><p>The 2001 Roadless Rule generally limited new road construction, road reconstruction, and timber harvest in these areas, with limited exceptions.</p><p>Wyoming has about 3.26 million acres of inventoried roadless areas on National Forest System lands.</p><p>A current federal rulemaking process is considering rescission of the 2001 national rule. A separate bill, H.R. 7695, would make the 2001 rule have no force or effect and require certain permanent and temporary roads where deemed necessary.</p><p>Supporters of keeping roadless protections emphasize water, wildlife habitat, hunting, fishing, recreation, solitude, and long-term public-land inheritance.</p><p>Supporters of changing the rule emphasize wildfire risk, forest health, insect damage, emergency access, timber work, grazing access, local economies, and local management flexibility.</p><h3>Plain-language definitions</h3><dl><dt><strong>Inventoried roadless area</strong></dt><dd>A National Forest area identified through Forest Service inventories as largely undeveloped and generally without permanent roads.</dd><dt><strong>Roadless-area protection</strong></dt><dd>A rule or plan limit on new roads, road reconstruction, or timber harvest in an inventoried roadless area, subject to exceptions.</dd><dt><strong>Temporary road</strong></dt><dd>A road built for a specific project or emergency purpose that is intended to be closed or removed after use.</dd><dt><strong>Permanent road</strong></dt><dd>A road intended to remain available for long-term access or management.</dd><dt><strong>Wildland-urban interface</strong></dt><dd>A place where homes, communities, or infrastructure are close to wildland vegetation and may face wildfire risk.</dd><dt><strong>Watershed</strong></dt><dd>An area of land where water drains into a common stream, river, reservoir, or aquifer.</dd></dl><h3>How responses will be used</h3><ul><li>Results will be reported in aggregate.</li><li>Exact question wording, answer choices, collection dates, sample size, verification method, and revision notes will be published with results.</li><li>Verified Wyoming voter responses and unverified responses will be reported separately when verification is used.</li><li>Individual answers remain confidential.</li></ul></div>"
+        }
+      ]
+    },
+    {
+      "name": "familiarity",
+      "title": "Section 1: Familiarity",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "familiarity_roadless_areas",
+          "title": "Before this survey, how familiar were you with inventoried roadless areas in Wyoming?",
+          "isRequired": true,
+          "choices": [
+            "Very familiar",
+            "Somewhat familiar",
+            "Heard the term, but not familiar",
+            "Not familiar",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "overall_approach",
+      "title": "Section 2: Overall approach",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "roadless_approach",
+          "title": "Which approach should Wyoming support for inventoried roadless areas?",
+          "isRequired": true,
+          "choices": [
+            "Keep current roadless-area protections mostly in place",
+            "Keep protections, but allow narrow site-specific exceptions for wildfire, watershed, or restoration work",
+            "Replace the national rule with local forest-plan and project-level review",
+            "Remove roadless-area protections and allow broader road construction and timber work through normal review",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "information_needs",
+      "title": "Section 3: Information needs",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "information_most_helpful",
+          "title": "What information would most help you understand this issue? Pick up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Maps showing affected areas",
+            "Examples of specific Wyoming roadless areas",
+            "Fire risk and forest health information",
+            "Water and watershed information",
+            "Wildlife and migration information",
+            "Hunting, fishing, and recreation information",
+            "Timber, grazing, and rural economy information",
+            "Road construction and maintenance cost information",
+            "Not sure",
+            "Other"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "temporary_roads",
+      "title": "Section 4: Temporary roads",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "temporary_road_conditions",
+          "title": "When should temporary roads be allowed in an inventoried roadless area? Pick all that apply.",
+          "isRequired": true,
+          "choices": [
+            "Only for emergency response",
+            "For hazardous fuels reduction near at-risk communities",
+            "For watershed restoration or road decommissioning work",
+            "For forest health or timber work after public review",
+            "For broader local management purposes when a forest plan allows it",
+            "Temporary roads should generally not be allowed",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "permanent_roads",
+      "title": "Section 5: Permanent roads",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "permanent_road_conditions",
+          "title": "When should permanent roads be allowed in an inventoried roadless area?",
+          "isRequired": true,
+          "choices": [
+            "Generally not allowed, except for emergency or legally required access",
+            "Allowed only when a specific project shows clear public benefit and limited long-term harm",
+            "Allowed when local forest managers determine the road is necessary after public review",
+            "Allowed more broadly to support access, forest management, grazing, timber, or local economies",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wildfire_approach",
+      "title": "Section 6: Wildfire and forest health",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "wildfire_forest_health_approach",
+          "title": "Which wildfire and forest-health approach is closest to your view?",
+          "isRequired": true,
+          "choices": [
+            "Keep roadless areas mostly roadless and use non-road tools where possible",
+            "Allow temporary roads near communities, watersheds, or high-risk areas when needed",
+            "Allow roads and timber work when forest plans identify a management need",
+            "Give land managers broad flexibility to act before fire, insects, or disease cause more harm",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "values",
+      "title": "Section 7: Values",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "values_that_matter_most",
+          "title": "What values should matter most in roadless-area decisions? Pick up to 4.",
+          "isRequired": true,
+          "maxSelectedChoices": 4,
+          "choices": [
+            "Clean water and headwaters",
+            "Wildlife habitat and migration",
+            "Hunting and fishing access",
+            "Backcountry recreation and solitude",
+            "Wildfire risk reduction",
+            "Emergency response access",
+            "Grazing, outfitting, and rural livelihoods",
+            "Timber and forest products",
+            "Cultural, historic, and Tribal interests",
+            "Long-term public-land inheritance",
+            "Cost of building and maintaining roads",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "voice",
+      "title": "Section 8: Who should have a voice",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "strongest_voice",
+          "title": "Who should have the strongest voice in Wyoming roadless-area decisions? Pick up to 3.",
+          "isRequired": true,
+          "maxSelectedChoices": 3,
+          "choices": [
+            "Wyoming residents",
+            "Local Forest Service land managers",
+            "County governments",
+            "State agencies",
+            "Tribal governments",
+            "Hunters, anglers, outfitters, and recreation users",
+            "Conservation and public-land organizations",
+            "A balanced public process with all major interests documented",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "transparency",
+      "title": "Section 9: Transparency before decisions",
+      "elements": [
+        {
+          "type": "checkbox",
+          "name": "published_before_decision",
+          "title": "What should be published before any major roadless-area decision? Pick up to 4.",
+          "isRequired": true,
+          "maxSelectedChoices": 4,
+          "choices": [
+            "Plain-language explanation of the proposed action",
+            "Map of affected acres",
+            "Expected benefits and expected risks",
+            "Water and wildlife impact review",
+            "Fire risk and forest health review",
+            "Road construction and maintenance cost estimate",
+            "Public comments and agency responses",
+            "Plan for closing or removing temporary roads",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "accountability",
+      "title": "Section 10: Accountability",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "accountability_tracking",
+          "title": "If roadless-area rules change, how should accountability be tracked?",
+          "isRequired": true,
+          "choices": [
+            "Annual public report of roadless-area projects and outcomes",
+            "Project-by-project dashboard with maps and decisions",
+            "Before-and-after maps of new roads, closed roads, and affected acres",
+            "Independent review after a set number of years",
+            "No additional reporting is needed beyond the normal agency process",
+            "Not sure"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "open_comment",
+      "title": "Section 11: In your own words",
+      "elements": [
+        {
+          "type": "comment",
+          "name": "roadless_areas_own_words",
+          "title": "In your own words, what should guide Wyoming when deciding the future of roadless areas? (Optional)",
+          "isRequired": false,
+          "rows": 6,
+          "maxLength": 2000
+        }
+      ]
+    }
+  ]
+}

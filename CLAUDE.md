@@ -89,6 +89,16 @@ Surveys are categorized as `normal-life`, `divisive`, or `bridge`. The first two
 
 Every active survey must have a matching `townhall_topics` row. Survey slug changes must update both `surveys` and `townhall_topics`. The seed script handles initial Town Hall topic creation; use `scripts/backfill-townhall-topics.mjs` for repair.
 
+### Browse-first survey design
+
+Every survey at `/surveys/<slug>` supports anonymous browsing. Unauthenticated users can read and fill all questions — a "Browse mode" banner explains that an account is required only to submit. In-progress answers are saved to `sessionStorage` and restored on return.
+
+- **Never gate survey browsing on account creation or address verification.**
+- `/api/surveys/list` and `/api/surveys/<slug>` (GET) are public — no auth required.
+- `/api/surveys/<slug>/responses` (POST) requires an authenticated session — this is the only submission gate.
+- `/surveys/take/<slug>` is a legacy compatibility route. Do not use it for new surveys.
+- Per-user response data (edit links, completion status) is enriched when a session is present but the list loads for everyone regardless.
+
 ### Auth stack
 
 Lucia (session auth) + SimpleWebAuthn (passkeys) + Cloudflare Turnstile (bot protection). Turnstile is bypassed locally via `TURNSTILE_BYPASS=true` in `.dev.vars`. All posting actions (Town Hall statements, reactions, reports) are tied to the internal `user.id` from the backend session — never trust browser-supplied identity.

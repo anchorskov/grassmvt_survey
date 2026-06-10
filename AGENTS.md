@@ -73,6 +73,17 @@ Read this alongside `CLAUDE.md` at the project root — both files are required 
 - Do not assume text notes or deployment logs prove current remote migration state.
 - Watch for duplicate migration numbers; this repo currently contains two `0015_*` migration files.
 
+## Browse-First Survey Design Rule
+
+Every survey must be browsable without an account. This is a platform-level design decision — do not change it.
+
+- `/surveys/<slug>` (the SurveyJS path) loads for anyone. Unauthenticated users see a "Browse mode" banner and can read and fill all questions. Submission requires an account.
+- `/api/surveys/list` (GET) is fully public. It returns per-user response data when a session is present, but never returns 403 to guests or unverified users.
+- `/api/surveys/<slug>` (GET) is fully public.
+- `/api/surveys/<slug>/responses` (POST) is the only route that requires an authenticated session.
+- Do not add auth guards or address-verification gates to the list or survey-fetch routes. Submission is the only gated action.
+- `/surveys/take/<slug>` is a legacy compatibility route. Do not use it for new surveys; always use the SurveyJS path.
+
 ## Survey Flow Notes
 
 - Landing page actions are currently hard-coded in `public/index.html`.

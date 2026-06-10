@@ -4,9 +4,17 @@ Trust First Survey Platform Flow
 Goal
 Load and publish SurveyJS JSON from JSONC files into D1 in a repeatable, auditable way and verify the survey flow end to end.
 
+Browse-first design rule
+Every survey must be accessible without an account. Users can read and fill any survey anonymously.
+An account is required only to submit — never to browse.
+- /surveys/<slug> loads for all users. Unauthenticated users see a "Browse mode" banner.
+- /api/surveys/list and /api/surveys/<slug> (GET) are fully public — no auth required.
+- /api/surveys/<slug>/responses (POST) is the only route that requires a session.
+- Do not add auth gates to browse or list routes.
+
 Runtime routes to keep in mind
 - Canonical path: /surveys/<slug> and /api/surveys/<slug>
-- Legacy /surveys/take/<slug> is compatibility-only and not the primary authoring flow.
+- Legacy /surveys/take/<slug> is compatibility-only — do not use it for new surveys.
 
 Source of truth
 Survey JSONC files live in `surveys/` and are registered in
