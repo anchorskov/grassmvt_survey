@@ -91,6 +91,9 @@
       sitekey: siteKey,
       appearance: widgetAppearance,
       size: widgetSize,
+      // 'execute' mode: widget renders but does not challenge until turnstile.execute() is called.
+      // Prevents a PAT challenge from firing on page load and interfering with the submit-time flow.
+      execution: 'execute',
       callback: (token) => {
         if (typeof onSuccess === 'function') {
           onSuccess(token);

@@ -377,9 +377,10 @@
     turnstileExecuted = true;
     setTurnstileState('running');
     
-    // Add timeout to prevent infinite hang
+    // Timeout fallback — PAT challenges can hang silently without firing error-callback.
+    // After 8s we fall back to the interactive checkbox so the user isn't stuck.
     const timeoutPromise = new Promise((resolve) => {
-      setTimeout(() => resolve(''), 30000); // 30 second timeout
+      setTimeout(() => resolve(''), 8000);
     });
     
     const token = await Promise.race([
