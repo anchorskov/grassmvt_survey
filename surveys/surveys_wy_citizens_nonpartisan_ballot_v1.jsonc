@@ -1,0 +1,83 @@
+// surveys/surveys_wy_citizens_nonpartisan_ballot_v1.jsonc
+// slug: wy-citizens-nonpartisan-ballot
+// version: v1 | 2026-06-17
+// title: Citizens Nonpartisan Ballot Survey
+// source: wy_citizens_nonpartisan_ballot_sources.pdf
+{
+  "title": "Citizens Nonpartisan Ballot Survey",
+  "description": "A Wyoming public input survey on whether voters support adding a third optional citizens nonpartisan ballot to the existing primary ballot system.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "completeText": "Submit survey",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "voter-choice",
+    "estimated_minutes": 3,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey measures whether Wyoming voters support adding a Citizens Nonpartisan Ballot as a third optional primary ballot.</p><p>Under this idea, Wyoming would keep the two existing party primary ballots and add one optional citizens nonpartisan ballot. Each voter would choose one ballot. On the citizens nonpartisan ballot, all candidates for each office would be listed together regardless of party label, and voters would choose one candidate per office. For the general election, one candidate from each ballot would advance for each office.</p><p>This is not an official election. It is a public input project to measure voter support and help shape whether a proposal is brought forward.</p><img src=\"/images/citizens-np-ballot.png\" alt=\"Citizens Nonpartisan Ballot — one voter, one ballot, one citizen path to November\" style=\"max-width:100%;height:auto;margin:1rem 0;border-radius:6px;\" /><p><a class=\"button button--small button--secondary\" href=\"/assets/wy_citizens_nonpartisan_ballot_sources.pdf\" target=\"_blank\" rel=\"noopener\">Sources and background</a></p><h3>Privacy</h3><p>Results may be summarized publicly in aggregate form. Individual responses remain confidential.</p><h3>How responses will be used</h3><ul><li>Results will be published in aggregate.</li><li>Exact question wording and response options will be published with the results.</li><li>Verified and unverified responses may be reported separately.</li><li>Individual responses will remain confidential.</li></ul>"
+        }
+      ]
+    },
+    {
+      "name": "questions",
+      "title": "Questions",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "q1_third_ballot",
+          "title": "Should Wyoming offer voters a third optional citizens nonpartisan ballot, in addition to the existing party primary ballots?",
+          "choices": [
+            "Yes",
+            "No"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q1_comment",
+          "title": "Optional comment on Question 1.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q2_one_advance_per_ballot",
+          "title": "Should one candidate from each ballot advance to the general election for each office?",
+          "choices": [
+            "Yes",
+            "No"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q2_comment",
+          "title": "Optional comment on Question 2.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "comment",
+          "name": "q3_additional_comments",
+          "title": "Additional comments or concerns about the Citizens Nonpartisan Ballot proposal?",
+          "maxLength": 2000,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}

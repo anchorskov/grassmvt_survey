@@ -406,6 +406,21 @@
     "href": "/surveys/wy-health-care-constitutional-process"
   },
   {
+    "id": "wy-citizens-nonpartisan-ballot",
+    "slug": "wy-citizens-nonpartisan-ballot",
+    "scope": "wy",
+    "title": "Citizens Nonpartisan Ballot Survey",
+    "description": "A Wyoming public input survey on whether voters support adding a third optional citizens nonpartisan ballot alongside the two existing party primary ballots.",
+    "landing_blurb": "Wyoming keeps both party primaries and adds one optional citizens nonpartisan ballot. Each voter picks one. One candidate from each ballot advances to November. Should Wyoming do this?",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "voter-choice",
+    "display_order": 36,
+    "estimated_minutes": 3,
+    "featured": true,
+    "href": "/surveys/wy-citizens-nonpartisan-ballot"
+  },
+  {
     "id": "military-force-ai",
     "slug": "military-force-ai",
     "scope": "public",
