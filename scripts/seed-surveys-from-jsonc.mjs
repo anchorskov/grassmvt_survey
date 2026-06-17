@@ -84,6 +84,11 @@ const surveySources = {
     file: 'surveys/surveys_wy_family_four_pillars_v1.jsonc',
     scope: 'wy',
   },
+  'wy-health-care-constitutional-process-v1': {
+    slug: 'wy-health-care-constitutional-process',
+    file: 'surveys/surveys_wy_health_care_constitutional_process_v1.jsonc',
+    scope: 'wy',
+  },
   'cost-of-living-v1': {
     slug: 'cost-of-living',
     file: 'surveys/surveys_cost_of_living_v1.jsonc',

@@ -391,6 +391,21 @@
     "href": "/surveys/wy-family-four-pillars"
   },
   {
+    "id": "wy-health-care-constitutional-process",
+    "slug": "wy-health-care-constitutional-process",
+    "scope": "wy",
+    "title": "Changing Health Care: The Constitutional Process",
+    "description": "A Wyoming survey on how to handle abortion policy after the Wyoming Supreme Court's ruling — including the constitutional amendment path, safeguards, and the duty of elected representatives.",
+    "landing_blurb": "The Wyoming Supreme Court ruled abortion is a protected health care decision. This survey asks whether Wyoming should pursue a constitutional amendment, what safeguards it must include, and whether our representatives are bound by their oath.",
+    "path": "divisive",
+    "status": "active",
+    "category_slug": "constitutional-process",
+    "display_order": 35,
+    "estimated_minutes": 5,
+    "featured": true,
+    "href": "/surveys/wy-health-care-constitutional-process"
+  },
+  {
     "id": "military-force-ai",
     "slug": "military-force-ai",
     "scope": "public",

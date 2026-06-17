@@ -1,0 +1,187 @@
+// surveys/surveys_wy_health_care_constitutional_process_v1.jsonc
+// slug: wy-health-care-constitutional-process
+// version: v1 | 2026-06-17
+// title: Changing Health Care: The Constitutional Process
+// source: wy_health_care_constitutional_process_sources.pdf
+{
+  "title": "Changing Health Care: The Constitutional Process",
+  "description": "A Wyoming survey on how to handle abortion policy after the Wyoming Supreme Court's ruling — including the constitutional amendment path, safeguards, and the duty of elected representatives.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "completeText": "Submit survey",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "divisive",
+    "category_slug": "constitutional-process",
+    "estimated_minutes": 5,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This survey asks Wyoming citizens about a hard question: how should Wyoming handle abortion policy after the Wyoming Supreme Court's ruling?</p><p>In January 2026, the Wyoming Supreme Court ruled that the decision whether to terminate or continue a pregnancy is a health care decision protected by Article 1, Section 38 of the Wyoming Constitution.</p><p>We are Wyoming. Our representatives work for us. The Constitution belongs to the people, and every elected representative is bound by the oath of office to support, obey, and defend it.</p><p>Wyoming citizens hold sincere moral, legal, medical, and constitutional concerns on this issue. If Wyoming wants to change the legal framework, the honest path is a constitutional amendment placed before the people of Wyoming.</p><p>This survey asks whether Wyoming should follow that path, whether an amendment should define when human life begins and receives the protections of law, what safeguards should be addressed if an amendment is proposed, and whether our representatives should remain within the guardrails of the Constitution.</p><p><a class=\"button button--small button--secondary\" href=\"/assets/wy_health_care_constitutional_process_sources.pdf\" target=\"_blank\" rel=\"noopener\">Sources and background</a></p><h3>Privacy</h3><p>Please leave out private medical history, names of patients, names of providers, and identifying medical details. Results may be summarized publicly in aggregate form.</p><h3>How responses will be used</h3><ul><li>Results will be published in aggregate.</li><li>Exact question wording and response options will be published with the results.</li><li>Verified and unverified responses may be reported separately.</li><li>Individual responses will remain confidential.</li></ul>"
+        }
+      ]
+    },
+    {
+      "name": "questions",
+      "title": "Questions",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "q1_constitutional_amendment_process",
+          "title": "Should we the people of Wyoming use the constitutional amendment process to decide whether to change how the Wyoming Constitution applies to health care and abortion policy?",
+          "choices": [
+            "Yes",
+            "No",
+            "Need more information"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q1_comment",
+          "title": "Optional comment. Please leave out private medical details.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q2_define_human_life",
+          "title": "Should a Wyoming constitutional amendment clearly define when human life begins and receives the protections of law?",
+          "choices": [
+            "Yes",
+            "No",
+            "Need more information"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q2_comment",
+          "title": "Optional comment. Please leave out private medical details.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q3_medical_emergency_safeguards",
+          "title": "Should any amendment defining legal protection for unborn life also clearly address medical emergencies, including but not limited to: miscarriage care, ectopic pregnancy care, fatal fetal anomalies, rape, incest, and serious threats to the pregnant patient's health?",
+          "choices": [
+            "Yes",
+            "No",
+            "Need more information"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q3_comment",
+          "title": "Optional comment. Please leave out private medical details.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q4_provider_protection",
+          "title": "Should Wyoming protect medical providers from government interference when making and performing lawful, medically appropriate health care decisions with their patients?",
+          "choices": [
+            "Yes",
+            "No",
+            "Need more information"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q4_comment",
+          "title": "Optional comment. Please leave out private medical details.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q5_require_amendment_path",
+          "title": "Should we require our representatives to use the constitutional amendment path before proposing any new abortion legislation?",
+          "choices": [
+            "Yes",
+            "No",
+            "Need more information"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q5_comment",
+          "title": "Optional comment. Please leave out private medical details.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q6_after_court_ruling",
+          "title": "When Wyoming courts rule that a law violates the Wyoming Constitution, what should our elected representatives do next?",
+          "choices": [
+            "Follow the ruling and legislate within constitutional guardrails",
+            "Pursue a constitutional amendment through the people",
+            "Continue passing ordinary laws and let the courts decide again"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q6_comment",
+          "title": "Optional comment. Please leave out private medical details.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q7_oath_of_office",
+          "title": "When Wyoming courts rule on the meaning of the Wyoming Constitution, should our elected representatives be bound by the oath of office to support, obey, and defend that Constitution?",
+          "choices": [
+            "Yes",
+            "No",
+            "Need more information"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q7_comment",
+          "title": "Optional comment. Please leave out private medical details.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q8_judicial_system_change",
+          "title": "Wyoming currently uses a judicial nominating commission, governor appointment, and voter retention elections. Should any major change to that system be placed before the people through a constitutional amendment?",
+          "choices": [
+            "Yes",
+            "No",
+            "Need more information"
+          ]
+        },
+        {
+          "type": "comment",
+          "name": "q8_comment",
+          "title": "Optional comment. Please leave out private medical details.",
+          "maxLength": 1200,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "comment",
+          "name": "q9_additional_comments",
+          "title": "Additional comments? Suggest what we should be talking about. Please leave out private medical details.",
+          "maxLength": 2000,
+          "placeholder": "Optional"
+        }
+      ]
+    }
+  ]
+}
