@@ -31,6 +31,21 @@
     "href": "/surveys/wy-health-care-costs-access-options"
   },
   {
+    "id": "wy-commercial-property-tax",
+    "slug": "wy-commercial-property-tax",
+    "scope": "wy",
+    "title": "Wyoming Commercial Property Tax Transparency Survey",
+    "description": "Share your view on commercial property valuation, mill levies, assessment notices, business personal property, and taxpayer review and appeal rights, using Natrona County and Casper as a case study.",
+    "landing_blurb": "A statewide survey on making Wyoming commercial property tax information clearer, more consistent, and more accountable.",
+    "path": "normal-life",
+    "status": "active",
+    "category_slug": "commercial-property-tax",
+    "display_order": 25,
+    "estimated_minutes": 8,
+    "featured": true,
+    "href": "/surveys/wy-commercial-property-tax"
+  },
+  {
     "id": "cost-of-living",
     "slug": "cost-of-living",
     "scope": "public",

@@ -1,0 +1,598 @@
+// surveys/surveys_wy_commercial_property_tax_v1.jsonc
+// slug: wy-commercial-property-tax
+// version: v1 | 2026-07-01
+// title: Wyoming Commercial Property Tax Transparency Survey
+// source: wyoming_commercial_property_tax_sources.pdf
+{
+  "title": "Wyoming Commercial Property Tax Transparency Survey",
+  "description": "A statewide Wyoming survey on commercial property valuation, mill levies, assessment notices, business personal property, and taxpayer review and appeal rights, using Natrona County and Casper as a case study.",
+  "completedHtml": "<p>Thank you. Your response has been recorded.</p>",
+  "showQuestionNumbers": "on",
+  "questionTitleLocation": "top",
+  "questionErrorLocation": "bottom",
+  "goNextPageAutomatic": false,
+  "showProgressBar": "off",
+  "completeText": "Submit survey",
+  "x_meta": {
+    "flow": "sectioned",
+    "sectionExitEnabled": true,
+    "sectionExitLabel": "End of section",
+    "exitUrl": "/surveys/list/",
+    "path": "normal-life",
+    "category_slug": "commercial-property-tax",
+    "estimated_minutes": 8,
+    "featured": true
+  },
+  "pages": [
+    {
+      "name": "intro",
+      "elements": [
+        {
+          "type": "html",
+          "name": "intro_overview",
+          "html": "<h3>Purpose</h3><p>This is a statewide Wyoming survey. Responses will be counted by county. Natrona County and Casper are being used as the starting case study because public records, valuation notices, mill levy information, commercial property guidance, and review procedures are available for public discussion.</p><p>The purpose is to understand whether citizens want clearer, more consistent, and more accountable commercial property tax information across Wyoming.</p><p><a class=\"button button--small button--secondary\" href=\"/assets/wyoming_commercial_property_tax_sources.pdf\" target=\"_blank\" rel=\"noopener\">Review the source packet</a></p><h3>How responses will be used</h3><ul><li>Results will be published in aggregate, reported by county.</li><li>Exact question wording and answer choices will be published with the results.</li><li>Individual responses will remain confidential.</li></ul>"
+        }
+      ]
+    },
+    {
+      "name": "section_1_county_connection",
+      "title": "Section 1: County and connection",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s1_header",
+          "html": "<h3>Section 1: County and connection</h3>"
+        },
+        {
+          "type": "dropdown",
+          "name": "q1_county",
+          "title": "1. Which Wyoming county should your response be counted in?",
+          "choices": [
+            "Albany",
+            "Big Horn",
+            "Campbell",
+            "Carbon",
+            "Converse",
+            "Crook",
+            "Fremont",
+            "Goshen",
+            "Hot Springs",
+            "Johnson",
+            "Laramie",
+            "Lincoln",
+            "Natrona",
+            "Niobrara",
+            "Park",
+            "Platte",
+            "Sheridan",
+            "Sublette",
+            "Sweetwater",
+            "Teton",
+            "Uinta",
+            "Washakie",
+            "Weston"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q1_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=1\" target=\"_blank\" rel=\"noopener\">Why county-level responses matter</a></p>"
+        },
+        {
+          "type": "checkbox",
+          "name": "q2_connection",
+          "title": "2. What is your connection to this issue? Select all that apply.",
+          "choices": [
+            "I own commercial property",
+            "I lease commercial space",
+            "I own or operate a business",
+            "I work for a business affected by rent or property costs",
+            "I own residential property",
+            "I rent my home",
+            "I am concerned as a taxpayer",
+            "I work in real estate, appraisal, finance, or property management",
+            "I serve or have served in local government"
+          ],
+          "hasOther": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q3_direct_experience",
+          "title": "3. Is your answer based on direct experience with commercial property taxes?",
+          "choices": [
+            "Yes",
+            "No",
+            "Somewhat",
+            "I am learning about the issue"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section_2_basic_understanding",
+      "title": "Section 2: Basic understanding",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s2_header",
+          "html": "<h3>Section 2: Basic understanding</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q4_understanding_calculation",
+          "title": "4. Before this survey, how well did you understand how Wyoming commercial property taxes are calculated?",
+          "choices": [
+            "Very well",
+            "Somewhat",
+            "Very little",
+            "Not at all",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q4_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=2\" target=\"_blank\" rel=\"noopener\">Learn how Wyoming property taxes are calculated</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q5_aware_9_5_percent",
+          "title": "5. Before this survey, did you know Wyoming commercial property is generally assessed at 9.5% of market value before mill levies are applied?",
+          "choices": [
+            "Yes",
+            "No",
+            "Somewhat",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q5_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=2\" target=\"_blank\" rel=\"noopener\">Review Wyoming commercial assessment rate</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q6_clarity_terms",
+          "title": "6. How clear is the difference between market value, assessed value, taxable value, and the final tax bill?",
+          "choices": [
+            "Very clear",
+            "Somewhat clear",
+            "Neutral",
+            "Somewhat unclear",
+            "Very unclear",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q6_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=2\" target=\"_blank\" rel=\"noopener\">Learn the terms: market value, assessed value, and mill levy</a></p>"
+        }
+      ]
+    },
+    {
+      "name": "section_3_valuation_uniformity",
+      "title": "Section 3: Valuation and uniformity",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s3_header",
+          "html": "<h3>Section 3: Valuation and uniformity</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q7_consistency",
+          "title": "7. Based on your experience, do similar commercial properties appear to be valued consistently?",
+          "choices": [
+            "Yes, mostly consistent",
+            "Mixed",
+            "No, there appear to be inconsistencies",
+            "I have not reviewed enough to know",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q7_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=3\" target=\"_blank\" rel=\"noopener\">Review Wyoming equal and uniform taxation principle</a></p>"
+        },
+        {
+          "type": "checkbox",
+          "name": "q8_inconsistency_source",
+          "title": "8. Where do you think inconsistency is most likely to enter the process? Select all that apply.",
+          "choices": [
+            "Market value estimate",
+            "Comparable sales used",
+            "Income approach assumptions",
+            "Building condition",
+            "Square footage or property data",
+            "Land value",
+            "Location or neighborhood adjustment",
+            "Commercial vs. industrial classification",
+            "Business personal property reporting",
+            "Different mill levies by tax district",
+            "Appeal or review process",
+            "Lack of plain-language explanation",
+            "No concern"
+          ],
+          "hasOther": true,
+          "otherText": "Other"
+        },
+        {
+          "type": "html",
+          "name": "q8_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=3\" target=\"_blank\" rel=\"noopener\">Why similar properties can have different tax bills</a></p>"
+        }
+      ]
+    },
+    {
+      "name": "section_4_notices",
+      "title": "Section 4: Notices and public explanation",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s4_header",
+          "html": "<h3>Section 4: Notices and public explanation</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q9_notice_explain_change",
+          "title": "9. When a property value changes, should the notice explain what changed and why?",
+          "choices": [
+            "Yes, for any change",
+            "Yes, for any increase",
+            "Yes, only for increases above 5%",
+            "Yes, only for increases above 10%",
+            "Only upon request",
+            "No",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q9_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=4\" target=\"_blank\" rel=\"noopener\">Review Wyoming assessment notice requirements</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q10_worksheet_support",
+          "title": "10. Should assessment notices include a simple worksheet showing market value, assessment rate, assessed value, mill levy, and estimated tax impact?",
+          "choices": [
+            "Strongly support",
+            "Support",
+            "Neutral",
+            "Oppose",
+            "Strongly oppose",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q10_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=4\" target=\"_blank\" rel=\"noopener\">See what information is already required on assessment schedules</a></p>"
+        }
+      ]
+    },
+    {
+      "name": "section_5_mill_levies",
+      "title": "Section 5: Mill levies and final tax bill",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s5_header",
+          "html": "<h3>Section 5: Mill levies and final tax bill</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q11_understand_mill_levies",
+          "title": "11. Before this survey, did you understand how mill levies affect the final tax bill?",
+          "choices": [
+            "Yes",
+            "Somewhat",
+            "No",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q11_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=5\" target=\"_blank\" rel=\"noopener\">Learn how mill levies affect the final tax bill</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q12_public_page_support",
+          "title": "12. Should every county provide a simple public page showing how local taxing entities affect the final property tax bill?",
+          "choices": [
+            "Strongly support",
+            "Support",
+            "Neutral",
+            "Oppose",
+            "Strongly oppose",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q12_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=5\" target=\"_blank\" rel=\"noopener\">View Natrona County mill levy example</a></p>"
+        }
+      ]
+    },
+    {
+      "name": "section_6_business_personal_property",
+      "title": "Section 6: Business personal property",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s6_header",
+          "html": "<h3>Section 6: Business personal property</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q13_aware_bpp",
+          "title": "13. Are you aware that Wyoming businesses may have to report business personal property annually?",
+          "choices": [
+            "Yes",
+            "Somewhat",
+            "No",
+            "Not applicable",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q13_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=5\" target=\"_blank\" rel=\"noopener\">Review business personal property reporting</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q14_bpp_easier",
+          "title": "14. Should business personal property reporting be easier to understand for small local businesses?",
+          "choices": [
+            "Strongly support",
+            "Support",
+            "Neutral",
+            "Oppose",
+            "Strongly oppose",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q14_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=5\" target=\"_blank\" rel=\"noopener\">Learn why business personal property is part of the tax conversation</a></p>"
+        }
+      ]
+    },
+    {
+      "name": "section_7_review_appeal",
+      "title": "Section 7: Review and appeal rights",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s7_header",
+          "html": "<h3>Section 7: Review and appeal rights</h3>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q15_know_appeal",
+          "title": "15. Do you know how to request a review or appeal a property valuation?",
+          "choices": [
+            "Yes, clearly",
+            "Somewhat",
+            "No",
+            "I tried and found the process difficult",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q15_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=6\" target=\"_blank\" rel=\"noopener\">Review property valuation review and appeal rights</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q16_appeal_checklist",
+          "title": "16. Should counties provide a plain-language appeal checklist with every assessment notice?",
+          "choices": [
+            "Strongly support",
+            "Support",
+            "Neutral",
+            "Oppose",
+            "Strongly oppose",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q16_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=6\" target=\"_blank\" rel=\"noopener\">Review assessment notice and appeal process sources</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q17_statewide_guide",
+          "title": "17. Should Wyoming provide a statewide taxpayer guide explaining review, appeal, county board, and State Board of Equalization steps?",
+          "choices": [
+            "Strongly support",
+            "Support",
+            "Neutral",
+            "Oppose",
+            "Strongly oppose",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q17_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=6\" target=\"_blank\" rel=\"noopener\">Review source packet appeal section</a></p>"
+        }
+      ]
+    },
+    {
+      "name": "section_8_transparency_reform",
+      "title": "Section 8: Transparency and reform",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s8_header",
+          "html": "<h3>Section 8: Transparency and reform</h3>"
+        },
+        {
+          "type": "checkbox",
+          "name": "q18_easiest_info",
+          "title": "18. What information should be easiest for the public to find? Select up to five.",
+          "maxSelectedChoices": 5,
+          "choices": [
+            "Property value history",
+            "Mill levy by taxing entity",
+            "Explanation of market value",
+            "Comparable sales or valuation method",
+            "Appeal steps and deadlines",
+            "Commercial vs. industrial classification",
+            "Business personal property rules",
+            "Taxing entity budget requests",
+            "How local budgets affect mill levies",
+            "How similar properties compare"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q18_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf\" target=\"_blank\" rel=\"noopener\">Review all source categories</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q19_reform_priority",
+          "title": "19. Which reform would improve trust the most? Choose one.",
+          "choices": [
+            "Clearer tax notices",
+            "Easier appeal process",
+            "Public commercial valuation trend reports",
+            "Better explanation of mill levies",
+            "Public comparison tools for similar properties",
+            "Stronger county-level uniformity reviews",
+            "Stronger state oversight",
+            "More public meetings before tax bills are final",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q19_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf\" target=\"_blank\" rel=\"noopener\">Review source packet before choosing reform priority</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q20_annual_report_support",
+          "title": "20. Should Wyoming counties publish an annual commercial valuation trend report by property type and general area, while protecting private taxpayer information?",
+          "choices": [
+            "Strongly support",
+            "Support",
+            "Neutral",
+            "Oppose",
+            "Strongly oppose",
+            "Unsure"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q20_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf#page=6\" target=\"_blank\" rel=\"noopener\">Learn the difference between public trend reporting and private taxpayer information</a></p>"
+        }
+      ]
+    },
+    {
+      "name": "section_9_public_testimony",
+      "title": "Section 9: Public testimony",
+      "elements": [
+        {
+          "type": "html",
+          "name": "s9_header",
+          "html": "<h3>Section 9: Public testimony</h3>"
+        },
+        {
+          "type": "comment",
+          "name": "q21_experience_comment",
+          "title": "21. Have you seen a commercial property tax increase, valuation concern, rent increase, business cost increase, or other issue connected to property taxes that Wyoming should understand?",
+          "isRequired": false,
+          "maxLength": 2000,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "comment",
+          "name": "q22_one_change",
+          "title": "22. What one change would make Wyoming's commercial property tax system more transparent and accountable?",
+          "isRequired": false,
+          "maxLength": 2000,
+          "placeholder": "Optional"
+        },
+        {
+          "type": "html",
+          "name": "q22_source_link",
+          "html": "<p class=\"survey-source-link\"><a href=\"/assets/wyoming_commercial_property_tax_sources.pdf\" target=\"_blank\" rel=\"noopener\">Review source packet before answering</a></p>"
+        },
+        {
+          "type": "radiogroup",
+          "name": "q23_willing_share",
+          "title": "23. Would you be willing to share your story or help review public property tax data for your county?",
+          "choices": [
+            "Yes",
+            "No",
+            "Maybe"
+          ]
+        },
+        {
+          "type": "radiogroup",
+          "name": "q24_follow_up_ok",
+          "title": "24. May we follow up with you?",
+          "choices": [
+            "Yes",
+            "No"
+          ]
+        },
+        {
+          "type": "html",
+          "name": "q24_privacy_note",
+          "html": "<p><strong>Privacy note:</strong> Contact information is optional and used only for follow-up on this survey.</p>",
+          "visibleIf": "{q24_follow_up_ok} = 'Yes'"
+        },
+        {
+          "type": "text",
+          "name": "q24_contact_name",
+          "title": "Name",
+          "isRequired": false,
+          "visibleIf": "{q24_follow_up_ok} = 'Yes'"
+        },
+        {
+          "type": "text",
+          "name": "q24_contact_email",
+          "title": "Email",
+          "inputType": "email",
+          "isRequired": false,
+          "visibleIf": "{q24_follow_up_ok} = 'Yes'",
+          "validators": [
+            {
+              "type": "email"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "name": "q24_contact_phone",
+          "title": "Phone",
+          "inputType": "tel",
+          "isRequired": false,
+          "visibleIf": "{q24_follow_up_ok} = 'Yes'"
+        },
+        {
+          "type": "text",
+          "name": "q24_contact_county",
+          "title": "County",
+          "isRequired": false,
+          "visibleIf": "{q24_follow_up_ok} = 'Yes'"
+        }
+      ]
+    }
+  ]
+}
