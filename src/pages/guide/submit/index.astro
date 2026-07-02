@@ -1,0 +1,21 @@
+---
+// src/pages/guide/submit/index.astro
+// Candidate questionnaire submission form — token-gated, no account required.
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Candidate Questionnaire | My Wyoming Ballot Guide"
+  description="Answer the same questions every candidate in your race receives so voters can compare positions directly."
+>
+  <main class="max-w-2xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold text-wy-charcoal mb-2">Candidate questionnaire</h1>
+    <p id="guide-submit-intro" class="helper-text text-wy-dust mb-6">Loading your questions…</p>
+
+    <p class="form-error is-hidden" id="guide-submit-error" role="alert"></p>
+
+    <div id="guide-submit-root"></div>
+  </main>
+
+  <script is:inline src="/js/guide-submit.js"></script>
+</BaseLayout>

@@ -604,6 +604,29 @@ const nowIso = () => new Date().toISOString();
 
 const addMinutesIso = (minutes) => new Date(Date.now() + minutes * 60 * 1000).toISOString();
 
+// Calls the Candidates ballot-lookup API to resolve county, city, and precinct
+// from a parsed address. Returns null-safe object; never throws.
+async function fetchBallotGeography(houseNumber, street, city, zip) {
+  const empty = { county: null, city: city || null, precinct: null };
+  if (!houseNumber || !street || !city || !zip) return empty;
+  try {
+    const res = await fetch('https://candidates.skovgard2026.org/api/ballot-lookup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ houseNumber, street, city, zip }),
+    });
+    if (!res.ok) return empty;
+    const data = await res.json();
+    return {
+      county: data?.districts?.county || null,
+      city: data?.districts?.matchedCity || city || null,
+      precinct: data?.resolvedPollingPlace?.precinct || null,
+    };
+  } catch (_) {
+    return empty;
+  }
+}
+
 const generateResetToken = () => {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
@@ -2294,6 +2317,551 @@ const sendVerifyVoterEmail = async (env, { to, verifyUrl, replyTo }) => {
   const text = `Use this link to finish your verified voter upgrade: ${verifyUrl}`;
   const html = `Use this link to finish your verified voter upgrade: <a href="${escapeHtml(verifyUrl)}">Verify voter status</a>.`;
   return sendEmail(env, { to, subject, text, html, replyTo });
+};
+
+// ============================================================================
+// MAGIC LINK (PASSWORDLESS) TOKEN HELPERS
+// ============================================================================
+// Accounts created here never get a real password: password_hash is filled with
+// a random value the user never sees, the same pattern the OAuth login handler
+// already uses (see handleOAuthCallback). This avoids a risky rebuild of the
+// live `user` table just to make password_hash nullable.
+
+const MAGIC_LINK_TTL_MINUTES = 60;
+const MAGIC_LINK_TOKEN_BYTES = 32;
+
+const hashMagicLinkToken = async (salt, token) => sha256Hex(`${salt}:magic:${token}`);
+
+const generateMagicLinkToken = () => {
+  const bytes = new Uint8Array(MAGIC_LINK_TOKEN_BYTES);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
+};
+
+// Finds or creates a user by email, returns userId. New users get a
+// user_profile row and a random, never-surfaced password_hash.
+const findOrCreateUserForMagicLink = async (env, email) => {
+  const existing = await env.DB.prepare('SELECT id FROM user WHERE email = ?').bind(email).first();
+  if (existing && existing.id) {
+    return existing.id;
+  }
+  const userId = crypto.randomUUID();
+  const randomPassword = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+  const passwordHash = await hashPassword(randomPassword);
+  await env.DB.prepare(
+    `INSERT INTO user (id, email, password_hash)
+     VALUES (?, ?, ?)`
+  )
+    .bind(userId, email, passwordHash)
+    .run();
+  await env.DB.prepare(
+    `INSERT INTO user_profile (user_id, email)
+     VALUES (?, ?)`
+  )
+    .bind(userId, email)
+    .run();
+  return userId;
+};
+
+// Creates a magic link token for an existing user. Returns the raw token
+// (only returned once, never stored).
+const createMagicLinkToken = async (env, userId, ipHash) => {
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[MagicLink] HASH_SALT not configured');
+    return null;
+  }
+  const rawToken = generateMagicLinkToken();
+  const tokenHash = await hashMagicLinkToken(salt, rawToken);
+  const tokenId = crypto.randomUUID();
+  const expiresAt = addMinutesIso(MAGIC_LINK_TTL_MINUTES);
+  const createdAt = nowIso();
+  try {
+    await env.DB.prepare(
+      `INSERT INTO magic_link_tokens
+       (id, token_hash, user_id, expires_at, used_at, request_ip_hash, created_at)
+       VALUES (?, ?, ?, ?, NULL, ?, ?)`
+    )
+      .bind(tokenId, tokenHash, userId, expiresAt, ipHash || null, createdAt)
+      .run();
+    return rawToken;
+  } catch (error) {
+    console.error('[MagicLink] Token creation failed:', error?.message);
+    return null;
+  }
+};
+
+// Verifies a magic link token and returns { userId } if valid.
+// Marks the token as used upon successful verification.
+const verifyMagicLinkToken = async (env, rawToken) => {
+  if (!env.DB || !rawToken) {
+    return null;
+  }
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[MagicLink] HASH_SALT not configured');
+    return null;
+  }
+  const tokenHash = await hashMagicLinkToken(salt, rawToken);
+  const now = nowIso();
+  try {
+    const result = await env.DB.prepare(
+      `SELECT id, user_id
+       FROM magic_link_tokens
+       WHERE token_hash = ?
+         AND used_at IS NULL
+         AND expires_at > ?`
+    )
+      .bind(tokenHash, now)
+      .first();
+    if (!result) {
+      return null;
+    }
+    await env.DB.prepare(`UPDATE magic_link_tokens SET used_at = ? WHERE id = ?`)
+      .bind(now, result.id)
+      .run();
+    return { userId: result.user_id };
+  } catch (error) {
+    console.error('[MagicLink] Token verification failed:', error?.message);
+    return null;
+  }
+};
+
+const sendMagicLinkEmail = async (env, { to, magicUrl, replyTo }) => {
+  const subject = 'Your Wyoming Ballot Guide sign-in link';
+  const text = `Click this link to access your Wyoming Ballot Guide: ${magicUrl}\n\nThis link expires in ${MAGIC_LINK_TTL_MINUTES} minutes. If you did not request this, you can ignore this email.`;
+  const html = `Click <a href="${escapeHtml(magicUrl)}">here</a> to access your Wyoming Ballot Guide.<br>This link expires in ${MAGIC_LINK_TTL_MINUTES} minutes. If you did not request this, you can ignore this email.`;
+  return sendEmail(env, { to, subject, text, html, replyTo });
+};
+
+const handleMagicLinkRequest = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ ok: false, code: 'MAGIC_LINK_FAILED' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ ok: false, code: 'MAGIC_LINK_FAILED' }, { status: 400 });
+  }
+
+  const body = await parseJsonBody(request);
+  const email = normalizeEmail(body.email || '');
+  const turnstileToken = body.turnstileToken || '';
+
+  if (!email || !isValidEmail(email)) {
+    return jsonResponse({ ok: false, code: 'INVALID_EMAIL' }, { status: 400 });
+  }
+
+  const turnstile = await verifyTurnstile(turnstileToken, request, env);
+  if (!turnstile.ok) {
+    return jsonResponse({ ok: false, code: 'MAGIC_LINK_FAILED' }, { status: 400 });
+  }
+
+  // Always respond the same way regardless of whether the account already
+  // existed, so this endpoint cannot be used to enumerate registered emails.
+  try {
+    const userId = await findOrCreateUserForMagicLink(env, email);
+    const signals = await getRequestSignals(request, env);
+    const rawToken = await createMagicLinkToken(env, userId, signals.ipHash);
+    if (rawToken) {
+      const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
+      const magicUrl = new URL('/auth/magic-link/verify/', baseUrl);
+      magicUrl.searchParams.set('token', rawToken);
+      const sent = await sendMagicLinkEmail(env, {
+        to: email,
+        magicUrl: magicUrl.toString(),
+        replyTo: env.EMAIL_FROM,
+      });
+      console.log('[MagicLink] request_send', {
+        email_masked: maskEmailForLogs(email),
+        ok: !!sent.ok,
+        code: sent.code || null,
+      });
+    }
+  } catch (error) {
+    console.error('[MagicLink] request failed:', error?.message);
+  }
+
+  return jsonResponse({ ok: true, status: 'MAGIC_LINK_SENT' }, { status: 200 });
+};
+
+const handleMagicLinkConfirm = async (request, env) => {
+  if (!env.DB) {
+    return jsonResponse({ ok: false, code: 'MAGIC_LINK_FAILED' }, { status: 500 });
+  }
+  const originError = requireSameOrigin(request, env);
+  if (originError) {
+    return jsonResponse({ ok: false, code: 'MAGIC_LINK_FAILED' }, { status: 400 });
+  }
+
+  const body = await parseJsonBody(request);
+  const token = (body.token || '').trim();
+  if (!token) {
+    return jsonResponse({ ok: false, code: 'INVALID_TOKEN' }, { status: 400 });
+  }
+
+  const verified = await verifyMagicLinkToken(env, token);
+  if (!verified) {
+    return jsonResponse({ ok: false, code: 'INVALID_TOKEN' }, { status: 400 });
+  }
+
+  const { userId } = verified;
+  const now = nowIso();
+  await env.DB.prepare(
+    `UPDATE user
+     SET email_verified_at = COALESCE(email_verified_at, ?),
+         account_status = 'active'
+     WHERE id = ?`
+  )
+    .bind(now, userId)
+    .run();
+
+  const lucia = initializeLucia(env);
+  const session = await lucia.createSession(userId, {});
+  await stampSessionTimestamps(env, session.id);
+  const sessionCookie = lucia.createSessionCookie(session.id);
+
+  const headers = new Headers();
+  headers.append('Set-Cookie', sessionCookie.serialize());
+
+  return jsonResponse({ ok: true, status: 'SIGNED_IN' }, { status: 200, headers });
+};
+
+// ============================================================================
+// GUIDE ANSWER TOKEN HELPERS (candidate questionnaire access)
+// ============================================================================
+// One reusable token per candidate, valid until expires_at. Not single-use --
+// candidates can return and update answers any time before the deadline.
+
+const GUIDE_ANSWER_TOKEN_BYTES = 32;
+
+// Candidate submission window closes on this date (Phase 3 "data lock").
+// See Candidates/docs/GuidePlan.md Phase 3 -- after this, POST /api/guide/submit-answer
+// returns 410 Gone and an admin runs the no_answer backfill script once.
+const GUIDE_SUBMISSION_DEADLINE = '2026-08-14T23:59:59Z';
+
+const hashGuideAnswerToken = async (salt, token) => sha256Hex(`${salt}:guide-answer:${token}`);
+
+const generateGuideAnswerToken = () => {
+  const bytes = new Uint8Array(GUIDE_ANSWER_TOKEN_BYTES);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
+};
+
+// Verifies a guide answer token and returns { wyCandidateId } if valid and unexpired.
+const verifyGuideAnswerToken = async (env, rawToken) => {
+  if (!env.DB || !rawToken) {
+    return null;
+  }
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[GuideAnswerToken] HASH_SALT not configured');
+    return null;
+  }
+  const tokenHash = await hashGuideAnswerToken(salt, rawToken);
+  const now = nowIso();
+  try {
+    const result = await env.DB.prepare(
+      `SELECT wy_candidate_id
+       FROM guide_answer_tokens
+       WHERE token_hash = ?
+         AND expires_at > ?`
+    )
+      .bind(tokenHash, now)
+      .first();
+    if (!result) {
+      return null;
+    }
+    return { wyCandidateId: result.wy_candidate_id };
+  } catch (error) {
+    console.error('[GuideAnswerToken] Token verification failed:', error?.message);
+    return null;
+  }
+};
+
+// ============================================================================
+// ALIGNMENT SCORING HELPERS (shared by /api/ballot/card and /api/ballot/alignment)
+// ============================================================================
+
+// Maps the wy D1 offices.level enum to the guide_questions.applicable_to enum.
+// The two schemas use different vocabularies for the same concept.
+const OFFICE_LEVEL_TO_APPLICABLE_TO = {
+  federal: 'federal',
+  statewide: 'statewide',
+  wy_house: 'state_house',
+  wy_senate: 'state_senate',
+  county: 'county',
+  city: 'city',
+};
+
+const ALIGNMENT_POSITION_VALUE = { strongly_support: 2, support: 1, neutral: 0, oppose: -1, strongly_oppose: -2 };
+const ALIGNMENT_WEIGHT_VALUE = { high: 3, medium: 2, low: 1 };
+
+// Scores one candidate against one voter's quiz answers.
+// voterMap: Map<question_id, {position, weight}>  (voter_quiz_responses rows)
+// questions: [{id, question_text, issue_category}]  (applicable guide_questions rows)
+// candAnswers: Map<question_id, {position, explanation, source_url, firmness, is_top_priority}>  (reviewed guide_answers rows)
+const scoreCandidateAgainstVoter = (voterMap, questions, candAnswers) => {
+  let sumWeighted = 0;
+  let sumWeight = 0;
+  let answeredCount = 0;
+  let noAnswerCount = 0;
+  const topPriorityFlags = [];
+  const breakdown = [];
+
+  for (const q of questions) {
+    const voterResp = voterMap.get(q.id);
+    // Skip removes the question from numerator and denominator for every candidate equally.
+    if (!voterResp || voterResp.weight === 'skip' || !voterResp.position) continue;
+
+    const voterValue = ALIGNMENT_POSITION_VALUE[voterResp.position];
+    const voterWeight = ALIGNMENT_WEIGHT_VALUE[voterResp.weight] ?? 0;
+    const candAns = candAnswers.get(q.id);
+
+    if (!candAns || candAns.position === 'no_answer') {
+      noAnswerCount += 1;
+      breakdown.push({
+        question_id: q.id,
+        issue_category: q.issue_category,
+        question_text: q.question_text,
+        voter_position: voterResp.position,
+        voter_weight: voterResp.weight,
+        candidate_position: 'no_answer',
+        match_score: null,
+        weighted_score: null,
+        is_top_priority: false,
+        firmness: null,
+        explanation: '',
+        source_url: '',
+      });
+      continue;
+    }
+
+    const candidateValue = ALIGNMENT_POSITION_VALUE[candAns.position];
+    const distance = Math.abs(voterValue - candidateValue);
+    const matchScore = 1 - distance / 4;
+    const weightedScore = matchScore * voterWeight;
+    sumWeighted += weightedScore;
+    sumWeight += voterWeight;
+    answeredCount += 1;
+    if (candAns.is_top_priority) topPriorityFlags.push(q.id);
+
+    breakdown.push({
+      question_id: q.id,
+      issue_category: q.issue_category,
+      question_text: q.question_text,
+      voter_position: voterResp.position,
+      voter_weight: voterResp.weight,
+      candidate_position: candAns.position,
+      match_score: Math.round(matchScore * 1000) / 1000,
+      weighted_score: Math.round(weightedScore * 1000) / 1000,
+      is_top_priority: !!candAns.is_top_priority,
+      firmness: candAns.firmness,
+      explanation: candAns.explanation ?? '',
+      source_url: candAns.source_url ?? '',
+    });
+  }
+
+  const alignmentPct = sumWeight > 0 ? Math.round((sumWeighted / sumWeight) * 1000) / 10 : null;
+
+  return {
+    alignment_pct: alignmentPct,
+    answered_count: answeredCount,
+    no_answer_count: noAnswerCount,
+    is_top_priority_flags: topPriorityFlags,
+    breakdown,
+  };
+};
+
+// Fetches the applicable guide_questions for an office level, plus a voter's
+// own quiz responses. Shared setup for any per-race alignment computation.
+const getAlignmentInputs = async (env, userId, wyDbOfficeId) => {
+  const officeRow = await env.DB.prepare('SELECT level FROM offices WHERE id = ?')
+    .bind(wyDbOfficeId)
+    .first();
+  const scope = OFFICE_LEVEL_TO_APPLICABLE_TO[officeRow?.level] || null;
+  const scopes = scope ? ['all', scope] : ['all'];
+  const scopePlaceholders = scopes.map(() => '?').join(',');
+
+  const qRows = await env.DB.prepare(`
+    SELECT id, question_text, issue_category
+    FROM guide_questions
+    WHERE active = 1 AND applicable_to IN (${scopePlaceholders})
+    ORDER BY display_order
+  `).bind(...scopes).all();
+  const questions = qRows.results ?? [];
+
+  const vqRows = await env.DB.prepare(
+    `SELECT question_id, position, weight FROM voter_quiz_responses WHERE user_id = ?`
+  ).bind(userId).all();
+  const voterMap = new Map((vqRows.results ?? []).map((r) => [r.question_id, r]));
+
+  return { questions, voterMap };
+};
+
+// Fetches reviewed guide_answers for a set of candidates, grouped by candidate.
+const getReviewedAnswersByCandidate = async (env, wyCandidateIds) => {
+  const answersByCandidate = new Map();
+  const ids = wyCandidateIds.filter(Boolean);
+  if (ids.length === 0) return answersByCandidate;
+  const idPlaceholders = ids.map(() => '?').join(',');
+  const aRows = await env.DB.prepare(`
+    SELECT wy_candidate_id, question_id, position, explanation, source_url, firmness, is_top_priority
+    FROM guide_answers
+    WHERE wy_candidate_id IN (${idPlaceholders}) AND reviewed = 1
+  `).bind(...ids).all();
+  for (const r of (aRows.results ?? [])) {
+    if (!answersByCandidate.has(r.wy_candidate_id)) answersByCandidate.set(r.wy_candidate_id, new Map());
+    answersByCandidate.get(r.wy_candidate_id).set(r.question_id, r);
+  }
+  return answersByCandidate;
+};
+
+// Loads a user's full ballot card: matching races, candidates, their existing
+// responses, ballot-visible evidence, and an alignment summary attached to
+// each race's chosen candidate. Shared by GET /api/ballot/card and the
+// email-summary endpoint so the two never drift apart.
+const loadBallotCardForUser = async (env, userId) => {
+  const addrRow = await env.DB.prepare(
+    `SELECT state_house_dist, state_senate_dist FROM user_address_verification WHERE user_id = ? LIMIT 1`
+  ).bind(userId).first();
+
+  const hdInt = addrRow?.state_house_dist ? parseInt(addrRow.state_house_dist, 10) : null;
+  const sdInt = addrRow?.state_senate_dist ? parseInt(addrRow.state_senate_dist, 10) : null;
+
+  // The wy D1 is the same DB so cross-table joins work.
+  const rows = await env.DB.prepare(`
+    SELECT
+      bs.race_slug   AS survey_slug,
+      bs.title       AS survey_title,
+      bs.scope_type,
+      bs.scope_value,
+      bs.display_order,
+      bs.wy_db_office_id,
+      rc.id          AS rc_id,
+      rc.candidate_name,
+      rc.candidate_slug,
+      rc.wy_candidate_id,
+      br.chosen,
+      br.notes
+    FROM ballot_surveys bs
+    JOIN candidates c  ON c.office_id = bs.wy_db_office_id
+    JOIN race_candidates rc ON rc.wy_candidate_id = c.id
+    LEFT JOIN ballot_responses br
+      ON br.user_id = ?
+     AND br.race_slug = bs.race_slug
+     AND br.candidate_slug = rc.candidate_slug
+    WHERE bs.active = 1
+      AND (
+        bs.scope_type IN ('federal', 'statewide')
+        OR (bs.scope_type = 'state_house'  AND CAST(bs.scope_value AS INTEGER) = ?)
+        OR (bs.scope_type = 'state_senate' AND CAST(bs.scope_value AS INTEGER) = ?)
+      )
+    ORDER BY bs.display_order, bs.title, rc.candidate_name
+  `).bind(userId, hdInt ?? -1, sdInt ?? -1).all();
+
+  const surveyMap = new Map();
+  for (const row of (rows.results ?? [])) {
+    if (!surveyMap.has(row.survey_slug)) {
+      surveyMap.set(row.survey_slug, {
+        race_slug: row.survey_slug,
+        title: row.survey_title,
+        scope_type: row.scope_type,
+        scope_value: row.scope_value,
+        display_order: row.display_order,
+        wy_db_office_id: row.wy_db_office_id,
+        candidates: [],
+      });
+    }
+    surveyMap.get(row.survey_slug).candidates.push({
+      rc_id: row.rc_id,
+      candidate_name: row.candidate_name,
+      candidate_slug: row.candidate_slug,
+      wy_candidate_id: row.wy_candidate_id,
+      chosen: row.chosen ?? 0,
+      notes: row.notes ?? null,
+      evidence: [],
+    });
+  }
+
+  // Fetch ballot-visible evidence for all matched candidates
+  const wyIds = [...new Set(
+    Array.from(surveyMap.values())
+      .flatMap((s) => s.candidates.map((c) => c.wy_candidate_id).filter(Boolean))
+  )];
+  if (wyIds.length > 0) {
+    const placeholders = wyIds.map(() => '?').join(',');
+    const evRows = await env.DB.prepare(`
+      SELECT
+        rel.candidate_id,
+        rel.category_key,
+        rel.reference_kind,
+        rel.reference_key,
+        rel.claim_summary,
+        li.topic_display,
+        li.source_framing,
+        li.official_url
+      FROM guide_rubric_evidence_links rel
+      LEFT JOIN guide_legislation_items li
+        ON li.ref_id = rel.reference_key AND rel.reference_kind = 'legislation'
+      WHERE rel.candidate_id IN (${placeholders})
+        AND rel.ballot_visible = 1
+      ORDER BY rel.candidate_id, rel.category_key
+    `).bind(...wyIds).all();
+
+    const evidenceByCandidate = new Map();
+    for (const ev of (evRows.results ?? [])) {
+      if (!evidenceByCandidate.has(ev.candidate_id)) {
+        evidenceByCandidate.set(ev.candidate_id, []);
+      }
+      const claim = ev.topic_display
+        ? `${ev.topic_display}: ${ev.source_framing ?? ev.claim_summary ?? ''}`
+        : (ev.claim_summary ?? '');
+      evidenceByCandidate.get(ev.candidate_id).push({
+        category_key: ev.category_key,
+        claim,
+        official_url: ev.official_url ?? null,
+      });
+    }
+
+    for (const survey of surveyMap.values()) {
+      for (const candidate of survey.candidates) {
+        if (candidate.wy_candidate_id) {
+          candidate.evidence = evidenceByCandidate.get(candidate.wy_candidate_id) ?? [];
+        }
+      }
+    }
+  }
+
+  // Attach an alignment summary (My Ballot Guide quiz match) to each race's
+  // chosen candidate, if any. Cheap: only scores the one chosen candidate
+  // per race, not the full field.
+  for (const survey of surveyMap.values()) {
+    const chosen = survey.candidates.find((c) => c.chosen === 1);
+    if (!chosen || !chosen.wy_candidate_id || !survey.wy_db_office_id) continue;
+    try {
+      const { questions, voterMap } = await getAlignmentInputs(env, userId, survey.wy_db_office_id);
+      const answersByCandidate = await getReviewedAnswersByCandidate(env, [chosen.wy_candidate_id]);
+      const candAnswers = answersByCandidate.get(chosen.wy_candidate_id) || new Map();
+      const scored = scoreCandidateAgainstVoter(voterMap, questions, candAnswers);
+      const topReason = scored.breakdown
+        .filter((b) => b.weighted_score !== null)
+        .sort((a, b) => b.weighted_score - a.weighted_score)[0] || null;
+      chosen.alignment_summary = {
+        alignment_pct: scored.alignment_pct,
+        answered_count: scored.answered_count,
+        no_answer_count: scored.no_answer_count,
+        top_reason: topReason ? { question_text: topReason.question_text, issue_category: topReason.issue_category } : null,
+      };
+    } catch (err) {
+      console.error('[loadBallotCardForUser] alignment_summary failed for', survey.race_slug, err.message);
+    }
+  }
+
+  return {
+    house_district: hdInt,
+    senate_district: sdInt,
+    surveys: Array.from(surveyMap.values()),
+  };
 };
 
 // ============================================================================
@@ -5949,6 +6517,14 @@ export default {
         return withAuthLogging(request, url, () => handleEmailVerifyConfirm(request, env));
       }
 
+      if (request.method === 'POST' && pathParts[2] === 'magic-link' && pathParts[3] === 'request') {
+        return withAuthLogging(request, url, () => handleMagicLinkRequest(request, env));
+      }
+
+      if (request.method === 'POST' && pathParts[2] === 'magic-link' && pathParts[3] === 'confirm') {
+        return withAuthLogging(request, url, () => handleMagicLinkConfirm(request, env));
+      }
+
       if (request.method === 'POST' && pathParts[2] === 'passkey' && pathParts[3] === 'register' && pathParts[4] === 'options') {
         return handlePasskeyRegisterOptions(request, env);
       }
@@ -6900,25 +7476,36 @@ export default {
         );
       }
 
+      // Enrich with county, city, precinct from Candidates ballot-lookup
+      const geo = await fetchBallotGeography(
+        body.house_number || '',
+        body.street || '',
+        body.city || '',
+        body.zip || ''
+      );
+
       const verifiedAt = nowIso();
       // TODO: tighten address coordinate persistence so addr_lat/addr_lng are
       // only retained after the address is linked to an approved verification
       // flow, such as a registered voter-file match.
       await env.DB.prepare(
-        `INSERT INTO user_address_verification 
-         (user_id, state_fips, state_house_dist, state_senate_dist, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, verified_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?)
+        `INSERT INTO user_address_verification
+         (user_id, state_fips, state_house_dist, state_senate_dist, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, county, city, precinct, verified_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id) DO UPDATE SET
            state_fips = excluded.state_fips,
            state_house_dist = excluded.state_house_dist,
            state_senate_dist = excluded.state_senate_dist,
            addr_lat = excluded.addr_lat,
            addr_lng = excluded.addr_lng,
+           county = excluded.county,
+           city = excluded.city,
+           precinct = excluded.precinct,
            verified_at = excluded.verified_at,
            updated_at = excluded.updated_at
         `
       )
-        .bind(userId, stateFips, stateHouseDist, stateSenateDist, addrLat, addrLng, verifiedAt, verifiedAt, verifiedAt)
+        .bind(userId, stateFips, stateHouseDist, stateSenateDist, addrLat, addrLng, geo.county, geo.city, geo.precinct, verifiedAt, verifiedAt, verifiedAt)
         .run();
 
       await env.DB.prepare(
@@ -6951,6 +7538,7 @@ export default {
       const congressionalDist = body.district || '';
       const stateSenateDist = body.state_senate_dist || '';
       const stateHouseDist = body.state_house_dist || '';
+      const verifyAddrFields = { house_number: body.house_number || '', street: body.street || '', city: body.city || '', zip: body.zip || '' };
 
       if (
         !Number.isFinite(addrLat) ||
@@ -6991,10 +7579,16 @@ export default {
           if (sessionResult.status === 'valid' && sessionResult.user?.id) {
             const userId = sessionResult.user.id;
             const verifiedAt = nowIso();
+            const verifyGeo = await fetchBallotGeography(
+              verifyAddrFields.house_number,
+              verifyAddrFields.street,
+              verifyAddrFields.city,
+              verifyAddrFields.zip
+            );
             await env.DB.prepare(
-              `INSERT INTO user_address_verification 
-               (user_id, state_fips, state_house_dist, state_senate_dist, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, verified_at, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)
+              `INSERT INTO user_address_verification
+               (user_id, state_fips, state_house_dist, state_senate_dist, addr_lat, addr_lng, device_lat, device_lng, distance_m, accuracy_m, county, city, precinct, verified_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(user_id) DO UPDATE SET
                  state_fips = excluded.state_fips,
                  state_house_dist = excluded.state_house_dist,
@@ -7005,11 +7599,14 @@ export default {
                  device_lng = NULL,
                  distance_m = excluded.distance_m,
                  accuracy_m = excluded.accuracy_m,
+                 county = excluded.county,
+                 city = excluded.city,
+                 precinct = excluded.precinct,
                  verified_at = excluded.verified_at,
                  updated_at = excluded.updated_at
               `
             )
-              .bind(userId, stateFips, stateHouseDist, stateSenateDist, addrLat, addrLng, Math.round(distance), Math.round(accuracy), verifiedAt, verifiedAt, verifiedAt)
+              .bind(userId, stateFips, stateHouseDist, stateSenateDist, addrLat, addrLng, Math.round(distance), Math.round(accuracy), verifyGeo.county, verifyGeo.city, verifyGeo.precinct, verifiedAt, verifiedAt, verifiedAt)
               .run();
 
             if (stateCode) {
@@ -9612,11 +10209,694 @@ export default {
       // Fall through to ASSETS — static page may exist (e.g. /races/us-senate-2026)
     }
 
+    // ── Ballot card API ─────────────────────────────────────────────────────
+    // GET /api/ballot/card
+    // Returns ballot surveys matching the authenticated user's districts,
+    // with candidates and the user's existing responses.
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'ballot' && pathParts[2] === 'card') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const card = await loadBallotCardForUser(env, auth.user.id);
+        return jsonResponse({ ok: true, ...card });
+      } catch (err) {
+        console.error('[GET /api/ballot/card]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // POST /api/ballot/response
+    // Upserts a single ballot response (chosen candidate for a race).
+    // Body: { race_slug, candidate_slug, chosen, notes?, wy_candidate_id? }
+    // race_slug must use ballot_surveys format (e.g. wy-house-district-59-2026).
+    if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'ballot' && pathParts[2] === 'response') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const userId = auth.user.id;
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const body = await request.json();
+        const { race_slug, candidate_slug, chosen, notes, wy_candidate_id } = body;
+
+        if (!race_slug || !candidate_slug) {
+          return jsonResponse({ error: 'race_slug and candidate_slug are required' }, { status: 400 });
+        }
+        if (chosen !== 0 && chosen !== 1) {
+          return jsonResponse({ error: 'chosen must be 0 or 1' }, { status: 400 });
+        }
+
+        const now = new Date().toISOString();
+        await env.DB.prepare(`
+          INSERT INTO ballot_responses (user_id, race_slug, candidate_slug, wy_candidate_id, chosen, notes, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(user_id, race_slug, candidate_slug) DO UPDATE SET
+            chosen     = excluded.chosen,
+            notes      = excluded.notes,
+            updated_at = excluded.updated_at
+        `).bind(userId, race_slug, candidate_slug, wy_candidate_id ?? null, chosen ? 1 : 0, notes ?? null, now, now).run();
+
+        return jsonResponse({ ok: true, race_slug, candidate_slug, chosen });
+      } catch (err) {
+        console.error('[POST /api/ballot/response]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/ballot/responses
+    // Returns all ballot responses for the authenticated user.
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'ballot' && pathParts[2] === 'responses') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const userId = auth.user.id;
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const rows = await env.DB.prepare(`
+          SELECT race_slug, candidate_slug, wy_candidate_id, chosen, notes, updated_at
+          FROM ballot_responses
+          WHERE user_id = ?
+          ORDER BY race_slug, candidate_slug
+        `).bind(userId).all();
+
+        return jsonResponse({ ok: true, responses: rows.results ?? [] });
+      } catch (err) {
+        console.error('[GET /api/ballot/responses]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // POST /api/ballot/email-summary
+    // Emails the requesting voter their own "My Ballot" summary (chosen candidates,
+    // alignment %, notes). No body required -- sends to the account's own email.
+    if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'ballot' && pathParts[2] === 'email-summary') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const card = await loadBallotCardForUser(env, auth.user.id);
+        const chosenRaces = card.surveys
+          .map((s) => ({ survey: s, pick: s.candidates.find((c) => c.chosen === 1) }))
+          .filter((r) => r.pick);
+
+        if (chosenRaces.length === 0) {
+          return jsonResponse({ error: 'No ballot choices to email yet' }, { status: 400 });
+        }
+
+        const textLines = ['Your Wyoming Ballot — My Choices', ''];
+        const htmlLines = ['<h2>Your Wyoming Ballot — My Choices</h2>'];
+        for (const { survey, pick } of chosenRaces) {
+          const alignmentLine = pick.alignment_summary?.alignment_pct != null
+            ? ` (${pick.alignment_summary.alignment_pct}% match with your quiz answers)`
+            : '';
+          textLines.push(`${survey.title}: ${pick.candidate_name}${alignmentLine}`);
+          if (pick.notes) textLines.push(`  Notes: ${pick.notes}`);
+          textLines.push('');
+
+          htmlLines.push(`<p><strong>${escapeHtml(survey.title)}:</strong> ${escapeHtml(pick.candidate_name)}${escapeHtml(alignmentLine)}`
+            + (pick.notes ? `<br><em>Notes: ${escapeHtml(pick.notes)}</em>` : '') + '</p>');
+        }
+        textLines.push('View or edit your ballot: ' + (env.APP_BASE_URL || 'https://grassrootsmvt.org') + '/ballot/results/');
+
+        const sent = await sendEmail(env, {
+          to: auth.user.email,
+          subject: 'Your Wyoming Ballot — My Choices',
+          text: textLines.join('\n'),
+          html: htmlLines.join('\n'),
+          replyTo: env.EMAIL_FROM,
+        });
+
+        if (!sent.ok) {
+          return jsonResponse({ error: 'Could not send email', code: sent.code || 'SEND_FAILED' }, { status: 502 });
+        }
+
+        return jsonResponse({ ok: true, sent_to: maskEmailForLogs(auth.user.email) });
+      } catch (err) {
+        console.error('[POST /api/ballot/email-summary]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/ballot/solidarity/<race_slug>
+    // Public, anonymized aggregate: how My Wyoming Ballot Guide participants are
+    // choosing in this race. Suppressed until 10+ responses exist per segment.
+    // Never labeled as a poll of all Wyoming voters -- see fairness rules in
+    // Candidates/docs/GuideConcept.md.
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'ballot' && pathParts[2] === 'solidarity' && pathParts[3]) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const raceSlug = pathParts[3];
+        const survey = await env.DB.prepare(
+          `SELECT race_slug, title, wy_db_office_id FROM ballot_surveys WHERE race_slug = ? AND active = 1`
+        ).bind(raceSlug).first();
+        if (!survey) {
+          return jsonResponse({ error: 'Race not found' }, { status: 404 });
+        }
+
+        const candRows = await env.DB.prepare(`
+          SELECT rc.candidate_slug, rc.candidate_name
+          FROM candidates c
+          JOIN race_candidates rc ON rc.wy_candidate_id = c.id
+          WHERE c.office_id = ?
+          ORDER BY rc.candidate_name
+        `).bind(survey.wy_db_office_id).all();
+        const candidateNames = new Map((candRows.results ?? []).map((c) => [c.candidate_slug, c.candidate_name]));
+
+        const countRows = await env.DB.prepare(`
+          SELECT br.candidate_slug, u.is_verified_voter, COUNT(*) AS n
+          FROM ballot_responses br
+          JOIN user u ON u.id = br.user_id
+          WHERE br.race_slug = ? AND br.chosen = 1
+          GROUP BY br.candidate_slug, u.is_verified_voter
+        `).bind(raceSlug).all();
+
+        const buildSegment = (rows) => {
+          const total = rows.reduce((sum, r) => sum + r.n, 0);
+          const show = total >= 10;
+          const candidates = show
+            ? rows
+                .map((r) => ({
+                  candidate_slug: r.candidate_slug,
+                  candidate_name: candidateNames.get(r.candidate_slug) ?? r.candidate_slug,
+                  chosen_count: r.n,
+                  pct: Math.round((r.n / total) * 1000) / 10,
+                }))
+                .sort((a, b) => b.chosen_count - a.chosen_count)
+            : [];
+          return { total_responses: total, show, candidates };
+        };
+
+        // countRows is grouped by (candidate_slug, is_verified_voter), so a candidate
+        // with both verified and unverified voters appears in two rows -- combine
+        // them per candidate_slug for the "all participants" segment.
+        const rawRows = countRows.results ?? [];
+        const allTotalsBySlug = new Map();
+        for (const r of rawRows) {
+          allTotalsBySlug.set(r.candidate_slug, (allTotalsBySlug.get(r.candidate_slug) || 0) + r.n);
+        }
+        const allRows = Array.from(allTotalsBySlug, ([candidate_slug, n]) => ({ candidate_slug, n }));
+        const verifiedRows = rawRows
+          .filter((r) => r.is_verified_voter === 1)
+          .map((r) => ({ candidate_slug: r.candidate_slug, n: r.n }));
+
+        return jsonResponse({
+          ok: true,
+          race_slug: raceSlug,
+          race_title: survey.title,
+          all_participants: buildSegment(allRows),
+          verified_voters: buildSegment(verifiedRows),
+          disclaimer: 'These results reflect My Wyoming Ballot Guide participants only — not a poll of all Wyoming voters.',
+        });
+      } catch (err) {
+        console.error('[GET /api/ballot/solidarity]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/ballot/candidates/<race_slug>
+    // Public, no auth -- lightweight candidate list for a race. Used by the
+    // vote-splitting simulator, which is a civic-education tool that should not
+    // require signing in (matches the platform's browse-first design rule).
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'ballot' && pathParts[2] === 'candidates' && pathParts[3]) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const raceSlug = pathParts[3];
+        const survey = await env.DB.prepare(
+          `SELECT race_slug, title FROM ballot_surveys WHERE race_slug = ? AND active = 1`
+        ).bind(raceSlug).first();
+        if (!survey) {
+          return jsonResponse({ error: 'Race not found' }, { status: 404 });
+        }
+
+        const candRows = await env.DB.prepare(`
+          SELECT rc.candidate_slug, rc.candidate_name
+          FROM ballot_surveys bs
+          JOIN candidates c ON c.office_id = bs.wy_db_office_id
+          JOIN race_candidates rc ON rc.wy_candidate_id = c.id
+          WHERE bs.race_slug = ?
+          ORDER BY rc.candidate_name
+        `).bind(raceSlug).all();
+
+        return jsonResponse({
+          ok: true,
+          race_slug: survey.race_slug,
+          race_title: survey.title,
+          candidates: candRows.results ?? [],
+        });
+      } catch (err) {
+        console.error('[GET /api/ballot/candidates]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/ballot/guide-questions
+    // Returns active guide_questions scoped to the authenticated user's districts,
+    // plus the user's existing voter_quiz_responses (if any) so the quiz can resume.
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'ballot' && pathParts[2] === 'guide-questions') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const userId = auth.user.id;
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const addrRow = await env.DB.prepare(
+          `SELECT state_house_dist, state_senate_dist FROM user_address_verification WHERE user_id = ? LIMIT 1`
+        ).bind(userId).first();
+
+        const scopes = ['all', 'statewide', 'federal'];
+        if (addrRow?.state_house_dist) scopes.push('state_house');
+        if (addrRow?.state_senate_dist) scopes.push('state_senate');
+
+        const placeholders = scopes.map(() => '?').join(',');
+        const rows = await env.DB.prepare(`
+          SELECT
+            gq.id, gq.question_text, gq.issue_category, gq.applicable_to, gq.display_order,
+            vqr.position AS voter_position, vqr.weight AS voter_weight
+          FROM guide_questions gq
+          LEFT JOIN voter_quiz_responses vqr
+            ON vqr.question_id = gq.id AND vqr.user_id = ?
+          WHERE gq.active = 1 AND gq.applicable_to IN (${placeholders})
+          ORDER BY gq.display_order
+        `).bind(userId, ...scopes).all();
+
+        const questions = (rows.results ?? []).map((r) => ({
+          id: r.id,
+          question_text: r.question_text,
+          issue_category: r.issue_category,
+          applicable_to: r.applicable_to,
+          voter_position: r.voter_position ?? null,
+          voter_weight: r.voter_weight ?? null,
+        }));
+
+        return jsonResponse({
+          ok: true,
+          questions,
+          categories: [...new Set(questions.map((q) => q.issue_category))],
+        });
+      } catch (err) {
+        console.error('[GET /api/ballot/guide-questions]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // POST /api/ballot/submit-quiz
+    // Upserts voter_quiz_responses rows for the authenticated user.
+    // Body: { responses: [{ question_id, position, weight }] }
+    // position may be null when weight = 'skip'.
+    if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'ballot' && pathParts[2] === 'submit-quiz') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const userId = auth.user.id;
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const body = await parseJsonBody(request);
+        const responses = Array.isArray(body.responses) ? body.responses : [];
+        if (responses.length === 0) {
+          return jsonResponse({ error: 'responses array is required' }, { status: 400 });
+        }
+
+        const validPositions = new Set([
+          'strongly_support', 'support', 'neutral', 'oppose', 'strongly_oppose',
+        ]);
+        const validWeights = new Set(['high', 'medium', 'low', 'skip']);
+
+        const now = new Date().toISOString();
+        const statements = [];
+        for (const r of responses) {
+          const questionId = Number(r.question_id);
+          const weight = validWeights.has(r.weight) ? r.weight : 'medium';
+          const position = weight === 'skip'
+            ? null
+            : (validPositions.has(r.position) ? r.position : null);
+          if (!Number.isInteger(questionId)) {
+            return jsonResponse({ error: 'Invalid question_id in responses' }, { status: 400 });
+          }
+          statements.push(
+            env.DB.prepare(`
+              INSERT INTO voter_quiz_responses (user_id, question_id, position, weight, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?)
+              ON CONFLICT(user_id, question_id) DO UPDATE SET
+                position   = excluded.position,
+                weight     = excluded.weight,
+                updated_at = excluded.updated_at
+            `).bind(userId, questionId, position, weight, now, now)
+          );
+        }
+
+        await env.DB.batch(statements);
+
+        return jsonResponse({ ok: true, saved: statements.length });
+      } catch (err) {
+        console.error('[POST /api/ballot/submit-quiz]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/guide/questions?token=<candidate token>
+    // Public (token-gated, no session required). Returns the candidate's name/race
+    // and the questions applicable to their office level, with any existing answers.
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'guide' && pathParts[2] === 'questions') {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const token = url.searchParams.get('token') || '';
+        const verified = await verifyGuideAnswerToken(env, token);
+        if (!verified) {
+          return jsonResponse({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' }, { status: 401 });
+        }
+        const { wyCandidateId } = verified;
+
+        const candidateRow = await env.DB.prepare(`
+          SELECT c.full_name AS candidate_name, o.title AS race_title, o.level AS office_level
+          FROM candidates c
+          JOIN offices o ON o.id = c.office_id
+          WHERE c.id = ?
+        `).bind(wyCandidateId).first();
+
+        if (!candidateRow) {
+          return jsonResponse({ error: 'Candidate not found' }, { status: 404 });
+        }
+
+        const scope = OFFICE_LEVEL_TO_APPLICABLE_TO[candidateRow.office_level] || null;
+        const scopes = scope ? ['all', scope] : ['all'];
+        const placeholders = scopes.map(() => '?').join(',');
+
+        const rows = await env.DB.prepare(`
+          SELECT
+            gq.id, gq.question_text, gq.issue_category,
+            ga.position, ga.explanation, ga.source_url, ga.firmness, ga.is_top_priority, ga.reviewed
+          FROM guide_questions gq
+          LEFT JOIN guide_answers ga
+            ON ga.question_id = gq.id AND ga.wy_candidate_id = ?
+          WHERE gq.active = 1 AND gq.applicable_to IN (${placeholders})
+          ORDER BY gq.display_order
+        `).bind(wyCandidateId, ...scopes).all();
+
+        return jsonResponse({
+          ok: true,
+          candidate_name: candidateRow.candidate_name,
+          race_title: candidateRow.race_title,
+          questions: (rows.results ?? []).map((r) => ({
+            id: r.id,
+            question_text: r.question_text,
+            issue_category: r.issue_category,
+            position: r.position ?? null,
+            explanation: r.explanation ?? '',
+            source_url: r.source_url ?? '',
+            firmness: r.firmness ?? null,
+            is_top_priority: !!r.is_top_priority,
+            reviewed: !!r.reviewed,
+          })),
+        });
+      } catch (err) {
+        console.error('[GET /api/guide/questions]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // POST /api/guide/submit-answer
+    // Body: { token, responses: [{ question_id, position, explanation?, source_url?, firmness?, is_top_priority? }] }
+    // Candidates never self-select 'no_answer' -- only the five substantive positions are accepted here.
+    if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'guide' && pathParts[2] === 'submit-answer') {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        if (new Date() >= new Date(GUIDE_SUBMISSION_DEADLINE)) {
+          return jsonResponse(
+            { error: 'The candidate questionnaire submission window has closed.', code: 'SUBMISSION_CLOSED' },
+            { status: 410 }
+          );
+        }
+
+        const body = await parseJsonBody(request);
+        const verified = await verifyGuideAnswerToken(env, body.token || '');
+        if (!verified) {
+          return jsonResponse({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' }, { status: 401 });
+        }
+        const { wyCandidateId } = verified;
+
+        const responses = Array.isArray(body.responses) ? body.responses : [];
+        if (responses.length === 0) {
+          return jsonResponse({ error: 'responses array is required' }, { status: 400 });
+        }
+
+        const validPositions = new Set([
+          'strongly_support', 'support', 'neutral', 'oppose', 'strongly_oppose',
+        ]);
+        const validFirmness = new Set(['core', 'leaning', 'open']);
+
+        const now = new Date().toISOString();
+        const statements = [];
+        for (const r of responses) {
+          const questionId = Number(r.question_id);
+          if (!Number.isInteger(questionId)) {
+            return jsonResponse({ error: 'Invalid question_id in responses' }, { status: 400 });
+          }
+          if (!validPositions.has(r.position)) {
+            // Skip questions the candidate hasn't answered yet -- partial submission is allowed.
+            continue;
+          }
+          const explanation = (r.explanation || '').toString().slice(0, 500) || null;
+          const sourceUrl = (r.source_url || '').toString().trim() || null;
+          const firmness = validFirmness.has(r.firmness) ? r.firmness : null;
+          const isTopPriority = r.is_top_priority ? 1 : 0;
+
+          statements.push(
+            env.DB.prepare(`
+              INSERT INTO guide_answers
+                (wy_candidate_id, question_id, position, explanation, source_url, firmness,
+                 is_top_priority, source_kind, reviewed, submitted_at, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, 'candidate_submission', 0, ?, ?, ?)
+              ON CONFLICT(wy_candidate_id, question_id) DO UPDATE SET
+                position        = excluded.position,
+                explanation     = excluded.explanation,
+                source_url      = excluded.source_url,
+                firmness        = excluded.firmness,
+                is_top_priority = excluded.is_top_priority,
+                reviewed        = 0,
+                submitted_at    = excluded.submitted_at,
+                updated_at      = excluded.updated_at
+            `).bind(wyCandidateId, questionId, r.position, explanation, sourceUrl, firmness, isTopPriority, now, now, now)
+          );
+        }
+
+        if (statements.length === 0) {
+          return jsonResponse({ error: 'No valid answered questions in submission' }, { status: 400 });
+        }
+
+        await env.DB.batch(statements);
+
+        return jsonResponse({ ok: true, saved: statements.length });
+      } catch (err) {
+        console.error('[POST /api/guide/submit-answer]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/guide/admin/pending-answers
+    // Admin-only. Lists unreviewed candidate answers awaiting approval.
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'guide' && pathParts[2] === 'admin' && pathParts[3] === 'pending-answers') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+        if (!isAdmin) {
+          return jsonResponse({ error: 'Forbidden.', code: 'FORBIDDEN' }, { status: 403 });
+        }
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const rows = await env.DB.prepare(`
+          SELECT
+            ga.id, ga.wy_candidate_id, ga.question_id, ga.position, ga.explanation,
+            ga.source_url, ga.firmness, ga.is_top_priority, ga.submitted_at,
+            c.full_name AS candidate_name,
+            gq.question_text, gq.issue_category
+          FROM guide_answers ga
+          JOIN candidates c ON c.id = ga.wy_candidate_id
+          JOIN guide_questions gq ON gq.id = ga.question_id
+          WHERE ga.reviewed = 0
+          ORDER BY ga.submitted_at
+        `).all();
+
+        return jsonResponse({ ok: true, pending: rows.results ?? [] });
+      } catch (err) {
+        console.error('[GET /api/guide/admin/pending-answers]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // POST /api/guide/admin/review-answer
+    // Admin-only. Body: { answer_id, action: 'approve' | 'reject' }
+    // Approve sets reviewed = 1 (answer goes live). Reject deletes the row so the
+    // candidate can resubmit with their still-valid token.
+    if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'guide' && pathParts[2] === 'admin' && pathParts[3] === 'review-answer') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+        if (!isAdmin) {
+          return jsonResponse({ error: 'Forbidden.', code: 'FORBIDDEN' }, { status: 403 });
+        }
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const body = await parseJsonBody(request);
+        const answerId = Number(body.answer_id);
+        const action = body.action;
+        if (!Number.isInteger(answerId) || (action !== 'approve' && action !== 'reject')) {
+          return jsonResponse({ error: 'answer_id and action (approve|reject) are required' }, { status: 400 });
+        }
+
+        if (action === 'approve') {
+          await env.DB.prepare(`UPDATE guide_answers SET reviewed = 1, updated_at = ? WHERE id = ?`)
+            .bind(new Date().toISOString(), answerId)
+            .run();
+        } else {
+          await env.DB.prepare(`DELETE FROM guide_answers WHERE id = ?`).bind(answerId).run();
+        }
+
+        return jsonResponse({ ok: true, answer_id: answerId, action });
+      } catch (err) {
+        console.error('[POST /api/guide/admin/review-answer]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // POST /api/guide/admin/create-answer-token
+    // Admin-only. Body: { wy_candidate_id, expires_days? }
+    // Creates (or regenerates) the candidate's questionnaire access token and
+    // returns the full submission URL. Regenerating invalidates the old link.
+    if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'guide' && pathParts[2] === 'admin' && pathParts[3] === 'create-answer-token') {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const isAdmin = await userHasRole(env, auth.user.id, 'admin');
+        if (!isAdmin) {
+          return jsonResponse({ error: 'Forbidden.', code: 'FORBIDDEN' }, { status: 403 });
+        }
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const body = await parseJsonBody(request);
+        const wyCandidateId = Number(body.wy_candidate_id);
+        if (!Number.isInteger(wyCandidateId)) {
+          return jsonResponse({ error: 'wy_candidate_id is required' }, { status: 400 });
+        }
+        const rawExpiresDays = Number(body.expires_days);
+        const expiresDays = Number.isFinite(rawExpiresDays) && rawExpiresDays > 0 ? rawExpiresDays : 45;
+
+        const candidateRow = await env.DB.prepare('SELECT id, full_name FROM candidates WHERE id = ?')
+          .bind(wyCandidateId)
+          .first();
+        if (!candidateRow) {
+          return jsonResponse({ error: 'Candidate not found' }, { status: 404 });
+        }
+
+        const salt = getHashSalt(env);
+        if (!salt) {
+          return jsonResponse({ error: 'Server misconfigured: HASH_SALT missing' }, { status: 500 });
+        }
+
+        const rawToken = generateGuideAnswerToken();
+        const tokenHash = await hashGuideAnswerToken(salt, rawToken);
+        const expiresAt = addMinutesIso(expiresDays * 24 * 60);
+        const now = nowIso();
+
+        await env.DB.prepare(`
+          INSERT INTO guide_answer_tokens (wy_candidate_id, token_hash, sent_at, expires_at, created_at)
+          VALUES (?, ?, NULL, ?, ?)
+          ON CONFLICT(wy_candidate_id) DO UPDATE SET
+            token_hash = excluded.token_hash,
+            expires_at = excluded.expires_at
+        `).bind(wyCandidateId, tokenHash, expiresAt, now).run();
+
+        const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
+        const submitUrl = new URL('/guide/submit/', baseUrl);
+        submitUrl.searchParams.set('token', rawToken);
+
+        return jsonResponse({
+          ok: true,
+          candidate_name: candidateRow.full_name,
+          submit_url: submitUrl.toString(),
+          expires_at: expiresAt,
+        });
+      } catch (err) {
+        console.error('[POST /api/guide/admin/create-answer-token]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/ballot/alignment/<race_slug>
+    // Computes per-candidate alignment for the requesting voter's own quiz answers.
+    // See Candidates/docs/GuideConcept.md "Decision B" for the scoring formula.
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'ballot' && pathParts[2] === 'alignment' && pathParts[3]) {
+      try {
+        const auth = await requireSessionUser(request, env);
+        if (auth.response) return auth.response;
+        const userId = auth.user.id;
+
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const raceSlug = pathParts[3];
+        const survey = await env.DB.prepare(
+          `SELECT race_slug, title, scope_type, wy_db_office_id FROM ballot_surveys WHERE race_slug = ? AND active = 1`
+        ).bind(raceSlug).first();
+        if (!survey) {
+          return jsonResponse({ error: 'Race not found' }, { status: 404 });
+        }
+
+        const candRows = await env.DB.prepare(`
+          SELECT rc.wy_candidate_id, rc.candidate_name, rc.candidate_slug
+          FROM candidates c
+          JOIN race_candidates rc ON rc.wy_candidate_id = c.id
+          WHERE c.office_id = ?
+          ORDER BY rc.candidate_name
+        `).bind(survey.wy_db_office_id).all();
+        const candidates = candRows.results ?? [];
+
+        if (candidates.length === 0) {
+          return jsonResponse({ ok: true, race_slug: raceSlug, race_title: survey.title, candidates: [] });
+        }
+
+        const { questions, voterMap } = await getAlignmentInputs(env, userId, survey.wy_db_office_id);
+        const answersByCandidate = await getReviewedAnswersByCandidate(env, candidates.map((c) => c.wy_candidate_id));
+
+        const results = candidates.map((c) => {
+          const candAnswers = answersByCandidate.get(c.wy_candidate_id) || new Map();
+          const scored = scoreCandidateAgainstVoter(voterMap, questions, candAnswers);
+          return {
+            wy_candidate_id: c.wy_candidate_id,
+            candidate_name: c.candidate_name,
+            candidate_slug: c.candidate_slug,
+            ...scored,
+          };
+        });
+
+        return jsonResponse({ ok: true, race_slug: raceSlug, race_title: survey.title, candidates: results });
+      } catch (err) {
+        console.error('[GET /api/ballot/alignment]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
     // Serve static assets from /public
     if (env.ASSETS && typeof env.ASSETS.fetch === 'function') {
       return env.ASSETS.fetch(request);
     }
-    
+
     // Fallback: serve index.html for any other routes
     return new Response('Not Found', { status: 404 });
   },

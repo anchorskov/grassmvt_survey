@@ -83,6 +83,10 @@
   let addressDistrict = '';
   let addressSenateDist = '';
   let addressHouseDist = '';
+  let addressHouseNumber = '';
+  let addressStreetName = '';
+  let addressCity = '';
+  let addressZip = '';
 
   const populateStates = () => {
     const fragment = document.createDocumentFragment();
@@ -234,15 +238,25 @@
     setDeviceSectionVisible(false);
     addressLat = null;
     addressLng = null;
+    addressHouseNumber = '';
+    addressStreetName = '';
+    addressCity = '';
+    addressZip = '';
+
+    const rawStreet1 = (document.getElementById('street1').value || '').trim();
+    const rawCity = (document.getElementById('city').value || '').trim();
+    const rawZip = (document.getElementById('zip').value || '').trim();
+    // Split "123 Main St" into house number and street for ballot-lookup
+    const streetMatch = rawStreet1.match(/^(\d+[A-Za-z]?)\s+(.+)$/);
 
     const payload = {
       first_name: document.getElementById('first-name').value,
       last_name: document.getElementById('last-name').value,
-      street1: document.getElementById('street1').value,
+      street1: rawStreet1,
       street2: document.getElementById('street2').value,
-      city: document.getElementById('city').value,
+      city: rawCity,
       state: document.getElementById('state').value,
-      zip: document.getElementById('zip').value,
+      zip: rawZip,
     };
 
     const result = await validateAddress(payload);
@@ -265,6 +279,10 @@
     addressDistrict = result.district || '';
     addressSenateDist = result.state_senate_dist || '';
     addressHouseDist = result.state_house_dist || '';
+    addressHouseNumber = streetMatch ? streetMatch[1] : '';
+    addressStreetName = streetMatch ? streetMatch[2] : rawStreet1;
+    addressCity = normalized.city || rawCity;
+    addressZip = normalized.zip || rawZip;
 
     if (addressLat === null || addressLng === null) {
       showMessage(addressNote, 'Address validated, district mapping pending. Device check not available yet.');
@@ -310,6 +328,10 @@
             district: addressDistrict,
             state_senate_dist: addressSenateDist,
             state_house_dist: addressHouseDist,
+            house_number: addressHouseNumber,
+            street: addressStreetName,
+            city: addressCity,
+            zip: addressZip,
           };
           const result = await verifyDevice(payload);
           deviceSubmit.disabled = false;
@@ -367,6 +389,10 @@
             district: addressDistrict,
             state_senate_dist: addressSenateDist,
             state_house_dist: addressHouseDist,
+            house_number: addressHouseNumber,
+            street: addressStreetName,
+            city: addressCity,
+            zip: addressZip,
           }),
         });
         const data = await response.json().catch(() => ({}));

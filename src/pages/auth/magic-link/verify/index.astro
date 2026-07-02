@@ -1,0 +1,88 @@
+---
+// src/pages/auth/magic-link/verify/index.astro
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Sign In | My Wyoming Ballot Guide">
+  <main class="max-w-lg mx-auto px-4 py-10">
+    <div class="bg-white border border-wy-dust rounded-xl p-8 text-center shadow-md">
+      <h1 class="text-2xl font-bold text-wy-charcoal mb-4">Sign in</h1>
+
+      <div id="loading" class="bg-gray-100 text-gray-700 border border-gray-300 rounded p-4 mb-4" style="display:none">
+        <p>Signing you in…</p>
+      </div>
+
+      <div id="success" class="bg-green-50 text-green-800 border border-green-300 rounded p-4 mb-4" style="display:none">
+        <p><strong>You're signed in!</strong></p>
+        <div class="mt-4">
+          <a href="/ballot/quiz/" class="button button--primary">Start the ballot quiz</a>
+        </div>
+      </div>
+
+      <div id="error" class="bg-red-50 text-red-800 border border-red-300 rounded p-4 mb-4" style="display:none">
+        <p><strong>Sign-in link invalid</strong></p>
+        <p class="mt-2" id="error-message">This link is invalid or has expired.</p>
+        <div class="mt-4">
+          <a href="/auth/magic-link/" class="button button--primary">Request a new link</a>
+        </div>
+      </div>
+
+      <div id="confirm-screen" style="display:none">
+        <p class="text-wy-charcoal mb-4">Click the button below to finish signing in.</p>
+        <button id="confirm-btn" class="button button--primary">Confirm sign-in</button>
+        <p class="text-xs text-gray-400 mt-4">This extra step protects your account from automated email scanners.</p>
+      </div>
+
+      <div id="no-token" style="display:none">
+        <p class="text-wy-charcoal mb-4">No sign-in link found.</p>
+        <a href="/auth/magic-link/" class="button button--primary">Request a sign-in link</a>
+      </div>
+    </div>
+  </main>
+
+  <script is:inline>
+    (() => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token') || '';
+
+      const show = (id) => { document.getElementById(id).style.display = 'block'; };
+      const hide = (id) => { document.getElementById(id).style.display = 'none'; };
+
+      if (!token) {
+        show('no-token');
+        return;
+      }
+
+      show('confirm-screen');
+      document.getElementById('confirm-btn').addEventListener('click', () => confirmSignIn(token));
+
+      async function confirmSignIn(rawToken) {
+        hide('confirm-screen');
+        show('loading');
+        hide('error');
+        hide('success');
+        try {
+          const response = await fetch('/api/auth/magic-link/confirm', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ token: rawToken }),
+            credentials: 'include',
+          });
+          const data = await response.json().catch(() => ({}));
+          hide('loading');
+          if (response.ok && data.ok) {
+            show('success');
+            setTimeout(() => { window.location.href = '/ballot/quiz/'; }, 1200);
+          } else {
+            document.getElementById('error-message').textContent =
+              'This link is invalid or has expired.';
+            show('error');
+          }
+        } catch (err) {
+          hide('loading');
+          document.getElementById('error-message').textContent = 'An error occurred. Please try again.';
+          show('error');
+        }
+      }
+    })();
+  </script>
+</BaseLayout>

@@ -1,0 +1,35 @@
+---
+// src/pages/ballot/compare/index.astro
+// Alignment comparison for one race — reads ?race=<race_slug> from the query string.
+// (Single static page + client fetch, matching the /guide/submit/?token= pattern,
+// rather than a per-slug static route -- there are 86 races, generated dynamically.)
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Compare Candidates — My Wyoming Ballot Guide"
+  description="See how closely each candidate on your ballot matches your quiz answers, with a full question-by-question breakdown."
+>
+  <header class="ballot-page-header">
+    <div class="ballot-page-header__inner">
+      <p class="ballot-page-header__eyebrow">My Wyoming Ballot Guide</p>
+      <h1 class="ballot-page-header__title" id="compare-title">Compare candidates</h1>
+      <p class="ballot-page-header__sub" id="compare-sub">
+        Based on your quiz answers. This is not a recommendation -- inspect the breakdown
+        for every question behind each percentage.
+      </p>
+    </div>
+  </header>
+
+  <p
+    id="compare-status"
+    class="text-sm italic text-wy-charcoal/60"
+    aria-live="polite"
+    style="max-width: 820px; margin: 1rem auto 0; padding: 0 1.25rem;"
+  >
+    Loading…
+  </p>
+  <div id="compare-root"></div>
+</BaseLayout>
+
+<script is:inline src="/js/ballot-compare.js"></script>

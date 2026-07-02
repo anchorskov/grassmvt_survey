@@ -1,0 +1,66 @@
+---
+// src/pages/ballot/results/index.astro
+// Ballot review page — shows the user's chosen candidates and notes for all races.
+// Auth + data loading handled client-side by ballot-results.js.
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="My Ballot Choices — 2026 | Grassroots Movement"
+  description="Review your 2026 Wyoming ballot choices and notes before election day."
+>
+  {/* ── Page hero ── */}
+  <section class="bg-wy-charcoal text-white" aria-labelledby="results-page-title">
+    <div class="mx-auto max-w-5xl px-6 py-10 md:py-14">
+      <p class="mb-2 text-xs font-bold uppercase tracking-widest text-wy-sandstone">2026 General Election</p>
+      <h1 id="results-page-title" class="mb-3 font-serif text-3xl font-bold leading-tight md:text-4xl">
+        My Ballot Choices
+      </h1>
+      <p class="max-w-2xl text-base leading-relaxed text-white/80">
+        Your selected candidates and notes for each race. Bring this list to the polls.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <a class="button button--secondary border-white/30 text-white hover:bg-white/10" href="/ballot/">
+          ← Back to Ballot
+        </a>
+        <button
+          type="button"
+          id="results-print-btn"
+          class="button button--secondary border-white/30 text-white hover:bg-white/10"
+          onclick="window.print()"
+        >
+          Print / Save PDF
+        </button>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Content root ── */}
+  <div class="bg-wy-bone min-h-screen">
+    <div class="mx-auto max-w-3xl px-5 py-8">
+      <p
+        id="results-status"
+        class="text-sm italic text-wy-charcoal/60"
+        aria-live="polite"
+      >
+        Loading your choices…
+      </p>
+      <div id="results-root"></div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  @media print {
+    .site-header, .site-footer, #results-print-btn, #feedback-modal,
+    #login-modal, #password-reset-modal, .auth-modal,
+    #results-email-btn, .results-email-msg { display: none !important; }
+    .bg-wy-charcoal { background: #fff !important; color: #000 !important; }
+    .text-white, .text-white\/80 { color: #000 !important; }
+    .text-wy-sandstone { color: #555 !important; }
+    a.button { display: none !important; }
+    body { background: #fff; }
+  }
+</style>
+
+<script is:inline src="/js/ballot-results.js"></script>

@@ -1,0 +1,123 @@
+---
+// src/pages/auth/magic-link/index.astro
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Sign In | My Wyoming Ballot Guide">
+  <main class="max-w-lg mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold text-wy-charcoal mb-2">Access your ballot guide</h1>
+    <p class="helper-text text-wy-dust mb-6">
+      Enter your email and we will send you a sign-in link. No password needed.
+    </p>
+
+    <form id="magic-link-form" class="survey-form">
+      <div class="form-row">
+        <label for="magic-link-email">Email</label>
+        <input id="magic-link-email" name="email" type="email" autocomplete="email" required />
+      </div>
+      <p class="helper-text is-hidden" id="turnstile-magic-label">Complete the human check to continue.</p>
+      <div class="form-row is-hidden" id="turnstile-magic"></div>
+      <p class="form-error is-hidden" id="magic-link-error" role="alert"></p>
+      <button class="button button--primary" type="submit" id="magic-link-submit">Send sign-in link</button>
+    </form>
+
+    <section id="magic-link-sent" class="survey-form is-hidden" aria-live="polite">
+      <h2 class="text-xl font-bold text-wy-charcoal mb-2">Check your email</h2>
+      <p class="helper-text">
+        If an account exists for that address, a sign-in link is on its way. It expires in 60 minutes.
+      </p>
+    </section>
+
+    <p class="helper-text mt-4">
+      Prefer a password? <a href="/auth/login/" class="text-wy-ember hover:underline">Sign in another way</a>
+    </p>
+  </main>
+
+  <Fragment slot="scripts">
+    <script is:inline src="/js/turnstile-loader.js"></script>
+    <script is:inline src="/js/auth/turnstile-client.js"></script>
+  </Fragment>
+
+  <script is:inline>
+    (() => {
+      const form = document.getElementById('magic-link-form');
+      const sentSection = document.getElementById('magic-link-sent');
+      const errorEl = document.getElementById('magic-link-error');
+      const submitBtn = document.getElementById('magic-link-submit');
+      const turnstileContainer = document.getElementById('turnstile-magic');
+      const turnstileLabel = document.getElementById('turnstile-magic-label');
+
+      let turnstileWidgetId = null;
+      let turnstileConfig = { siteKey: '', bypass: false };
+
+      const showError = (message) => {
+        errorEl.textContent = message;
+        errorEl.classList.remove('is-hidden');
+      };
+
+      const initTurnstile = async () => {
+        try {
+          const res = await fetch('/api/auth/turnstile', { cache: 'no-store' });
+          turnstileConfig = await res.json();
+        } catch (err) {
+          turnstileConfig = { siteKey: '', bypass: false };
+        }
+        if (turnstileConfig.bypass || !turnstileConfig.siteKey || !window.TurnstileClient) {
+          return;
+        }
+        const loaded = await window.TurnstileClient.loadTurnstileOnce({ siteKey: turnstileConfig.siteKey });
+        if (!loaded) return;
+        turnstileLabel.classList.remove('is-hidden');
+        turnstileContainer.classList.remove('is-hidden');
+        turnstileWidgetId = await window.TurnstileClient.renderTurnstile({
+          container: turnstileContainer,
+          siteKey: turnstileConfig.siteKey,
+          appearance: 'interaction-only',
+          size: 'flexible',
+        });
+      };
+
+      const getTurnstileToken = async () => {
+        if (turnstileConfig.bypass || turnstileWidgetId === null) {
+          return '';
+        }
+        return window.TurnstileClient.getTokenOrExecute({ widgetId: turnstileWidgetId });
+      };
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        errorEl.classList.add('is-hidden');
+        const email = document.getElementById('magic-link-email').value.trim();
+        if (!email) {
+          showError('Please enter your email address.');
+          return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
+        try {
+          const turnstileToken = await getTurnstileToken();
+          const response = await fetch('/api/auth/magic-link/request', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email, turnstileToken }),
+            credentials: 'include',
+          });
+          const data = await response.json().catch(() => ({}));
+          if (response.ok && data.ok) {
+            form.classList.add('is-hidden');
+            sentSection.classList.remove('is-hidden');
+          } else {
+            showError('Something went wrong. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send sign-in link';
+          }
+        } catch (err) {
+          showError('Something went wrong. Please try again.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Send sign-in link';
+        }
+      });
+
+      initTurnstile();
+    })();
+  </script>
+</BaseLayout>

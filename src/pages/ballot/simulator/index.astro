@@ -1,0 +1,35 @@
+---
+// src/pages/ballot/simulator/index.astro
+// Vote-splitting simulator -- civic education, not persuasion. Reads ?race=<race_slug>.
+// No auth required (browse-first, matches the platform's design rule).
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Vote-Splitting Simulator — My Wyoming Ballot Guide"
+  description="Explore how vote splits play out in a plurality race. Civic education, not a prediction or a recommendation."
+>
+  <header class="ballot-page-header">
+    <div class="ballot-page-header__inner">
+      <p class="ballot-page-header__eyebrow">My Wyoming Ballot Guide</p>
+      <h1 class="ballot-page-header__title" id="sim-title">Vote-splitting simulator</h1>
+      <p class="ballot-page-header__sub">
+        In a plurality race, the candidate with the most votes wins — even if most voters
+        preferred someone else. This simulator lets you explore how the vote might split.
+        It does not predict or suggest any outcome; every candidate starts equal.
+      </p>
+    </div>
+  </header>
+
+  <p
+    id="sim-status"
+    class="text-sm italic text-wy-charcoal/60"
+    aria-live="polite"
+    style="max-width: 820px; margin: 1rem auto 0; padding: 0 1.25rem;"
+  >
+    Loading…
+  </p>
+  <div id="sim-root"></div>
+</BaseLayout>
+
+<script is:inline src="/js/ballot-simulator.js"></script>

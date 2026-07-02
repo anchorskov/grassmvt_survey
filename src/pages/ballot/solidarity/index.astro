@@ -1,0 +1,33 @@
+---
+// src/pages/ballot/solidarity/index.astro
+// Public, anonymized aggregate results for one race -- reads ?race=<race_slug>.
+// No auth required. Never labeled as a poll of all Wyoming voters.
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Guide Solidarity Results — My Wyoming Ballot Guide"
+  description="See how My Wyoming Ballot Guide participants are choosing in this race -- anonymized, not a poll of all Wyoming voters."
+>
+  <header class="ballot-page-header">
+    <div class="ballot-page-header__inner">
+      <p class="ballot-page-header__eyebrow">My Wyoming Ballot Guide</p>
+      <h1 class="ballot-page-header__title" id="solidarity-title">Guide participant results</h1>
+      <p class="ballot-page-header__sub">
+        These results reflect My Wyoming Ballot Guide participants only — not a poll of all Wyoming voters.
+      </p>
+    </div>
+  </header>
+
+  <p
+    id="solidarity-status"
+    class="text-sm italic text-wy-charcoal/60"
+    aria-live="polite"
+    style="max-width: 820px; margin: 1rem auto 0; padding: 0 1.25rem;"
+  >
+    Loading…
+  </p>
+  <div id="solidarity-root"></div>
+</BaseLayout>
+
+<script is:inline src="/js/ballot-solidarity.js"></script>

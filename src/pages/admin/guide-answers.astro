@@ -1,0 +1,167 @@
+---
+// src/pages/admin/guide-answers.astro
+// Admin: review pending candidate questionnaire answers, and generate/regenerate
+// a candidate's questionnaire access link. Requires admin role -- enforced by
+// /api/guide/admin/* routes.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Guide Answers Admin | Grassroots Movement">
+  <main class="max-w-4xl mx-auto px-4 py-10">
+    <div class="mb-6 flex items-center gap-4">
+      <a href="/admin/" class="text-wy-rust text-sm hover:underline">&larr; Admin tools</a>
+    </div>
+
+    <h1 class="font-serif text-3xl font-bold text-wy-charcoal mb-2">Guide answers admin</h1>
+    <p class="text-wy-charcoal/70 mb-10">
+      Review candidate questionnaire submissions and generate candidate questionnaire links.
+    </p>
+
+    <section class="mb-12 rounded-lg border border-wy-dust bg-wy-bone p-5">
+      <h2 class="font-serif text-lg font-bold text-wy-charcoal mb-3">Generate a candidate link</h2>
+      <div class="flex flex-wrap gap-3 items-end mb-3">
+        <label class="block">
+          <span class="block text-xs font-bold uppercase tracking-wide text-wy-charcoal mb-1">wy_candidate_id</span>
+          <input id="token-candidate-id" type="number" min="1" class="w-40 rounded-md border border-wy-dust bg-white px-3 py-2 text-wy-charcoal" />
+        </label>
+        <label class="block">
+          <span class="block text-xs font-bold uppercase tracking-wide text-wy-charcoal mb-1">Expires in days</span>
+          <input id="token-expires-days" type="number" min="1" placeholder="45" class="w-32 rounded-md border border-wy-dust bg-white px-3 py-2 text-wy-charcoal" />
+        </label>
+        <button id="token-generate" class="button button--primary" type="button">Generate link</button>
+      </div>
+      <p id="token-error" class="hidden text-red-700 text-sm"></p>
+      <p id="token-result" class="hidden text-sm text-wy-charcoal break-all"></p>
+    </section>
+
+    <section>
+      <div class="flex items-center gap-4 mb-5">
+        <h2 class="font-serif text-xl font-bold text-wy-charcoal">Pending answers</h2>
+        <button id="pending-load" class="button button--secondary text-sm" type="button">Load</button>
+      </div>
+      <p id="pending-meta" class="text-sm text-wy-charcoal/70 mb-4 hidden"></p>
+      <div id="pending-list" class="flex flex-col gap-3"></div>
+      <p id="pending-error" class="hidden text-red-700 text-sm"></p>
+    </section>
+  </main>
+</BaseLayout>
+
+<script>
+(function () {
+  function escH(s: any) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function showError(el: HTMLElement | null, msg: string) {
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  function hideError(el: HTMLElement | null) {
+    if (!el) return;
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
+
+  /* ── Generate candidate link ── */
+  const tokenCandidateId = document.getElementById('token-candidate-id') as HTMLInputElement;
+  const tokenExpiresDays = document.getElementById('token-expires-days') as HTMLInputElement;
+  const tokenGenerate = document.getElementById('token-generate');
+  const tokenError = document.getElementById('token-error');
+  const tokenResult = document.getElementById('token-result');
+
+  tokenGenerate && tokenGenerate.addEventListener('click', async function () {
+    hideError(tokenError);
+    if (tokenResult) tokenResult.classList.add('hidden');
+    const wyCandidateId = parseInt(tokenCandidateId?.value || '', 10);
+    if (!Number.isInteger(wyCandidateId)) {
+      showError(tokenError, 'Enter a valid wy_candidate_id.');
+      return;
+    }
+    const expiresDays = parseInt(tokenExpiresDays?.value || '', 10) || undefined;
+    try {
+      const res = await fetch('/api/guide/admin/create-answer-token', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ wy_candidate_id: wyCandidateId, expires_days: expiresDays }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || res.statusText);
+      if (tokenResult) {
+        tokenResult.innerHTML = `<strong>${escH(data.candidate_name)}</strong> — link expires ${escH(data.expires_at)}<br><a href="${escH(data.submit_url)}" target="_blank" class="text-wy-ember hover:underline">${escH(data.submit_url)}</a>`;
+        tokenResult.classList.remove('hidden');
+      }
+    } catch (e: any) {
+      showError(tokenError, e.message || 'Error generating link.');
+    }
+  });
+
+  /* ── Pending answers ── */
+  const pendingLoad = document.getElementById('pending-load');
+  const pendingMeta = document.getElementById('pending-meta');
+  const pendingList = document.getElementById('pending-list');
+  const pendingError = document.getElementById('pending-error');
+
+  function renderPending(items: any[]) {
+    if (!pendingList) return;
+    if (items.length === 0) {
+      pendingList.innerHTML = '<p class="text-wy-charcoal/60 text-sm">No answers awaiting review.</p>';
+      return;
+    }
+    pendingList.innerHTML = items.map((a) => `
+      <div class="rounded border border-wy-dust bg-white p-4" data-answer-id="${a.id}">
+        <p class="text-xs font-bold uppercase tracking-wide text-wy-rust mb-1">${escH(a.candidate_name)} &bull; ${escH(a.issue_category)}</p>
+        <p class="font-semibold text-wy-charcoal text-sm mb-2">${escH(a.question_text)}</p>
+        <p class="text-sm text-wy-charcoal mb-1"><strong>Position:</strong> ${escH(a.position)}${a.is_top_priority ? ' &#9733; top priority' : ''}${a.firmness ? ' &bull; ' + escH(a.firmness) : ''}</p>
+        ${a.explanation ? `<p class="text-sm text-wy-charcoal/80 mb-1">${escH(a.explanation)}</p>` : ''}
+        ${a.source_url ? `<p class="text-xs mb-2"><a href="${escH(a.source_url)}" target="_blank" rel="noopener" class="text-wy-ember hover:underline">${escH(a.source_url)}</a></p>` : ''}
+        <div class="flex gap-2 mt-2">
+          <button class="button button--primary text-sm" type="button" data-action="approve" data-id="${a.id}">Approve</button>
+          <button class="button button--secondary text-sm" type="button" data-action="reject" data-id="${a.id}">Reject</button>
+        </div>
+      </div>`).join('');
+  }
+
+  pendingLoad && pendingLoad.addEventListener('click', async function () {
+    hideError(pendingError);
+    try {
+      const res = await fetch('/api/guide/admin/pending-answers', { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || res.statusText);
+      const items = data.pending || [];
+      if (pendingMeta) {
+        pendingMeta.textContent = `${items.length} answer(s) awaiting review`;
+        pendingMeta.classList.remove('hidden');
+      }
+      renderPending(items);
+    } catch (e: any) {
+      showError(pendingError, e.message || 'Error loading pending answers.');
+    }
+  });
+
+  pendingList && pendingList.addEventListener('click', async function (e) {
+    const target = e.target as HTMLElement;
+    const btn = target.closest('button[data-action]') as HTMLButtonElement | null;
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const answerId = parseInt(btn.dataset.id || '', 10);
+    if (!Number.isInteger(answerId)) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/guide/admin/review-answer', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ answer_id: answerId, action }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || res.statusText);
+      const card = btn.closest('[data-answer-id]');
+      card?.remove();
+    } catch (e: any) {
+      showError(pendingError, e.message || 'Error updating answer.');
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
