@@ -1,0 +1,34 @@
+---
+// src/pages/poll/2026-primary/results/index.astro
+// Public, anonymized results for one race in the informal 2026 primary poll --
+// reads ?race=<race_slug>. No auth required. Hidden until an admin sets
+// poll_config.results_visible = 1.
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="2026 Primary Poll Results"
+  description="Results from the informal 2026 Wyoming primary poll."
+>
+  <header class="ballot-page-header">
+    <div class="ballot-page-header__inner">
+      <p class="ballot-page-header__eyebrow">2026 Primary Poll</p>
+      <h1 class="ballot-page-header__title" id="poll-results-title">Poll results</h1>
+      <p class="ballot-page-header__sub">
+        An informal poll, not an official prediction or record of who will win.
+      </p>
+    </div>
+  </header>
+
+  <p
+    id="poll-results-status"
+    class="text-sm italic text-wy-charcoal/60"
+    aria-live="polite"
+    style="max-width: 820px; margin: 1rem auto 0; padding: 0 1.25rem;"
+  >
+    Loading…
+  </p>
+  <div id="poll-results-root"></div>
+
+  <script is:inline src="/js/poll-results.js"></script>
+</BaseLayout>

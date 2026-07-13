@@ -1,0 +1,21 @@
+---
+// src/pages/poll/2026-primary/index.astro
+// Informal 2026 primary candidate-choice poll -- token-gated, no account required.
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="2026 Primary Poll | Which candidate do you choose?"
+  description="An informal poll for the 2026 Wyoming primary -- pick a candidate in each race on your ballot."
+>
+  <main class="max-w-2xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold text-wy-charcoal mb-2">Which candidate do you choose?</h1>
+    <p id="poll-vote-intro" class="helper-text text-wy-dust mb-6">Loading your ballot…</p>
+
+    <p class="form-error is-hidden" id="poll-vote-error" role="alert"></p>
+
+    <div id="poll-vote-root"></div>
+  </main>
+
+  <script is:inline src="/js/poll-vote.js"></script>
+</BaseLayout>

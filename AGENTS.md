@@ -10,6 +10,8 @@ Read this alongside `CLAUDE.md` at the project root — both files are required 
 - `survey_flow.txt` — step-by-step survey build/seed/verify workflow
 - `AI_CONTRACT.md` — full workflow and data exposure rules
 - `guides/survey/attach_pdf_sources.md` — canonical method for attaching a PDF sources document to a survey (file placement, naming, JSONC link pattern, build requirement, email integration)
+- `docs/race_poll_data_plan.md` — prior (2026-06-04) plan to build race candidate polling on the existing SurveyJS/`response_aggregates` engine
+- `docs/poll_summary.md` — the informal 2026 primary "which candidate do you choose" poll (email invite via skovgard2026's Blast pipeline, token-gated no-account voting, results chart). **Built, tested end-to-end, and deployed to production** across this repo and skovgard2026 — not just a plan. Only sequencing step 7 (the real chunked send to the full ~14,200-voter audience) remains, and it is **paused, not scheduled**: Jimmy paused the Blast plan because Gmail was routing all mail sent from `grassrootsmvt.org` to spam, and a new delivery method for polling voters needs to be discussed before resuming. Do not resume step 7 under the old grassrootsmvt.org-Blast delivery path without that discussion happening first.
 
 ## Purpose
 
@@ -245,3 +247,48 @@ Update `AGENTS.md` when any of the following change:
 - a recurring agent mistake is discovered and can be prevented with one short rule
 
 Keep updates brief and operational. Prefer changing this file when workflow or structure changes, not for one-off task notes.
+
+<!-- WY-DATA-RESOURCES:START -->
+## Shared Wyoming Data Resources (Managed)
+
+This project consumes shared voter data resources from:
+- Data root: /home/anchor/projects/voterdata/wyoming
+- DB: /home/anchor/projects/voterdata/wyoming/wy.sqlite
+- Docs root: /home/anchor/projects/voterdata/wyoming/docs
+
+Core docs:
+- /home/anchor/projects/voterdata/wyoming/docs/email_view.md
+- /home/anchor/projects/voterdata/wyoming/docs/CommsEventMapping.md
+- /home/anchor/projects/voterdata/wyoming/docs/query-playbook.md
+- /home/anchor/projects/voterdata/wyoming/docs/OptinOptout.md
+- /home/anchor/projects/voterdata/wyoming/docs/ContactTracking.md
+- /home/anchor/projects/voterdata/wyoming/docs/Voter_Schema.md
+
+Preflight checks:
+```bash
+sqlite3 "/home/anchor/projects/voterdata/wyoming/wy.sqlite" "SELECT name,type FROM sqlite_master WHERE name IN ('voter_emails','voter_demographics','v_demographics_email','v_unique_name_email_all','v_unique_name_email_not_stale');"
+```
+
+### Consent Data - Source-of-Truth Contract
+
+`/home/anchor/projects/voterdata/wyoming/wy.sqlite` (`comms_consent` / `comms_events`) is the canonical, cross-project record of
+communication consent (opt-in / opt-out per channel). See `/home/anchor/projects/voterdata/wyoming/docs/OptinOptout.md` and
+`/home/anchor/projects/voterdata/wyoming/docs/CommsEventMapping.md`.
+
+This project's own known local consent/contact table(s):
+- sms_optins / volunteers (dormant migrations - unwired); survey_submissions.email (active)
+
+Rules:
+- Treat any local consent table as a collection point only, not authoritative for
+  cross-project suppression or outreach decisions.
+- Keep opt-in/opt-out keyword vocabulary (STOP, START, UNSUBSCRIBE, etc.) consistent with
+  `/home/anchor/projects/voterdata/wyoming/docs/CommsEventMapping.md` rather than inventing a divergent local word list.
+- Syncing locally collected consent back into `comms_events` is a known open task (it
+  requires matching local phone/email to a canonical `person_id` first). No automated
+  sync exists yet - do not assume one does, and check with the user before building new
+  sync/export code.
+
+Sync source:
+- Registry: /home/anchor/projects/voterdata/wyoming/docs/project_resource_registry.csv
+- Script: /home/anchor/projects/voterdata/wyoming/bin/sync_agents_stubs.sh
+<!-- WY-DATA-RESOURCES:END -->

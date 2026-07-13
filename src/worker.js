@@ -2579,6 +2579,161 @@ const verifyGuideAnswerToken = async (env, rawToken) => {
 };
 
 // ============================================================================
+// POLL INVITE TOKEN HELPERS (informal 2026 primary candidate-choice poll)
+// ============================================================================
+// One reusable token per voter, valid until expires_at -- not single-use, a
+// voter can return and change their vote any time before the lock date.
+// Minted server-to-server by skovgard2026-api's Blast pipeline (which already
+// knows voter_id/district/party from a WY_DB voter_emails join), not by any
+// human admin action, so this is gated by POLL_MINT_SERVICE_KEY rather than
+// requireSessionUser.
+
+const POLL_INVITE_TOKEN_BYTES = 32;
+
+const hashPollInviteToken = async (salt, token) => sha256Hex(`${salt}:poll-invite:${token}`);
+
+const generatePollInviteToken = () => {
+  const bytes = new Uint8Array(POLL_INVITE_TOKEN_BYTES);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
+};
+
+// Verifies a poll invite token and returns voter/poll context if valid and unexpired.
+const verifyPollInviteToken = async (env, rawToken) => {
+  if (!env.DB || !rawToken) {
+    return null;
+  }
+  const salt = getHashSalt(env);
+  if (!salt) {
+    console.error('[PollInviteToken] HASH_SALT not configured');
+    return null;
+  }
+  const tokenHash = await hashPollInviteToken(salt, rawToken);
+  const now = nowIso();
+  try {
+    const result = await env.DB.prepare(
+      `SELECT poll_slug, voter_id, house_district, senate_district, political_party, county, city, precinct_code
+       FROM poll_invite_tokens
+       WHERE token_hash = ?
+         AND expires_at > ?`
+    )
+      .bind(tokenHash, now)
+      .first();
+    if (!result) {
+      return null;
+    }
+    return {
+      pollSlug: result.poll_slug,
+      voterId: result.voter_id,
+      houseDistrict: result.house_district,
+      senateDistrict: result.senate_district,
+      politicalParty: result.political_party,
+      county: result.county,
+      city: result.city,
+      precinctCode: result.precinct_code,
+    };
+  } catch (error) {
+    console.error('[PollInviteToken] Token verification failed:', error?.message);
+    return null;
+  }
+};
+
+// candidates.party is stored inconsistently in production data (a mix of "REP"/"DEM"/"NP"
+// and "Republican"/"Democratic" across rows from different import batches) -- normalize
+// before comparing rather than comparing raw strings.
+const normalizePartyLabel = (raw) => {
+  const v = String(raw || '').trim().toUpperCase();
+  if (!v) return null;
+  if (v === 'DEM' || v === 'DEMOCRATIC' || v === 'DEMOCRAT') return 'Democratic';
+  if (v === 'REP' || v === 'REPUBLICAN') return 'Republican';
+  if (v === 'LIB' || v === 'LIBERTARIAN') return 'Libertarian';
+  if (v === 'NP' || v === 'NONPARTISAN' || v === 'NON-PARTISAN') return 'Nonpartisan';
+  if (v === 'UNAFFILIATED' || v === 'UNA' || v === 'IND' || v === 'INDEPENDENT') return 'Unaffiliated';
+  return null;
+};
+
+// Mirrors Wyoming's closed primary: a partisan candidate is only shown to/votable by
+// that same party's registered voters. Nonpartisan candidates, and candidates whose
+// party data is missing or unrecognized (a handful of race_candidates rows have no
+// wy_candidate_id match), are shown to everyone rather than hidden due to a data gap.
+const isPartyEligible = (voterPartyRaw, candidatePartyRaw) => {
+  const candidateParty = normalizePartyLabel(candidatePartyRaw);
+  if (!candidateParty || candidateParty === 'Nonpartisan') return true;
+  return normalizePartyLabel(voterPartyRaw) === candidateParty;
+};
+
+// County/city/precinct races for the poll -- queried directly from offices/candidates,
+// the same tables the Candidates sub-project's own ballot-lookup flow
+// (Candidates/src/pages/api/ballot-lookup.js's getLocalRaces) uses, rather than
+// race_candidates (which only ever got Statewide/Federal/Legislature rows seeded).
+// race_slug convention: "office-<office_id>" (deterministic, no separate mapping
+// table needed); candidate_slug is candidates.slug directly.
+//
+// scope_kind distinguishes three shapes within level='county':
+//   - 'countywide' (or anything else non-precinct): match by county only.
+//   - 'precinct_party'/'precinct_party_gender': match by precinct_code -- these
+//     also carry level='county' in the data, so they'd otherwise be wrongly
+//     included for every voter in the county rather than just their own precinct.
+// level='city' with scope_kind='municipal_ward' needs ward resolution, which isn't
+// built yet (only precinct was asked for) -- excluded for now, same as Candidates'
+// own "hasWardRaces, don't show" behavior when ward is unknown.
+//
+// ballot_party (e.g. "REP"/"DEM") marks a race as belonging to one party's primary
+// (common for WY county/precinct offices) -- filtered via the same isPartyEligible
+// used for state legislative/statewide races, extended here since Candidates itself
+// doesn't yet filter local races by party at all (an acknowledged gap, not something
+// to replicate) and leaving it unfiltered would be an inconsistency, not a match,
+// with how every other race type in this poll already works.
+async function queryLocalOfficeRaces(env, { county, city, precinctCode }) {
+  if (!county && !city && !precinctCode) return [];
+
+  const clauses = [];
+  const binds = [];
+  if (county) {
+    clauses.push(`(o.level = 'county' AND o.scope_kind NOT IN ('precinct_party','precinct_party_gender') AND UPPER(TRIM(o.county)) = UPPER(TRIM(?)))`);
+    binds.push(county);
+  }
+  if (city) {
+    clauses.push(`(o.level = 'city' AND o.scope_kind != 'municipal_ward' AND UPPER(TRIM(o.municipality)) = UPPER(TRIM(?)))`);
+    binds.push(city);
+  }
+  if (precinctCode && county) {
+    // precinct_code is only unique WITHIN a county (e.g. "8-1" exists in Park,
+    // Big Horn, Goshen, Sheridan, and Natrona independently) -- matching on
+    // precinct_code alone would surface other counties' precinct committee races.
+    // Skip entirely (rather than guess) if county is unknown.
+    clauses.push(`(o.scope_kind IN ('precinct_party','precinct_party_gender') AND UPPER(TRIM(o.precinct_code)) = UPPER(TRIM(?)) AND UPPER(TRIM(o.county)) = UPPER(TRIM(?)))`);
+    binds.push(precinctCode, county);
+  }
+  if (!clauses.length) return [];
+
+  const rows = await env.DB.prepare(`
+    SELECT o.id AS office_id, o.title, o.level, o.ballot_party, o.seats_available,
+           c.slug AS candidate_slug, c.full_name AS candidate_name, c.party AS candidate_party
+    FROM offices o
+    LEFT JOIN candidates c ON c.office_id = o.id AND c.withdrawn_at IS NULL
+    WHERE ${clauses.join(' OR ')}
+    ORDER BY o.id, c.full_name
+  `).bind(...binds).all();
+
+  const levelLabel = { county: 'County', city: 'City' };
+  return (rows.results ?? [])
+    .filter((row) => row.candidate_slug)
+    .map((row) => ({
+      race_slug: `office-${row.office_id}`,
+      race_title: row.title,
+      race_category: levelLabel[row.level] || row.level,
+      district_type: null,
+      district_number: null,
+      seats_available: row.seats_available || 1,
+      ballot_party: row.ballot_party,
+      candidate_slug: row.candidate_slug,
+      candidate_name: row.candidate_name,
+      candidate_party: row.candidate_party,
+    }));
+}
+
+// ============================================================================
 // ALIGNMENT SCORING HELPERS (shared by /api/ballot/card and /api/ballot/alignment)
 // ============================================================================
 
@@ -10835,6 +10990,402 @@ export default {
         });
       } catch (err) {
         console.error('[POST /api/guide/admin/create-answer-token]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // POST /api/poll/admin/mint-invite-token
+    // Machine-to-machine only (called by skovgard2026-api's Blast pipeline during
+    // the invite send, once per recipient) -- gated by POLL_MINT_SERVICE_KEY, not
+    // by a human admin session. Body: { voter_id, email_norm, poll_slug?,
+    // house_district?, senate_district?, political_party?, expires_days? }.
+    // Idempotent: re-minting for the same (poll_slug, voter_id) replaces the token
+    // and extends expiry rather than erroring, so a resend doesn't create orphan rows.
+    if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'poll' && pathParts[2] === 'admin' && pathParts[3] === 'mint-invite-token') {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const serviceKey = String(env.POLL_MINT_SERVICE_KEY || '').trim();
+        if (!serviceKey) {
+          return jsonResponse({ error: 'Server misconfigured: POLL_MINT_SERVICE_KEY missing' }, { status: 500 });
+        }
+
+        const body = await parseJsonBody(request);
+        const providedKey = String(body.service_key || '').trim();
+        if (!providedKey || !timingSafeEqual(providedKey, serviceKey)) {
+          return jsonResponse({ error: 'Forbidden.', code: 'FORBIDDEN' }, { status: 403 });
+        }
+
+        const voterId = String(body.voter_id || '').trim();
+        const emailNorm = String(body.email_norm || '').trim().toLowerCase();
+        if (!voterId || !emailNorm) {
+          return jsonResponse({ error: 'voter_id and email_norm are required' }, { status: 400 });
+        }
+        const pollSlug = String(body.poll_slug || '2026-primary').trim();
+        const houseDistrict = body.house_district != null ? String(body.house_district).trim() || null : null;
+        const senateDistrict = body.senate_district != null ? String(body.senate_district).trim() || null : null;
+        const politicalParty = body.political_party != null ? String(body.political_party).trim() || null : null;
+        const county = body.county != null ? String(body.county).trim() || null : null;
+        const city = body.city != null ? String(body.city).trim() || null : null;
+        const precinctCode = body.precinct_code != null ? String(body.precinct_code).trim() || null : null;
+        const rawExpiresDays = Number(body.expires_days);
+        const expiresDays = Number.isFinite(rawExpiresDays) && rawExpiresDays > 0 ? rawExpiresDays : 60;
+
+        const salt = getHashSalt(env);
+        if (!salt) {
+          return jsonResponse({ error: 'Server misconfigured: HASH_SALT missing' }, { status: 500 });
+        }
+
+        const rawToken = generatePollInviteToken();
+        const tokenHash = await hashPollInviteToken(salt, rawToken);
+        const expiresAt = addMinutesIso(expiresDays * 24 * 60);
+        const now = nowIso();
+
+        await env.DB.prepare(`
+          INSERT INTO poll_invite_tokens
+            (poll_slug, voter_id, email_norm, token_hash, house_district, senate_district, political_party, county, city, precinct_code, sent_at, expires_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+          ON CONFLICT(poll_slug, voter_id) DO UPDATE SET
+            email_norm = excluded.email_norm,
+            token_hash = excluded.token_hash,
+            house_district = excluded.house_district,
+            senate_district = excluded.senate_district,
+            political_party = excluded.political_party,
+            county = excluded.county,
+            city = excluded.city,
+            precinct_code = excluded.precinct_code,
+            expires_at = excluded.expires_at
+        `).bind(pollSlug, voterId, emailNorm, tokenHash, houseDistrict, senateDistrict, politicalParty, county, city, precinctCode, expiresAt, now).run();
+
+        const baseUrl = env.APP_BASE_URL || 'http://localhost:8787';
+        const pollUrl = new URL(`/poll/${encodeURIComponent(pollSlug)}/`, baseUrl);
+        pollUrl.searchParams.set('token', rawToken);
+
+        return jsonResponse({
+          ok: true,
+          token: rawToken,
+          poll_link: pollUrl.toString(),
+          expires_at: expiresAt,
+        });
+      } catch (err) {
+        console.error('[POST /api/poll/admin/mint-invite-token]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/poll/races?token=<poll invite token>
+    // Public (token-gated, no session). Returns races scoped to the voter's district
+    // plus statewide/federal/judicial-retention races, with candidates filtered to the
+    // voter's registered party (see isPartyEligible), and any existing choice prefilled
+    // from poll_responses. A race with zero eligible candidates after party filtering
+    // (e.g. an Unaffiliated voter in an all-partisan race) is dropped from the response
+    // -- there is nothing for that voter to vote on in it.
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'poll' && pathParts[2] === 'races') {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const token = url.searchParams.get('token') || '';
+        const verified = await verifyPollInviteToken(env, token);
+        if (!verified) {
+          return jsonResponse({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' }, { status: 401 });
+        }
+        const { pollSlug, voterId, houseDistrict, senateDistrict, politicalParty } = verified;
+
+        const houseNum = houseDistrict ? formatDistrictNumber(houseDistrict) : null;
+        const senateNum = senateDistrict ? formatDistrictNumber(senateDistrict) : null;
+
+        const rcRows = await env.DB.prepare(`
+          SELECT rc.race_slug, rc.race_title, rc.race_category, rc.district_type, rc.district_number,
+                 rc.candidate_name, rc.candidate_slug, rc.wy_candidate_id, rc.display_order,
+                 c.party AS candidate_party
+          FROM race_candidates rc
+          LEFT JOIN candidates c ON c.id = rc.wy_candidate_id
+          WHERE rc.is_active = 1
+          ORDER BY rc.race_slug, rc.display_order, rc.candidate_name
+        `).all();
+
+        const existingRows = await env.DB.prepare(`
+          SELECT race_slug, candidate_slug
+          FROM poll_responses
+          WHERE poll_slug = ? AND voter_id = ? AND chosen = 1
+        `).bind(pollSlug, voterId).all();
+        const existingBySlug = new Map();
+        for (const r of existingRows.results ?? []) {
+          if (!existingBySlug.has(r.race_slug)) existingBySlug.set(r.race_slug, []);
+          existingBySlug.get(r.race_slug).push(r.candidate_slug);
+        }
+
+        const racesBySlug = new Map();
+        for (const row of rcRows.results ?? []) {
+          const geoEligible =
+            ['Federal', 'Statewide', 'Judicial Retention'].includes(row.race_category) ||
+            (row.district_type === 'state_house' && houseNum && row.district_number === houseNum) ||
+            (row.district_type === 'state_senate' && senateNum && row.district_number === senateNum);
+          if (!geoEligible) continue;
+          if (!isPartyEligible(politicalParty, row.candidate_party)) continue;
+
+          if (!racesBySlug.has(row.race_slug)) {
+            const selected = existingBySlug.get(row.race_slug) || [];
+            racesBySlug.set(row.race_slug, {
+              race_slug: row.race_slug,
+              race_title: row.race_title,
+              race_category: row.race_category,
+              district_type: row.district_type,
+              district_number: row.district_number,
+              seats_available: 1,
+              candidates: [],
+              selected_candidate_slug: selected[0] || null,
+              selected_candidate_slugs: selected,
+            });
+          }
+          racesBySlug.get(row.race_slug).candidates.push({
+            candidate_slug: row.candidate_slug,
+            candidate_name: row.candidate_name,
+            party: row.candidate_party || null,
+          });
+        }
+
+        const localRows = await queryLocalOfficeRaces(env, verified);
+        for (const row of localRows) {
+          if (!isPartyEligible(politicalParty, row.ballot_party || row.candidate_party)) continue;
+          if (!racesBySlug.has(row.race_slug)) {
+            const selected = existingBySlug.get(row.race_slug) || [];
+            racesBySlug.set(row.race_slug, {
+              race_slug: row.race_slug,
+              race_title: row.race_title,
+              race_category: row.race_category,
+              district_type: row.district_type,
+              district_number: row.district_number,
+              seats_available: row.seats_available || 1,
+              candidates: [],
+              selected_candidate_slug: selected[0] || null,
+              selected_candidate_slugs: selected,
+            });
+          }
+          racesBySlug.get(row.race_slug).candidates.push({
+            candidate_slug: row.candidate_slug,
+            candidate_name: row.candidate_name,
+            party: row.candidate_party || null,
+          });
+        }
+
+        const races = Array.from(racesBySlug.values()).filter((r) => r.candidates.length > 0);
+
+        return jsonResponse({ ok: true, poll_slug: pollSlug, races });
+      } catch (err) {
+        console.error('[GET /api/poll/races]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // POST /api/poll/vote
+    // Body: { token, race_slug, candidate_slug } for single-seat races (unchanged),
+    // or { token, race_slug, candidate_slugs: [...] } for multi-seat races
+    // (offices.seats_available > 1 -- county commissioner, some precinct committee
+    // races). The full currently-selected set is submitted and replaces whatever was
+    // previously stored for that race, matching how a checkbox group naturally
+    // submits. Re-validates race/candidate/district/party/seat-count eligibility
+    // server-side -- never trusts that a client only submits what GET /api/poll/races
+    // showed it, since that list can go stale (redistricting-free here, but
+    // district/party edits to race_candidates/offices or a re-minted token could
+    // change eligibility between page load and submit).
+    if (request.method === 'POST' && pathParts[0] === 'api' && pathParts[1] === 'poll' && pathParts[2] === 'vote') {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const body = await parseJsonBody(request);
+        const verified = await verifyPollInviteToken(env, body.token || '');
+        if (!verified) {
+          return jsonResponse({ error: 'Invalid or expired token', code: 'INVALID_TOKEN' }, { status: 401 });
+        }
+        const { pollSlug, voterId, houseDistrict, senateDistrict, politicalParty, county, city, precinctCode } = verified;
+
+        const raceSlug = String(body.race_slug || '').trim();
+        const rawSlugs = Array.isArray(body.candidate_slugs)
+          ? body.candidate_slugs.map((s) => String(s || '').trim()).filter(Boolean)
+          : [];
+        const singleSlug = String(body.candidate_slug || '').trim();
+        const candidateSlugs = [...new Set(rawSlugs.length ? rawSlugs : (singleSlug ? [singleSlug] : []))];
+        if (!raceSlug) {
+          return jsonResponse({ error: 'race_slug is required' }, { status: 400 });
+        }
+
+        const config = await env.DB.prepare(
+          `SELECT vote_lock_at FROM poll_config WHERE poll_slug = ?`
+        ).bind(pollSlug).first();
+        if (config?.vote_lock_at && new Date() >= new Date(config.vote_lock_at)) {
+          return jsonResponse({ error: 'Voting has closed for this poll.', code: 'VOTING_CLOSED' }, { status: 410 });
+        }
+
+        const isOfficeRace = raceSlug.startsWith('office-');
+        let seatsAvailable = 1;
+        const candidateById = new Map(); // candidate_slug -> wy_candidate_id
+
+        if (isOfficeRace) {
+          const officeId = Number(raceSlug.slice('office-'.length));
+          const officeRows = await env.DB.prepare(`
+            SELECT o.id AS office_id, o.level, o.county, o.municipality, o.scope_kind, o.precinct_code,
+                   o.ballot_party, o.seats_available,
+                   c.id AS candidate_id, c.slug AS candidate_slug
+            FROM offices o
+            JOIN candidates c ON c.office_id = o.id AND c.withdrawn_at IS NULL
+            WHERE o.id = ?
+          `).bind(officeId).all();
+          const rows = officeRows.results ?? [];
+          if (!rows.length) {
+            return jsonResponse({ error: 'Race not found' }, { status: 404 });
+          }
+          const office = rows[0];
+          seatsAvailable = office.seats_available || 1;
+
+          const geoEligible =
+            (office.level === 'county' && !['precinct_party', 'precinct_party_gender'].includes(office.scope_kind)
+              && county && String(office.county || '').toUpperCase().trim() === String(county).toUpperCase().trim()) ||
+            (office.level === 'city' && office.scope_kind !== 'municipal_ward'
+              && city && String(office.municipality || '').toUpperCase().trim() === String(city).toUpperCase().trim()) ||
+            (['precinct_party', 'precinct_party_gender'].includes(office.scope_kind)
+              && precinctCode && String(office.precinct_code || '').toUpperCase().trim() === String(precinctCode).toUpperCase().trim());
+          if (!geoEligible) {
+            return jsonResponse({ error: 'This race is not available for your district.', code: 'NOT_ELIGIBLE' }, { status: 403 });
+          }
+          if (!isPartyEligible(politicalParty, office.ballot_party)) {
+            return jsonResponse({ error: 'This race is not available for your registered party.', code: 'NOT_ELIGIBLE' }, { status: 403 });
+          }
+          for (const row of rows) candidateById.set(row.candidate_slug, row.candidate_id);
+        } else {
+          const rcRows = await env.DB.prepare(`
+            SELECT rc.race_category, rc.district_type, rc.district_number, rc.candidate_slug, rc.wy_candidate_id,
+                   c.party AS candidate_party
+            FROM race_candidates rc
+            LEFT JOIN candidates c ON c.id = rc.wy_candidate_id
+            WHERE rc.race_slug = ? AND rc.is_active = 1
+          `).bind(raceSlug).all();
+          const rows = rcRows.results ?? [];
+          if (!rows.length) {
+            return jsonResponse({ error: 'Race not found' }, { status: 404 });
+          }
+          seatsAvailable = 1;
+
+          const houseNum = houseDistrict ? formatDistrictNumber(houseDistrict) : null;
+          const senateNum = senateDistrict ? formatDistrictNumber(senateDistrict) : null;
+          const race = rows[0];
+          const geoEligible =
+            ['Federal', 'Statewide', 'Judicial Retention'].includes(race.race_category) ||
+            (race.district_type === 'state_house' && houseNum && race.district_number === houseNum) ||
+            (race.district_type === 'state_senate' && senateNum && race.district_number === senateNum);
+          if (!geoEligible) {
+            return jsonResponse({ error: 'This race is not available for your district.', code: 'NOT_ELIGIBLE' }, { status: 403 });
+          }
+          for (const slug of candidateSlugs) {
+            const row = rows.find((r) => r.candidate_slug === slug);
+            if (row && !isPartyEligible(politicalParty, row.candidate_party)) {
+              return jsonResponse({ error: 'This candidate is not available for your registered party.', code: 'NOT_ELIGIBLE' }, { status: 403 });
+            }
+          }
+          for (const row of rows) candidateById.set(row.candidate_slug, row.wy_candidate_id);
+        }
+
+        if (seatsAvailable === 1 && candidateSlugs.length !== 1) {
+          return jsonResponse({ error: 'candidate_slug is required for this race' }, { status: 400 });
+        }
+        if (candidateSlugs.length > seatsAvailable) {
+          return jsonResponse({ error: `This race allows at most ${seatsAvailable} selection(s).`, code: 'TOO_MANY_SELECTIONS' }, { status: 400 });
+        }
+        for (const slug of candidateSlugs) {
+          if (!candidateById.has(slug)) {
+            return jsonResponse({ error: 'Candidate not found for this race' }, { status: 404 });
+          }
+        }
+
+        const now = nowIso();
+        if (candidateSlugs.length) {
+          const placeholders = candidateSlugs.map(() => '?').join(', ');
+          await env.DB.prepare(
+            `DELETE FROM poll_responses
+             WHERE poll_slug = ? AND voter_id = ? AND race_slug = ? AND candidate_slug NOT IN (${placeholders})`
+          ).bind(pollSlug, voterId, raceSlug, ...candidateSlugs).run();
+        } else {
+          await env.DB.prepare(
+            `DELETE FROM poll_responses WHERE poll_slug = ? AND voter_id = ? AND race_slug = ?`
+          ).bind(pollSlug, voterId, raceSlug).run();
+        }
+        for (const slug of candidateSlugs) {
+          await env.DB.prepare(`
+            INSERT INTO poll_responses (poll_slug, voter_id, race_slug, candidate_slug, wy_candidate_id, chosen, updated_at, created_at)
+            VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+            ON CONFLICT(poll_slug, voter_id, race_slug, candidate_slug) DO UPDATE SET
+              chosen = 1,
+              updated_at = excluded.updated_at
+          `).bind(pollSlug, voterId, raceSlug, slug, candidateById.get(slug), now, now).run();
+        }
+
+        return jsonResponse({ ok: true, race_slug: raceSlug, candidate_slugs: candidateSlugs });
+      } catch (err) {
+        console.error('[POST /api/poll/vote]', err.message);
+        return jsonResponse({ error: err.message }, { status: 500 });
+      }
+    }
+
+    // GET /api/poll/results/<race_slug>?poll_slug=2026-primary
+    // Public, no auth. Checks poll_config.results_visible FIRST, before running any
+    // aggregate query -- results must never be computed then withheld (that would do
+    // wasted work, and risks a code path that leaks totals before the reveal decision
+    // is made). Reuses the module-level MIN_PUBLISH_N (defined once above for
+    // /api/ballot/solidarity) rather than a second hardcoded "10" literal.
+    if (request.method === 'GET' && pathParts[0] === 'api' && pathParts[1] === 'poll' && pathParts[2] === 'results' && pathParts[3]) {
+      try {
+        if (!env.DB) return jsonResponse({ error: 'DB unavailable' }, { status: 503 });
+
+        const raceSlug = pathParts[3];
+        const pollSlug = url.searchParams.get('poll_slug') || '2026-primary';
+
+        const config = await env.DB.prepare(
+          `SELECT results_visible FROM poll_config WHERE poll_slug = ?`
+        ).bind(pollSlug).first();
+        if (!config || !config.results_visible) {
+          return jsonResponse({ ok: true, race_slug: raceSlug, visible: false });
+        }
+
+        const raceRow = await env.DB.prepare(
+          `SELECT DISTINCT race_title FROM race_candidates WHERE race_slug = ? AND is_active = 1`
+        ).bind(raceSlug).first();
+        if (!raceRow) {
+          return jsonResponse({ error: 'Race not found' }, { status: 404 });
+        }
+
+        const countRows = await env.DB.prepare(`
+          SELECT pr.candidate_slug, rc.candidate_name, COUNT(*) AS n
+          FROM poll_responses pr
+          JOIN race_candidates rc ON rc.race_slug = pr.race_slug AND rc.candidate_slug = pr.candidate_slug
+          WHERE pr.poll_slug = ? AND pr.race_slug = ? AND pr.chosen = 1
+          GROUP BY pr.candidate_slug
+        `).bind(pollSlug, raceSlug).all();
+
+        const rows = countRows.results ?? [];
+        const total = rows.reduce((sum, r) => sum + r.n, 0);
+        const show = total >= MIN_PUBLISH_N;
+        const candidates = show
+          ? rows
+              .map((r) => ({
+                candidate_slug: r.candidate_slug,
+                candidate_name: r.candidate_name,
+                chosen_count: r.n,
+                pct: Math.round((r.n / total) * 1000) / 10,
+              }))
+              .sort((a, b) => b.chosen_count - a.chosen_count)
+          : [];
+
+        return jsonResponse({
+          ok: true,
+          visible: true,
+          race_slug: raceSlug,
+          race_title: raceRow.race_title,
+          total_responses: total,
+          show,
+          candidates,
+        });
+      } catch (err) {
+        console.error('[GET /api/poll/results]', err.message);
         return jsonResponse({ error: err.message }, { status: 500 });
       }
     }
